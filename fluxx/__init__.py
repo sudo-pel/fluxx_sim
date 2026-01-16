@@ -164,17 +164,5 @@ class Game:
         while self.winner == -1:
             self.start_of_turn()
 
-    # fluxx game flow
-    # (1) start of turn: apply start-of-turn rule effects
-    # (2) end-of-turn conditions reached?
-    #   YES: end turn: go to (3)
-    #   NO: prompt player game action
-    #       apply player game action (see below)
-    #       return to (2)
-    # (3) apply end of turn effects
-    # reset player turn stats (cards_drawn, cards_played, etc.)
-    # increment self.turn
-    # go to (1)
-
 # test
 new_game = Game()
