@@ -1,7 +1,4 @@
 # begin with implementing a two-player game.
-
-# card data is stored as an integer ID, which maps to relevant information
-from enum import Enum
 import random
 from typing import Optional
 
@@ -24,47 +21,100 @@ class Game:
         self.draw_pile: list[Card] = []
         self.force_turn_over: bool = False
         self.winner = -1
+        self.deck = deck # for now, not the same as draw_pile
 
     def get_draw_rules(self):
         """Calculate, based on cards in play, how many cards should be drawn by a player."""
         draw = 0
         for rule in self.rules:
-            draw += rule.draw
+            if rule.draw:
+                draw += rule.draw
+
+        if draw == 0:
+            draw = 1 # basic rule
+
         return draw
 
     def get_play_rules(self, player_number: int):
         """Calculate, based on cards in play, how many cards should be played by a player."""
         play = 0
         for rule in self.rules:
-            play += rule.play
+            if rule.play:
+                play += rule.play
+
+        if play == 0:
+            play = 1 # basic rule
+
         return play
 
-    def can_play_card(self, player: Player, i: int) -> bool:
+    def get_keeper_limit(self, player_number: Optional[int]=None) -> Optional[int]:
+        """Calculate how many keepers may be in play."""
+        limit = None
+        for rule in self.rules:
+            if rule.keeper_limit is not None:
+                limit = rule.keeper_limit
+
+        return limit
+
+    def get_hand_limit(self, player_number: Optional[int]=None) -> Optional[int]:
+        """Calculate how many cards may be held in hand."""
+        limit = None
+        for rule in self.rules:
+            if rule.hand_limit is not None:
+                limit = rule.hand_limit
+
+        return limit
+
+    def can_play_card(self, player_number: int, i: int) -> bool:
         """
         Check whether a player can play a given card in their hand.
 
         Does not include input validation (checking whether 'i' is in range of hand array)
         """
-        if player.cards_played >= self.get_play_rules():
+        player = self.players[player_number]
+
+        if player.cards_played >= self.get_play_rules(player_number):
             return False
 
         card_to_play = player.hand[i]
 
         return True
 
+    def discard_card(self, player: Player, card_to_discard: int):
+        self.discard_pile.append(player.hand[card_to_discard])
+        del player.hand[card_to_discard]
+
+    def discard_keeper(self, player: Player, keeper_to_discard: int):
+        self.discard_pile.append(player.keepers[keeper_to_discard])
+        del player.keepers[keeper_to_discard]
+
+    def limit_check_player(self, player_number: int):
+        player = self.players[player_number]
+
+        keeper_limit = self.get_keeper_limit()
+        hand_limit = self.get_hand_limit()
+
+        while keeper_limit and len(player.keepers) > keeper_limit:
+            keeper_to_discard = self.agents[player_number].discard_keeper(self.get_game_state())
+            self.discard_keeper(player, keeper_to_discard)
+
+        while hand_limit and len(player.hand) > hand_limit:
+            card_to_discard = self.agents[player_number].discard_from_hand(self.get_game_state())
+            self.discard_card(player, card_to_discard)
+
     def play_rule(self, player: Player, card_played: Rule):
         # Discard contradictory rules
         contradictory_rules = []
         possible_contradictions = ["draw", "play", "keeper_limit", "hand_limit"]
         for option in possible_contradictions:
-            if card_played[option] > 0:
+            if card_played[option]:
                 contradictory_rules.append(option)
 
         new_rules = []
         for rule in self.rules:
             contradictory = False
             for option in contradictory_rules:
-                if rule[option] > 0:
+                if rule[option]:
                     contradictory = True
                     break
 
@@ -76,7 +126,12 @@ class Game:
         # Add new rule
         self.rules.append(card_played)
 
-        # TODO: Rule immediate effects
+        # Rule immediate effects (limits)
+        for i, cur_player in enumerate(self.players):
+            if cur_player == player:
+                continue
+
+            self.limit_check_player(i)
 
         # TODO: Rule special effects
 
@@ -90,6 +145,7 @@ class Game:
         for i, player in enumerate(self.players):
             keeper_names = [card.name for card in player.hand if card.card_type == CardType.KEEPER]
             if goal_keepers <= set(keeper_names):
+                print(f"[[ THE GAME HAS BEEN WON BY PLAYER {i} !!! ]]")
                 self.winner = i
 
         # TODO: special goal cards (cards in hand, etc)
@@ -114,6 +170,7 @@ class Game:
         """Play a card. Does not include validation."""
         card_to_play = player.hand[i]
 
+        self.discard_pile.append(player.hand[i])
         del player.hand[i]
         player.cards_played += 1
 
@@ -129,8 +186,9 @@ class Game:
             raise Exception("Invalid card type")
 
     def draw(self, player: Player):
-        """Draw a card from the deck and add it to the hand of player 'player'."""
+        """Draw a card from the deck and add it to the hand of player 'player'. Does NOT increment player.cards_drawn"""
         card_drawn = self.draw_pile.pop()
+        print(f"[[ DRAWN '{card_drawn.name}' ]]")
 
         player.hand.append(card_drawn)
 
@@ -146,18 +204,28 @@ class Game:
         # start-of-turn rule effects
         # draw
         draw_amount = self.get_draw_rules()
+        print(f"draw amoount: {draw_amount}")
         # tba: special case re "play all but 1"
 
         # TODO: special start of turn effects
 
-        for i in range(draw_amount):
+        while turn_player.cards_drawn < draw_amount:
             self.draw(turn_player)
+            turn_player.cards_drawn += 1
 
     def end_of_turn(self):
         """Apply end of turn effects. Reset player turn stats like cards_played."""
         turn_player = self.players[self.player_turn]
 
         # end-of-turn rule effects
+
+        # end-of-turn limit checks
+        self.limit_check_player(self.player_turn)
+
+        # reset turn statistics
+        turn_player.cards_drawn = 0
+        turn_player.cards_played = 0
+        self.force_turn_over = False
 
         self.player_turn = (self.player_turn + 1) % self.player_count
         self.turn_count += 1
@@ -168,8 +236,8 @@ class Game:
         turn_player = self.players[self.player_turn]
 
         plays = self.get_play_rules(self.player_turn)
-
-        if plays >= turn_player.cards_played:
+        print(f"plays: {turn_player.cards_played}")
+        if plays <= turn_player.cards_played:
             return True
 
         return self.force_turn_over
@@ -180,36 +248,41 @@ class Game:
             "player_count": self.player_count,
             "players": self.players,
             "goal": self.goal,
-            "rules": self.rules
+            "rules": self.rules,
+            "player_turn": self.player_turn
         }
 
     def run_game(self):
         """Run the game."""
+        random.shuffle(self.deck)
+        self.draw_pile = self.deck
+
         while self.winner == -1:
             turn_agent = self.agents[self.player_turn]
             turn_player = self.players[self.player_turn]
 
             self.start_of_turn()
 
-            """
-            NOT IMPLEMENTED
-            
-            free_action = turn_agent.play_free_action()
-            while free_action:
-                # play free action
+            while True:
+                """
+                NOT IMPLEMENTED
+
                 free_action = turn_agent.play_free_action()
-            """
+                while free_action:
+                    # play free action
+                    free_action = turn_agent.play_free_action()
+                """
 
-            if self.player_turn_over():
-                self.end_of_turn()
-                continue
+                if self.player_turn_over():
+                    self.end_of_turn()
+                    break
 
-            played_card = turn_agent.play_card(self.get_game_state())
+                played_card = turn_agent.play_card(self.get_game_state())
 
-            if not self.can_play_card(turn_player, self.player_turn):
-                raise Exception("Illegal action selected!")
+                if not self.can_play_card(self.player_turn, played_card):
+                    raise Exception("Illegal action selected!")
 
-            self.play_card(turn_player, played_card)
+                self.play_card(turn_player, played_card)
 
 
 

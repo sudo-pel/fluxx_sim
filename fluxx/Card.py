@@ -22,7 +22,7 @@ special? (bool)
     For Rule cards with complex text.
 """
 class RulesOptions:
-    def __init__(self, draw=0, play=0, keeper_limit=0, hand_limit=0, special=False):
+    def __init__(self, draw=None, play=None, keeper_limit=None, hand_limit=None, special=False):
         self.draw = draw
         self.play = play
         self.keeper_limit = keeper_limit
