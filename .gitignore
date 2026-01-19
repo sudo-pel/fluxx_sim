@@ -1,0 +1,9 @@
+# created by virtualenv automatically
+.venv/bin
+
+# pycharm files
+__pychache__/
+.idea/
+*.pyc
+.env
+venv/
