@@ -10,6 +10,12 @@ Relevant agent choice points:
 import abc
 
 class Agent(metaclass=abc.ABCMeta):
+    def __init__(self):
+        self.player_number = -1
+
+    def set_player_number(self, number: int):
+        self.player_number = number
+
     @classmethod
     def __subclasshook__(cls, subclass):
         return (

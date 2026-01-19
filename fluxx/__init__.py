@@ -11,7 +11,7 @@ from Agents.PlayerControlled import PlayerControlledAgent
 class Game:
     def __init__(self, player_agents: list[Agent], deck: list[Card]):
         self.player_count: int = len(player_agents)
-        self.players: list[Player] = [Player(i) for i in range(self.player_count)]
+        self.players: list[Player] = []
         self.agents: list[Agent] = player_agents
         self.rules: list[Rule] = []
         self.player_turn: int = 0
@@ -22,6 +22,10 @@ class Game:
         self.force_turn_over: bool = False
         self.winner = -1
         self.deck = deck # for now, not the same as draw_pile
+
+        for i, agent in enumerate(self.agents):
+            agent.set_player_number(i)
+            self.players.append(Player(i))
 
     def get_draw_rules(self):
         """Calculate, based on cards in play, how many cards should be drawn by a player."""
@@ -94,11 +98,11 @@ class Game:
         keeper_limit = self.get_keeper_limit()
         hand_limit = self.get_hand_limit()
 
-        while keeper_limit and len(player.keepers) > keeper_limit:
+        while keeper_limit is not None and len(player.keepers) > keeper_limit:
             keeper_to_discard = self.agents[player_number].discard_keeper(self.get_game_state())
             self.discard_keeper(player, keeper_to_discard)
 
-        while hand_limit and len(player.hand) > hand_limit:
+        while hand_limit is not None and len(player.hand) > hand_limit:
             card_to_discard = self.agents[player_number].discard_from_hand(self.get_game_state())
             self.discard_card(player, card_to_discard)
 
@@ -114,8 +118,9 @@ class Game:
         for rule in self.rules:
             contradictory = False
             for option in contradictory_rules:
-                if rule[option]:
+                if rule[option] is not None:
                     contradictory = True
+                    self.discard_pile.append(rule)
                     break
 
             if not contradictory:
@@ -143,7 +148,7 @@ class Game:
         goal_keepers = set(self.goal.required_keepers)
 
         for i, player in enumerate(self.players):
-            keeper_names = [card.name for card in player.hand if card.card_type == CardType.KEEPER]
+            keeper_names = [card.name for card in player.keepers if card.card_type == CardType.KEEPER]
             if goal_keepers <= set(keeper_names):
                 print(f"[[ THE GAME HAS BEEN WON BY PLAYER {i} !!! ]]")
                 self.winner = i
@@ -152,6 +157,8 @@ class Game:
 
     def play_goal(self, player: Player, goal: Goal):
         """Play a goal card. Does not perform validation."""
+        if self.goal:
+            self.discard_pile.append(self.goal)
         self.goal = goal
 
         # Check whether any player has won the game
@@ -167,10 +174,9 @@ class Game:
         pass
 
     def play_card(self, player: Player, i: int):
-        """Play a card. Does not include validation."""
+        """Play a card. Does not include validation. Does NOT discard the card played"""
         card_to_play = player.hand[i]
 
-        self.discard_pile.append(player.hand[i])
         del player.hand[i]
         player.cards_played += 1
 
@@ -197,14 +203,14 @@ class Game:
             self.draw_pile = self.discard_pile
             self.discard_pile = []
 
-    def start_of_turn(self):
-        """Apply start of turn effects, including drawing."""
+    def draw_for_turn(self):
+        """Draw cards for the turn player."""
         turn_player = self.players[self.player_turn]
 
         # start-of-turn rule effects
         # draw
         draw_amount = self.get_draw_rules()
-        print(f"draw amoount: {draw_amount}")
+        print(f"draw amount: {draw_amount}")
         # tba: special case re "play all but 1"
 
         # TODO: special start of turn effects
@@ -212,6 +218,11 @@ class Game:
         while turn_player.cards_drawn < draw_amount:
             self.draw(turn_player)
             turn_player.cards_drawn += 1
+            print(f"drawn {turn_player.cards_drawn}/{draw_amount}")
+
+    def start_of_turn(self):
+        """Apply start of turn effects, including drawing."""
+        self.draw_for_turn()
 
     def end_of_turn(self):
         """Apply end of turn effects. Reset player turn stats like cards_played."""
@@ -235,9 +246,14 @@ class Game:
         """Check whether a players turn is over, based on cards played."""
         turn_player = self.players[self.player_turn]
 
+        # turn over if out of plays
         plays = self.get_play_rules(self.player_turn)
         print(f"plays: {turn_player.cards_played}")
         if plays <= turn_player.cards_played:
+            return True
+
+        # turn over if out of cards in hand + no free actions
+        if len(turn_player.hand) == 0: # TODO: free actions check
             return True
 
         return self.force_turn_over
@@ -276,6 +292,8 @@ class Game:
                 if self.player_turn_over():
                     self.end_of_turn()
                     break
+
+                self.draw_for_turn()
 
                 played_card = turn_agent.play_card(self.get_game_state())
 
