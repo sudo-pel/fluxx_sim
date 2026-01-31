@@ -7,6 +7,8 @@ from Card import CardType, Card, Rule, Goal, Keeper, Action, RulesOptions
 from Player import Player
 from Agents.Agent import Agent
 from Agents.PlayerControlled import PlayerControlledAgent
+from fluxx.Cards import action_cards
+
 
 class Game:
     def __init__(self, player_agents: list[Agent], deck: list[Card]):
@@ -16,7 +18,7 @@ class Game:
         self.rules: list[Rule] = []
         self.player_turn: int = 0
         self.turn_count: int = 0
-        self.goal: Optional[Goal] = None
+        self.goals: list[Goal] = []
         self.discard_pile: list[Card] = []
         self.draw_pile: list[Card] = []
         self.force_turn_over: bool = False
@@ -26,6 +28,10 @@ class Game:
         for i, agent in enumerate(self.agents):
             agent.set_player_number(i)
             self.players.append(Player(i))
+
+    def game_message(self, message):
+        print(f"\033[96m{message}\033[0m")
+        # TODO: move this elsewhere (some kind of prompt module, it doesnt need to be here)
 
     def get_draw_rules(self):
         """Calculate, based on cards in play, how many cards should be drawn by a player."""
@@ -106,7 +112,9 @@ class Game:
             card_to_discard = self.agents[player_number].discard_from_hand(self.get_game_state())
             self.discard_card(player, card_to_discard)
 
-    def play_rule(self, player: Player, card_played: Rule):
+    def play_rule(self, player_number: int, card_played: Rule):
+        player = self.players[player_number]
+
         # Discard contradictory rules
         contradictory_rules = []
         possible_contradictions = ["draw", "play", "keeper_limit", "hand_limit"]
@@ -142,66 +150,86 @@ class Game:
 
     def check_for_winners(self):
         """Check whether any players have won the game. If so, change 'winner' member variable"""
-        if not self.goal:
+        if not self.goals:
             return
 
-        goal_keepers = set(self.goal.required_keepers)
+        for current_goal in self.goals:
+            goal_keepers = set(current_goal.required_keepers)
 
-        for i, player in enumerate(self.players):
-            keeper_names = [card.name for card in player.keepers if card.card_type == CardType.KEEPER]
-            if goal_keepers <= set(keeper_names):
-                print(f"[[ THE GAME HAS BEEN WON BY PLAYER {i} !!! ]]")
-                self.winner = i
+            for i, player in enumerate(self.players):
+                keeper_names = [card.name for card in player.keepers if card.card_type == CardType.KEEPER]
+                if goal_keepers <= set(keeper_names):
+                    print(f"[[ THE GAME HAS BEEN WON BY PLAYER {i} !!! ]]")
+                    self.winner = i
+                    return
 
-        # TODO: special goal cards (cards in hand, etc)
+            # TODO: special goal cards (cards in hand, etc)
 
-    def play_goal(self, player: Player, goal: Goal):
+    def play_goal(self, player_number: int, goal: Goal):
+        player = self.players[player_number]
+
         """Play a goal card. Does not perform validation."""
-        if self.goal:
-            self.discard_pile.append(self.goal)
-        self.goal = goal
+        if len(self.goals) == 1:
+            self.discard_pile.append(self.goals[0])
+            del self.goals[0]
+
+        self.goals.append(goal)
 
         # Check whether any player has won the game
         self.check_for_winners()
 
-    def play_keeper(self, player: Player, keeper: Keeper):
+    def play_keeper(self, player_number: int, keeper: Keeper):
         """Play a keeper card. Does not perform validation."""
+        player = self.players[player_number]
+
         player.keepers.append(keeper)
 
         self.check_for_winners()
 
-    def play_action(self, player: Player, action: Action):
-        pass
+    def play_action(self, player_number: int, action: Action):
+        action_cards.activate_action(action.name, self, player_number)
 
-    def play_card(self, player: Player, i: int):
+    def activate_card(self, player_number: int, card_to_play):
+        """Activate a card. Is the result of 'playing a card', but is not the same thing as it"""
+        if card_to_play.card_type == CardType.ACTION:
+            self.play_action(player_number, card_to_play)
+        elif card_to_play.card_type == CardType.RULE:
+            self.play_rule(player_number, card_to_play)
+        elif card_to_play.card_type == CardType.GOAL:
+            self.play_goal(player_number, card_to_play)
+        elif card_to_play.card_type == CardType.KEEPER:
+            self.play_keeper(player_number, card_to_play)
+        else:
+            raise Exception("Invalid card type")
+
+    def play_card(self, player_number: int, i: int):
+        player = self.players[player_number]
+
         """Play a card. Does not include validation. Discards card from player hand but does NOT add it to the discard pile"""
         card_to_play = player.hand[i]
 
         del player.hand[i]
         player.cards_played += 1
 
-        if card_to_play.card_type == CardType.ACTION:
-            self.play_action(player, card_to_play)
-        elif card_to_play.card_type == CardType.RULE:
-            self.play_rule(player, card_to_play)
-        elif card_to_play.card_type == CardType.GOAL:
-            self.play_goal(player, card_to_play)
-        elif card_to_play.card_type == CardType.KEEPER:
-            self.play_keeper(player, card_to_play)
-        else:
-            raise Exception("Invalid card type")
+        self.activate_card(player_number, card_to_play)
 
-    def draw(self, player: Player):
-        """Draw a card from the deck and add it to the hand of player 'player'. Does NOT increment player.cards_drawn"""
+    def get_card_from_draw_pile(self) -> Card:
+        """Get a card from the draw pile. Not the same as drawing a card."""
         card_drawn = self.draw_pile.pop()
         print(f"[[ DRAWN '{card_drawn.name}' ]]")
-
-        player.hand.append(card_drawn)
 
         if not self.draw_pile:
             random.shuffle(self.discard_pile)
             self.draw_pile = self.discard_pile
             self.discard_pile = []
+
+        return card_drawn
+
+    def draw(self, player: Player):
+        """Draw a card from the deck and add it to the hand of player 'player'. Does NOT increment player.cards_drawn"""
+        card_drawn = self.get_card_from_draw_pile()
+
+        player.hand.append(card_drawn)
 
     def draw_for_turn(self):
         """Draw cards for the turn player."""
@@ -210,7 +238,6 @@ class Game:
         # start-of-turn rule effects
         # draw
         draw_amount = self.get_draw_rules()
-        print(f"draw amount: {draw_amount}")
         # tba: special case re "play all but 1"
 
         # TODO: special start of turn effects
@@ -218,7 +245,6 @@ class Game:
         while turn_player.cards_drawn < draw_amount:
             self.draw(turn_player)
             turn_player.cards_drawn += 1
-            print(f"drawn {turn_player.cards_drawn}/{draw_amount}")
 
     def start_of_turn(self):
         """Apply start of turn effects, including drawing."""
@@ -248,7 +274,6 @@ class Game:
 
         # turn over if out of plays
         plays = self.get_play_rules(self.player_turn)
-        print(f"plays: {turn_player.cards_played}")
         if plays <= turn_player.cards_played:
             return True
 
@@ -263,15 +288,24 @@ class Game:
         return {
             "player_count": self.player_count,
             "players": self.players,
-            "goal": self.goal,
+            "goals": self.goals,
             "rules": self.rules,
             "player_turn": self.player_turn
         }
 
     def run_game(self):
         """Run the game."""
-        random.shuffle(self.deck)
+
+        # TODO: AUGMENTED GAME START RULES FOR TESTING PURPOSES
         self.draw_pile = self.deck
+        for p in range(len(self.players)):
+            for i in range(5):
+                self.draw(self.players[p])
+
+        random.shuffle(self.draw_pile)
+
+        #random.shuffle(self.deck)
+        #self.draw_pile = self.deck
 
         while self.winner == -1:
             turn_agent = self.agents[self.player_turn]
@@ -300,7 +334,7 @@ class Game:
                 if not self.can_play_card(self.player_turn, played_card):
                     raise Exception("Illegal action selected!")
 
-                self.play_card(turn_player, played_card)
+                self.play_card(self.player_turn, played_card)
 
 
 
@@ -365,7 +399,17 @@ test_deck = [
     Goal("toast", ["bread", "the_toasted"]),
     Goal("turn_it_up", ["music", "the_party"]),
     Goal("winning_the_lottery", ["dreams", "money"]),
-    Goal("world_peace", ["dreams", "peace"])
+    Goal("world_peace", ["dreams", "peace"]),
+
+    Action("use_what_you_take"),
+    Action("zap_a_card"),
+    Action("trash_a_new_rule"),
+    Action("trash_a_keeper"),
+    Action("trade_hands"),
+    Action("todays_special"),
+    Action("draw_2_and_use_em"),
+    Action("draw_3_play_2_of_them"),
+
 ]
 new_game = Game([PlayerControlledAgent(), PlayerControlledAgent()], test_deck)
 new_game.run_game()

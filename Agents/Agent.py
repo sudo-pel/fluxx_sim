@@ -46,3 +46,15 @@ class Agent(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def discard_from_hand(self, game_state):
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def select_card(self, game_state, selection):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def select_player_besides_self(self, game_state):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def select_card_to_play(self, game_state, selection):
+        raise NotImplementedError

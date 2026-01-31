@@ -1,4 +1,9 @@
 from Agents.Agent import Agent
+from itertools import chain
+
+max_row_size = 30
+ui_size = 94
+col_size = 30
 
 class PlayerControlledAgent(Agent):
     def play_free_action(self, game_state):
@@ -16,27 +21,75 @@ class PlayerControlledAgent(Agent):
         self.printout_state(game_state)
         return int(input("Please choose a CARD to discard from HAND >>"))
 
+    def select_card(self, game_state, selection):
+        for card_name in selection:
+            print(card_name)
+
+        return input("Please choose a CARD (type the name) from the following above >>")
+
+    def select_player_besides_self(self, game_state):
+        player_numbers = [i for i in range(len(game_state.players))]
+        del player_numbers[self.player_number]
+
+        return int(input(f"Please choose a PLAYER NUMBER from the following: {player_numbers}>>"))
+
+    def select_card_to_play(self, game_state, selection):
+        for i, card in enumerate(selection):
+            print(f"({i}) - {card.name}")
+
+        return int(input(f"Please choose a CARD NUMBER from the following above >>"))
+
     def printout_state(self, game_state):
-        print("\n\n---GOALS IN PLAY---")
-        # print("\n".join([g.name for g in game_state["goal"]]))
-        string = "None"
-        if game_state["goal"]:
-            string = game_state["goal"].name
-        print(string)
+        """Print out the game state"""
 
-        print("---RULES IN PLAY---")
-        print("\n".join([r.name for r in game_state["rules"]]))
+        goals = [g.name for g in game_state["goals"]]
 
-        print("---KEEPERS IN PLAY---")
+        rules = [r.name for r in game_state["rules"]]
+        player_keepers = [[k.name for k in player.keepers] for player in game_state["players"]]
+        hand = [f"({i}) - {c.name}" for i, c in enumerate(game_state["players"][self.player_number].hand)]
+
+        enemy_keepers = []
         for i, player in enumerate(game_state["players"]):
-            string = f"-Player {i}"
             if i == self.player_number:
-                string += " (you)-"
-            else:
-                string += "-"
-            print(string)
-            print("\n".join([k.name for k in player.keepers]))
+                continue
+            enemy_keepers.append(f" ***PLAYER {i} KEEPERS***")
+            for keeper in player.keepers:
+                enemy_keepers.append(keeper.name)
 
-        print("---CARDS IN HAND---")
-        print("\n".join([c.name for c in game_state["players"][self.player_number].hand]))
+        output_string: list[str] = []
+
+        output_string.append("-" * ui_size)
+        output_string.append("|" + " " * (ui_size - 2) + "|")
+
+        def make_row(column: int, content: str):
+            if column == 0:
+                new_row = "|"
+            else:
+                new_row = ("|" + " " * col_size) * column
+            new_row += content
+            output_string.append(new_row)
+
+        def add_to_row(column: int, row_data: list[str]):
+            """Only call once per column."""
+            for i, row in enumerate(row_data):
+                if i > len(output_string) - 3:
+                    make_row(column, (row + " " * (max_row_size - len(row)) + "|"))
+                else:
+                    row_to_append_to = output_string[i+2]
+                    output_string[i+2] = row_to_append_to + (row + " " * (max_row_size - len(row)) + "|")
+
+            # pad unfilled columns
+            for i in range(len(row_data) + 2, len(output_string)):
+                row_to_append_to = output_string[i]
+                output_string[i] = row_to_append_to + (" " * max_row_size + "|")
+
+        add_to_row(0, [" ***HAND***"] + hand + ["", " ***KEEPERS***"] + player_keepers[self.player_number])
+        add_to_row(1, enemy_keepers)
+        add_to_row(2, [" ***GOAL***"] + goals + ["", " ***RULES***"] + rules)
+
+        output_string.append("-" * ui_size)
+
+        for row in output_string:
+            print(row)
+
 
