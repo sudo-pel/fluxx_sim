@@ -174,7 +174,7 @@ class Game:
         pass
 
     def play_card(self, player: Player, i: int):
-        """Play a card. Does not include validation. Does NOT discard the card played"""
+        """Play a card. Does not include validation. Discards card from player hand but does NOT add it to the discard pile"""
         card_to_play = player.hand[i]
 
         del player.hand[i]
