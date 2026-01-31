@@ -56,5 +56,5 @@ class Agent(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def select_card_to_play(self, game_state, selection):
+    def select_card_to_play(self, game_state, selection) -> int:
         raise NotImplementedError

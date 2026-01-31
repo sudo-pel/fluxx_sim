@@ -188,6 +188,7 @@ class Game:
 
     def play_action(self, player_number: int, action: Action):
         action_cards.activate_action(action.name, self, player_number)
+        self.discard_pile.append(action)
 
     def activate_card(self, player_number: int, card_to_play):
         """Activate a card. Is the result of 'playing a card', but is not the same thing as it"""
@@ -401,14 +402,26 @@ test_deck = [
     Goal("winning_the_lottery", ["dreams", "money"]),
     Goal("world_peace", ["dreams", "peace"]),
 
-    Action("use_what_you_take"),
-    Action("zap_a_card"),
-    Action("trash_a_new_rule"),
-    Action("trash_a_keeper"),
-    Action("trade_hands"),
-    Action("todays_special"),
+    #Action("use_what_you_take"),
+    #Action("zap_a_card"),
+    #Action("trash_a_new_rule"),
+    #Action("trash_a_keeper"),
+    #Action("trade_hands"),
+    #Action("todays_special"),
     Action("draw_2_and_use_em"),
     Action("draw_3_play_2_of_them"),
+    #Action("steal_a_keeper"),
+    #Action("share_the_wealth"),
+    #Action("rules_reset"),
+    #Action("rock_paper_scissors_showdown"),
+    #Action("random_tax"),
+    #Action("no_limits"),
+    #Action("lets_simplify"),
+    #Action("lets_do_that_again"),
+    #Action("jackpot"),
+    Action("exchange_keepers"),
+    Action("empty_the_trash"),
+    Action("discard_and_draw"),
 
 ]
 new_game = Game([PlayerControlledAgent(), PlayerControlledAgent()], test_deck)
