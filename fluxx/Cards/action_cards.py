@@ -323,6 +323,49 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
         for i in range(draw_amount):
             game_state.draw(user_player)
 
+    elif action_name == "everybody_gets_1":
+        latent_card_pile = [game_state.get_card_from_draw_pile() for i in range(len(game_state.players))]
+        player_set = [player.id for player in game_state.players]
 
+        for card in latent_card_pile:
+            game_state.game_message(f"<< Drawn {card.name} >>")
+
+        while player_set:
+            current_card = latent_card_pile.pop()
+            game_state.game_message(f"Please select a player to receive << {current_card.name} >>:")
+            chosen_player_number = player_agent.select_player_from_set(game_state, player_set)
+
+            chosen_player = game_state.players[chosen_player_number]
+            chosen_player.hand.append(current_card)
+
+            del player_set[chosen_player_number]
+
+    elif action_name == "take_another_turn":
+        game_state.game_message("<< Extra turn! >>")
+        game_state.extra_turn = True
+
+    elif action_name == "rotate_hands":
+        rotation_direction = player_agent.select_player_rotation_direction(game_state)
+        n = len(game_state.players)
+
+        current_index = 0
+        temp = game_state.players[current_index].hand
+        for i in range(n):
+            next_index = current_index + rotation_direction
+            if next_index == -1:
+                next_index = n-1
+            elif next_index == n:
+                next_index = 0
+
+            swap = game_state.players[next_index].hand
+
+            game_state.players[next_index].hand = temp
+            temp = swap
+
+            current_index = (current_index + rotation_direction) % n
+            if current_index == -1:
+                current_index = n-1
+            elif current_index == n:
+                current_index = 0
     else:
         raise Exception(f"Error: Action [[{action_name}]] not implemented")

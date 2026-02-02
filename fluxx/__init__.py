@@ -24,6 +24,7 @@ class Game:
         self.force_turn_over: bool = False
         self.winner = -1
         self.deck = deck # for now, not the same as draw_pile
+        self.extra_turn = False
 
         for i, agent in enumerate(self.agents):
             agent.set_player_number(i)
@@ -265,7 +266,11 @@ class Game:
         turn_player.cards_played = 0
         self.force_turn_over = False
 
-        self.player_turn = (self.player_turn + 1) % self.player_count
+        if not self.extra_turn:
+            self.player_turn = (self.player_turn + 1) % self.player_count
+        else:
+            self.extra_turn = False
+
         self.turn_count += 1
 
 
@@ -422,6 +427,9 @@ test_deck = [
     Action("exchange_keepers"),
     Action("empty_the_trash"),
     Action("discard_and_draw"),
+    Action("everybody_gets_1"),
+    Action("take_another_turn"),
+    Action("rotate_hands")
 
 ]
 new_game = Game([PlayerControlledAgent(), PlayerControlledAgent()], test_deck)

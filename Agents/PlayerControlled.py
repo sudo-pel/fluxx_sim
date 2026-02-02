@@ -33,11 +33,17 @@ class PlayerControlledAgent(Agent):
 
         return int(input(f"Please choose a PLAYER NUMBER from the following: {player_numbers}>>"))
 
+    def select_player_from_set(self, game_state, player_numbers: list[int]):
+        return int(input(f"Please choose a PLAYER NUMBER from the following: {player_numbers}"))
+
     def select_card_to_play(self, game_state, selection):
         for i, card in enumerate(selection):
             print(f"({i}) - {card.name}")
 
         return int(input(f"Please choose a CARD NUMBER from the following above >>"))
+
+    def select_player_rotation_direction(self, game_state):
+        return int(input("Please select a ROTATION DIRECTION (-1 = left, 1 = right) >>"))
 
     def printout_state(self, game_state):
         """Print out the game state"""
