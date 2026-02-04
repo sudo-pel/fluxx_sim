@@ -22,12 +22,12 @@ special? (bool)
     For Rule cards with complex text.
 """
 class RulesOptions:
-    def __init__(self, draw=None, play=None, keeper_limit=None, hand_limit=None, special=False):
+    def __init__(self, draw=None, play=None, keeper_limit=None, hand_limit=None, free_action=False):
         self.draw = draw
         self.play = play
         self.keeper_limit = keeper_limit
         self.hand_limit = hand_limit
-        self.special = special
+        self.free_action = free_action
 
 class Rule(Card):
     def __init__(self, name: str, rules_options: RulesOptions):
@@ -36,7 +36,7 @@ class Rule(Card):
         self.play = rules_options.play
         self.keeper_limit = rules_options.keeper_limit
         self.hand_limit = rules_options.hand_limit
-        self.special = rules_options.special
+        self.free_action = rules_options.free_action
 
     def __getitem__(self, key):
         if key == "draw":
@@ -47,8 +47,8 @@ class Rule(Card):
             return self.keeper_limit
         elif key == "hand_limit":
             return self.hand_limit
-        elif key == "special":
-            return self.special
+        elif key == "free_action":
+            return self.free_action
         else:
             raise Exception("Invalid key")
 

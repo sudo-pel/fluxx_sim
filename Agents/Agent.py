@@ -32,10 +32,6 @@ class Agent(metaclass=abc.ABCMeta):
         )
 
     @abc.abstractmethod
-    def play_free_action(self, game_state):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def play_card(self, game_state):
         raise NotImplementedError
 
@@ -65,4 +61,12 @@ class Agent(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def select_player_rotation_direction(self, game_state):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def play_free_action(self, game_state, available_free_actions: list[str]):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def choose_to_discard(self, game_state):
         raise NotImplementedError

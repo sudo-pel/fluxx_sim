@@ -8,6 +8,7 @@ from Player import Player
 from Agents.Agent import Agent
 from Agents.PlayerControlled import PlayerControlledAgent
 from fluxx.Cards import action_cards
+from fluxx.Cards.free_actions import can_use_free_action, activate_free_action
 
 
 class Game:
@@ -25,6 +26,7 @@ class Game:
         self.winner = -1
         self.deck = deck # for now, not the same as draw_pile
         self.extra_turn = False
+        self.played_free_actions = set()
 
         for i, agent in enumerate(self.agents):
             agent.set_player_number(i)
@@ -215,6 +217,8 @@ class Game:
 
         self.activate_card(player_number, card_to_play)
 
+        self.check_for_winners()
+
     def get_card_from_draw_pile(self) -> Card:
         """Get a card from the draw pile. Not the same as drawing a card."""
         card_drawn = self.draw_pile.pop()
@@ -265,6 +269,7 @@ class Game:
         turn_player.cards_drawn = 0
         turn_player.cards_played = 0
         self.force_turn_over = False
+        self.played_free_actions = set()
 
         if not self.extra_turn:
             self.player_turn = (self.player_turn + 1) % self.player_count
@@ -299,6 +304,28 @@ class Game:
             "player_turn": self.player_turn
         }
 
+    def get_available_free_actions(self):
+        available_free_actions = []
+
+        for rule in self.rules:
+            if rule.free_action and can_use_free_action(rule.name, self, self.player_turn):
+                available_free_actions.append(rule.name)
+
+        return available_free_actions
+
+    def play_free_action(self, free_action_name):
+        activate_free_action(free_action_name, self, self.player_turn)
+        self.played_free_actions.add(free_action_name)
+
+        self.check_for_winners()
+
+    def rule_in_play(self, rule_name) -> bool:
+        for rule in self.rules:
+            if rule.name == rule_name:
+                return True
+
+        return False
+
     def run_game(self):
         """Run the game."""
 
@@ -320,15 +347,19 @@ class Game:
             self.start_of_turn()
 
             while True:
-                """
-                NOT IMPLEMENTED
+                if self.player_turn_over():
+                    self.end_of_turn()
+                    break
 
-                free_action = turn_agent.play_free_action()
-                while free_action:
-                    # play free action
-                    free_action = turn_agent.play_free_action()
-                """
+                available_free_actions = self.get_available_free_actions()
+                played_free_action = -1
+                while len(available_free_actions) > 0 and played_free_action is not None and not self.force_turn_over:
+                    played_free_action = turn_agent.play_free_action(self, available_free_actions)
+                    if played_free_action is not None:
+                        self.play_free_action(available_free_actions[played_free_action])
+                        available_free_actions = self.get_available_free_actions()
 
+                # Playing a free action can insta-end your turn
                 if self.player_turn_over():
                     self.end_of_turn()
                     break
@@ -429,7 +460,13 @@ test_deck = [
     Action("discard_and_draw"),
     Action("everybody_gets_1"),
     Action("take_another_turn"),
-    Action("rotate_hands")
+    Action("rotate_hands"),
+
+    Rule("mystery_play", RulesOptions(free_action=True)),
+    Rule("swap_plays_for_draws", RulesOptions(free_action=True)),
+    Rule("get_on_with_it", RulesOptions(free_action=True)),
+    Rule("recycling", RulesOptions(free_action=True)),
+    Rule("goal_mill", RulesOptions(free_action=True)),
 
 ]
 new_game = Game([PlayerControlledAgent(), PlayerControlledAgent()], test_deck)

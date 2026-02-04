@@ -6,9 +6,6 @@ ui_size = 94
 col_size = 30
 
 class PlayerControlledAgent(Agent):
-    def play_free_action(self, game_state):
-        pass
-
     def play_card(self, game_state):
         self.printout_state(game_state)
         return int(input("Please choose a card to play >> "))
@@ -44,6 +41,21 @@ class PlayerControlledAgent(Agent):
 
     def select_player_rotation_direction(self, game_state):
         return int(input("Please select a ROTATION DIRECTION (-1 = left, 1 = right) >>"))
+
+    def play_free_action(self, game_state, available_free_actions):
+        for i, action in enumerate(available_free_actions):
+            print(f"({i}) - {action}")
+        print(f"({len(available_free_actions)}) - No free action")
+
+        choice = int(input(f"Please choose a FREE ACTION to play (or none)"))
+
+        if choice == len(available_free_actions):
+            return None
+        else:
+            return choice
+
+    def choose_to_discard(self, game_state):
+        return int(input("Choose to discard? [[0: NO, 1: YES]]>>"))
 
     def printout_state(self, game_state):
         """Print out the game state"""
