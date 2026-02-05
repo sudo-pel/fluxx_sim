@@ -40,7 +40,7 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
 
         selected_card = get_selected_card(game_state, selected_card_location)
         user_player.hand.append(selected_card)
-        trash_selected_card(game_state, selected_card_location, False)
+        trash_selected_card(game_state, user_number, selected_card_location, False)
 
     elif action_name == "trash_a_new_rule":
         selected_card_location = select_card(game_state, user_number, ["rules"])
@@ -48,7 +48,7 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
         if selected_card_location is None:
             return
 
-        trash_selected_card(game_state, selected_card_location, True)
+        trash_selected_card(game_state, user_number, selected_card_location, True)
 
     elif action_name == "trash_a_keeper":
         selected_card_location = select_card(game_state, user_number, ["keepers"])
@@ -56,7 +56,7 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
         if selected_card_location is None:
             return
 
-        trash_selected_card(game_state, selected_card_location, True)
+        trash_selected_card(game_state, user_number, selected_card_location, True)
 
     elif action_name == "trade_hands":
         selected_player = player_agent.select_player_besides_self(game_state)
@@ -86,7 +86,7 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
 
         selected_card = get_selected_card(game_state, selected_card_location)
         user_player.keepers.append(selected_card)
-        trash_selected_card(game_state, selected_card_location, False)
+        trash_selected_card(game_state, user_number, selected_card_location, False)
 
     elif action_name == "share_the_wealth":
         all_keepers = [ keeper for player in game_state.players for keeper in player.keepers ]
@@ -146,13 +146,13 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
         to_discard = (len(game_state.rules)+1) // 2
         for i in range(to_discard):
             selected_card_location = select_card(game_state, user_number, ["rules"])
-            trash_selected_card(game_state, selected_card_location, True)
+            trash_selected_card(game_state, user_number, selected_card_location, True)
 
     elif action_name == "lets_do_that_again":
         # Note: the discarded card should not be in the discard pile when it is played (in case it has its own discard interaction)
         selected_card_location = select_card(game_state, user_number, ["discard_pile"], [CardType.GOAL, CardType.KEEPER])
         selected_card = get_selected_card(game_state, selected_card_location)
-        trash_selected_card(game_state, selected_card_location, False)
+        trash_selected_card(game_state, user_number, selected_card_location, False)
         game_state.activate_card(user_number, selected_card)
         game_state.discard_pile.append(selected_card)
 
@@ -170,8 +170,8 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
         keeper_to_give = get_selected_card(game_state, keeper_to_give_location)
         keeper_to_take = get_selected_card(game_state, keeper_to_take_location)
 
-        trash_selected_card(game_state, keeper_to_give_location, False)
-        trash_selected_card(game_state, keeper_to_take_location, False)
+        trash_selected_card(game_state, user_number, keeper_to_give_location, False)
+        trash_selected_card(game_state, user_number, keeper_to_take_location, False)
         user_player.keepers.append(keeper_to_take)
         game_state.players[keeper_to_take_location[1]].keepers.append(keeper_to_give)
 

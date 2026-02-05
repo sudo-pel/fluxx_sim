@@ -31,8 +31,13 @@ def draw_and_play(game_state: 'Game', user_number: int, draw_amount: int, play_a
         for card in latent_card_pile:
             game_state.discard_pile.append(card)
 
-def trash_selected_card(game_state: 'Game', card_location: list, add_to_discard: bool):
+def trash_selected_card(game_state: 'Game', user_number: int, card_location: list, add_to_discard: bool):
     if card_location[0] == "rules":
+        rule_discarded = get_selected_card(game_state, card_location)
+        if rule_discarded.name == "double_agenda" and len(game_state.goals) == 2:
+            goal_to_discard = select_card(game_state, user_number, ["goals"])
+            trash_selected_card(game_state, user_number, goal_to_discard, True)
+
         if add_to_discard:
             game_state.discard_pile.append(game_state.rules[card_location[1]])
         del game_state.rules[card_location[1]]

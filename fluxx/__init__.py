@@ -1,6 +1,7 @@
 # begin with implementing a two-player game.
 import random
 from typing import Optional
+from collections import Counter
 
 from Card import CardType, Card, Rule, Goal, Keeper, Action, RulesOptions
 
@@ -9,6 +10,7 @@ from Agents.Agent import Agent
 from Agents.PlayerControlled import PlayerControlledAgent
 from fluxx.Cards import action_cards
 from fluxx.Cards.free_actions import can_use_free_action, activate_free_action
+from fluxx.utils import card_effect_utils
 
 
 class Game:
@@ -36,8 +38,10 @@ class Game:
         print(f"\033[96m{message}\033[0m")
         # TODO: move this elsewhere (some kind of prompt module, it doesnt need to be here)
 
-    def get_draw_rules(self):
+    def get_draw_rules(self, player_number):
         """Calculate, based on cards in play, how many cards should be drawn by a player."""
+        player = self.players[player_number]
+
         draw = 0
         for rule in self.rules:
             if rule.draw:
@@ -46,10 +50,21 @@ class Game:
         if draw == 0:
             draw = 1 # basic rule
 
+        if self.rule_in_play("party_bonus") and self.keeper_in_play("the_party"):
+            draw += 1
+
+        if self.rule_in_play("poor_bonus"):
+            keeper_count = len(player.keepers)
+            keeper_counts = [len(p.keepers) for p in self.players]
+            if keeper_count == min(keeper_counts) and Counter(keeper_counts)[keeper_count] == 1:
+                draw += 1
+
         return draw
 
     def get_play_rules(self, player_number: int):
         """Calculate, based on cards in play, how many cards should be played by a player."""
+        player = self.players[player_number]
+
         play = 0
         for rule in self.rules:
             if rule.play:
@@ -57,6 +72,21 @@ class Game:
 
         if play == 0:
             play = 1 # basic rule
+
+        if self.rule_in_play("play_all"):
+            play = player.cards_played + 1
+
+        if self.rule_in_play("play_all_but_1") and len(player.hand) > 1:
+            play = player.cards_played + 1
+
+        if self.rule_in_play("party_bonus") and self.keeper_in_play("the_party"):
+            play += 1
+
+        if self.rule_in_play("rich_bonus"):
+            keeper_count = len(player.keepers)
+            keeper_counts = [len(p.keepers) for p in self.players]
+            if keeper_count == max(keeper_counts) and Counter(keeper_counts)[keeper_count] == 1:
+                play += 1
 
         return play
 
@@ -169,25 +199,25 @@ class Game:
             # TODO: special goal cards (cards in hand, etc)
 
     def play_goal(self, player_number: int, goal: Goal):
+        """Play a goal card. Does not perform validation."""
         player = self.players[player_number]
 
-        """Play a goal card. Does not perform validation."""
-        if len(self.goals) == 1:
-            self.discard_pile.append(self.goals[0])
-            del self.goals[0]
+        if self.rule_in_play("double_agenda"):
+            if len(self.goals) == 2:
+                goal_location = card_effect_utils.select_card(self, player_number, ["goals"])
+                card_effect_utils.trash_selected_card(self, player_number, goal_location, True)
+        else:
+            if len(self.goals) == 1:
+                self.discard_pile.append(self.goals[0])
+                del self.goals[0]
 
         self.goals.append(goal)
-
-        # Check whether any player has won the game
-        self.check_for_winners()
 
     def play_keeper(self, player_number: int, keeper: Keeper):
         """Play a keeper card. Does not perform validation."""
         player = self.players[player_number]
 
         player.keepers.append(keeper)
-
-        self.check_for_winners()
 
     def play_action(self, player_number: int, action: Action):
         action_cards.activate_action(action.name, self, player_number)
@@ -243,7 +273,7 @@ class Game:
 
         # start-of-turn rule effects
         # draw
-        draw_amount = self.get_draw_rules()
+        draw_amount = self.get_draw_rules(self.player_turn)
         # tba: special case re "play all but 1"
 
         # TODO: special start of turn effects
@@ -254,6 +284,13 @@ class Game:
 
     def start_of_turn(self):
         """Apply start of turn effects, including drawing."""
+        turn_player = self.players[self.player_turn]
+
+        if self.rule_in_play("no_hand_bonus"):
+            if len(turn_player.hand) == 0:
+                for i in range(3):
+                    self.draw(turn_player)
+
         self.draw_for_turn()
 
     def end_of_turn(self):
@@ -326,6 +363,14 @@ class Game:
 
         return False
 
+    def keeper_in_play(self, keeper_name) -> bool:
+        for player in self.players:
+            for keeper in player.keepers:
+                if keeper.name == keeper_name:
+                    return True
+
+        return False
+
     def run_game(self):
         """Run the game."""
 
@@ -346,7 +391,7 @@ class Game:
 
             self.start_of_turn()
 
-            while True:
+            while self.winner == -1:
                 if self.player_turn_over():
                     self.end_of_turn()
                     break
@@ -366,7 +411,15 @@ class Game:
 
                 self.draw_for_turn()
 
-                played_card = turn_agent.play_card(self.get_game_state())
+                played_card = None
+
+                if self.rule_in_play("first_play_random"):
+                    if self.get_play_rules(self.player_turn) > 1 and turn_player.cards_played == 0:
+                        played_card = random.randint(0, len(turn_player.hand)-1)
+                        self.game_message(f"<<< 'First Play Random': PLAYED {turn_player.hand[played_card].name}! >>")
+
+                if played_card is None:
+                    played_card = turn_agent.play_card(self.get_game_state())
 
                 if not self.can_play_card(self.player_turn, played_card):
                     raise Exception("Illegal action selected!")
@@ -390,6 +443,7 @@ test_deck = [
     Rule("draw_3", RulesOptions(draw=3)),
     Rule("play_4", RulesOptions(play=4)),
     Rule("play_3", RulesOptions(play=3)),
+
 
     Keeper("the_sun"),
     Keeper("the_party"),
@@ -440,7 +494,7 @@ test_deck = [
 
     #Action("use_what_you_take"),
     #Action("zap_a_card"),
-    #Action("trash_a_new_rule"),
+    Action("trash_a_new_rule"),
     #Action("trash_a_keeper"),
     #Action("trade_hands"),
     #Action("todays_special"),
@@ -455,18 +509,28 @@ test_deck = [
     #Action("lets_simplify"),
     #Action("lets_do_that_again"),
     #Action("jackpot"),
-    Action("exchange_keepers"),
-    Action("empty_the_trash"),
-    Action("discard_and_draw"),
-    Action("everybody_gets_1"),
-    Action("take_another_turn"),
-    Action("rotate_hands"),
+    #Action("exchange_keepers"),
+    #Action("empty_the_trash"),
+    #Action("discard_and_draw"),
+    #Action("everybody_gets_1"),
+    #Action("take_another_turn"),
+    #Action("rotate_hands"),
 
-    Rule("mystery_play", RulesOptions(free_action=True)),
-    Rule("swap_plays_for_draws", RulesOptions(free_action=True)),
-    Rule("get_on_with_it", RulesOptions(free_action=True)),
-    Rule("recycling", RulesOptions(free_action=True)),
-    Rule("goal_mill", RulesOptions(free_action=True)),
+    #Rule("mystery_play", RulesOptions(free_action=True)),
+    #Rule("swap_plays_for_draws", RulesOptions(free_action=True)),
+    #Rule("get_on_with_it", RulesOptions(free_action=True)),
+    #Rule("recycling", RulesOptions(free_action=True)),
+    #Rule("goal_mill", RulesOptions(free_action=True)),
+
+    #Rule("play_all", RulesOptions(play=-1)),
+    #Rule("play_all_but_1", RulesOptions(play=-1)),
+    #Rule("no_hand_bonus", RulesOptions()),
+    #Rule("party_bonus", RulesOptions()),
+    Keeper("the_party"),
+    Rule("poor_bonus", RulesOptions()),
+    Rule("rich_bonus", RulesOptions()),
+    Rule("double_agenda", RulesOptions()),
+    Rule("first_play_random", RulesOptions()),
 
 ]
 new_game = Game([PlayerControlledAgent(), PlayerControlledAgent()], test_deck)

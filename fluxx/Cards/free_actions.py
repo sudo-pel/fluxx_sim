@@ -64,7 +64,7 @@ def activate_free_action(free_action_name: str, game_state: 'Game', user_number:
             if discard_card == 0:
                 break
             selected_goal_location = select_card(game_state, user_number, ["hand"], [CardType.RULE, CardType.KEEPER, CardType.ACTION])
-            trash_selected_card(game_state, selected_goal_location, True)
+            trash_selected_card(game_state, user_number, selected_goal_location, True)
             cards_to_draw += 1
 
         for i in range(cards_to_draw):
@@ -81,7 +81,7 @@ def activate_free_action(free_action_name: str, game_state: 'Game', user_number:
 
     elif free_action_name == "recycling":
         selected_keeper_location = select_card(game_state, user_number, ["own_keepers"])
-        trash_selected_card(game_state, selected_keeper_location, True)
+        trash_selected_card(game_state, user_number, selected_keeper_location, True)
 
         for i in range(3):
             game_state.draw(user)
