@@ -74,7 +74,7 @@ def activate_free_action(free_action_name: str, game_state: 'Game', user_number:
         while len(user.hand) > 0:
             game_state.discard_pile.append(user.hand.pop())
 
-        for i in range(3):
+        for i in range(3 + game_state.inflation()):
             game_state.draw(user)
 
         game_state.force_turn_over = True
@@ -83,7 +83,7 @@ def activate_free_action(free_action_name: str, game_state: 'Game', user_number:
         selected_keeper_location = select_card(game_state, user_number, ["own_keepers"])
         trash_selected_card(game_state, user_number, selected_keeper_location, True)
 
-        for i in range(3):
+        for i in range(3 + game_state.inflation()):
             game_state.draw(user)
 
     else:

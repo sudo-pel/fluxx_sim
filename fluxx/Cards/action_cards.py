@@ -20,7 +20,7 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
     if action_name == "use_what_you_take":
         players_with_cards = [p for p in other_players if len(p.hand) > 0]
         if len(players_with_cards) == 0:
-            game_state.game_message("No players have any cards in hand!")
+            game_messages.notification("No players have any cards in hand!")
         else:
             player_to_take = random.randint(0, len(players_with_cards)-1)
             card_to_take = random.randint(0, len(players_with_cards[player_to_take].hand)-1)
@@ -28,7 +28,7 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
             card_to_play = players_with_cards[player_to_take].hand[card_to_take]
             del players_with_cards[player_to_take].hand[card_to_take]
 
-            game_state.game_message(f"<< ACTIVATING {card_to_play.name} >>")
+            game_messages.special_effect(f"<< ACTIVATING {card_to_play.name} >>")
 
             game_state.activate_card(user_number, card_to_play)
 
@@ -67,16 +67,16 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
         game_state.players[selected_player].hand = user_player.hand
         user_player.hand = temp
 
-        game_state.game_message(f"<< Player {user_number} traded hands with player {selected_player} >> ")
+        game_messages.special_effect(f"<< Player {user_number} traded hands with player {selected_player} >> ")
 
     elif action_name == "todays_special":
-        draw_and_play(game_state, user_number, 3, 1, "discard_pile")
+        draw_and_play(game_state, user_number, 3+game_state.inflation(), 1+game_state.inflation(), "discard_pile")
 
     elif action_name == "draw_2_and_use_em":
-        draw_and_play(game_state, user_number, 2, 2, "discard_pile")
+        draw_and_play(game_state, user_number, 2+game_state.inflation(), 2+game_state.inflation(), "discard_pile")
 
     elif action_name == "draw_3_play_2_of_them":
-        draw_and_play(game_state, user_number, 3, 2, "discard_pile")
+        draw_and_play(game_state, user_number, 3+game_state.inflation(), 2+game_state.inflation(), "discard_pile")
 
     elif action_name == "steal_a_keeper":
         selected_card_location = select_card(game_state, user_number, ["enemy_keepers"])
@@ -96,7 +96,7 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
         for i in range(len(all_keepers)):
             game_state.players[i % len(game_state.players)].keepers.append(all_keepers[i])
 
-        game_state.game_message("<< Keepers redistributed! >>")
+        game_messages.special_effect("<< Keepers redistributed! >>")
 
     elif action_name == "rules_reset":
         for rule in game_state.rules:
@@ -116,23 +116,24 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
             winner = selected_player
             loser = user_player
 
-        game_state.game_message(f"<< Player {winner.id} defeated {loser.id} in RPS! >>")
+        game_messages.special_effect(f"<< Player {winner.id} defeated {loser.id} in RPS! >>")
 
         winner.hand += loser.hand
         loser.hand = []
 
     elif action_name == "random_tax":
-        for player_number, player in enumerate(game_state.players):
-            if len(player.hand) == 0 or player_number == user_number:
-                continue
+        for i in range(game_state.inflation() + 1):
+            for player_number, player in enumerate(game_state.players):
+                if len(player.hand) == 0 or player_number == user_number:
+                    continue
 
-            index_to_take = random.randint(0, len(player.hand)-1)
-            card_to_take = player.hand[index_to_take]
+                index_to_take = random.randint(0, len(player.hand)-1)
+                card_to_take = player.hand[index_to_take]
 
-            game_state.game_message(f"<< Stolen {card_to_take.name} from Player {player_number}! >>")
+                game_messages.special_effect(f"<< Stolen {card_to_take.name} from Player {player_number}! >>")
 
-            user_player.hand.append(card_to_take)
-            del player.hand[index_to_take]
+                user_player.hand.append(card_to_take)
+                del player.hand[index_to_take]
 
     elif action_name == "no_limits":
         new_rules = []
@@ -157,7 +158,7 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
         game_state.discard_pile.append(selected_card)
 
     elif action_name == "jackpot":
-        for i in range(3):
+        for i in range(3 + game_state.inflation()):
             game_state.draw(user_player)
 
     elif action_name == "exchange_keepers":
@@ -175,14 +176,14 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
         user_player.keepers.append(keeper_to_take)
         game_state.players[keeper_to_take_location[1]].keepers.append(keeper_to_give)
 
-        game_state.game_message(f"<< Swapped {keeper_to_give.name} for {keeper_to_take.name}! >>")
+        game_messages.special_effect(f"<< Swapped {keeper_to_give.name} for {keeper_to_take.name}! >>")
 
     elif action_name == "empty_the_trash":
         game_state.draw_pile += game_state.discard_pile
         discard_pile_size = len(game_state.discard_pile)
         game_state.discard_pile = []
         random.shuffle(game_state.draw_pile)
-        game_state.game_message(f"<< Shuffled {discard_pile_size} cards from discard pile into deck! >>")
+        game_messages.special_effect(f"<< Shuffled {discard_pile_size} cards from discard pile into deck! >>")
 
     elif action_name == "discard_and_draw":
         draw_amount = len(user_player.hand)
@@ -194,15 +195,18 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
             game_state.draw(user_player)
 
     elif action_name == "everybody_gets_1":
-        latent_card_pile = [game_state.get_card_from_draw_pile() for i in range(len(game_state.players))]
-        player_set = [player.id for player in game_state.players]
+        latent_card_pile = [game_state.get_card_from_draw_pile() for i in range((game_state.inflation() + 1) * len(game_state.players))]
 
         for card in latent_card_pile:
-            game_state.game_message(f"<< Drawn {card.name} >>")
+            game_messages.special_effect(f"<< Drawn {card.name} >>")
+
+        player_set = [player.id for player in game_state.players]
+        if game_state.inflation() == 1:
+            player_set.extend(player_set)
 
         while player_set:
             current_card = latent_card_pile.pop()
-            game_state.game_message(f"Please select a player to receive << {current_card.name} >>:")
+            game_messages.notification(f"Please select a player to receive << {current_card.name} >>:")
             chosen_player_number = player_agent.select_player_from_set(game_state, player_set)
 
             chosen_player = game_state.players[chosen_player_number]
@@ -211,7 +215,7 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
             del player_set[chosen_player_number]
 
     elif action_name == "take_another_turn":
-        game_state.game_message("<< Extra turn! >>")
+        game_messages.special_effect("<< Extra turn! >>")
         game_state.extra_turn = True
 
     elif action_name == "rotate_hands":

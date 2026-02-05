@@ -8,35 +8,16 @@ from Card import CardType, Card, Rule, Goal, Keeper, Action, RulesOptions
 from Player import Player
 from Agents.Agent import Agent
 from Agents.PlayerControlled import PlayerControlledAgent
+from fluxx import game_messages
 from fluxx.Cards import action_cards
 from fluxx.Cards.free_actions import can_use_free_action, activate_free_action
+from fluxx.GameSchema import GameSchema
 from fluxx.utils import card_effect_utils
 
 
-class Game:
+class Game(GameSchema):
     def __init__(self, player_agents: list[Agent], deck: list[Card]):
-        self.player_count: int = len(player_agents)
-        self.players: list[Player] = []
-        self.agents: list[Agent] = player_agents
-        self.rules: list[Rule] = []
-        self.player_turn: int = 0
-        self.turn_count: int = 0
-        self.goals: list[Goal] = []
-        self.discard_pile: list[Card] = []
-        self.draw_pile: list[Card] = []
-        self.force_turn_over: bool = False
-        self.winner = -1
-        self.deck = deck # for now, not the same as draw_pile
-        self.extra_turn = False
-        self.played_free_actions = set()
-
-        for i, agent in enumerate(self.agents):
-            agent.set_player_number(i)
-            self.players.append(Player(i))
-
-    def game_message(self, message):
-        print(f"\033[96m{message}\033[0m")
-        # TODO: move this elsewhere (some kind of prompt module, it doesnt need to be here)
+        GameSchema.__init__(self, player_agents, deck)
 
     def get_draw_rules(self, player_number):
         """Calculate, based on cards in play, how many cards should be drawn by a player."""
@@ -45,19 +26,19 @@ class Game:
         draw = 0
         for rule in self.rules:
             if rule.draw:
-                draw += rule.draw
+                draw += (rule.draw + self.inflation())
 
         if draw == 0:
-            draw = 1 # basic rule
+            draw = 1 + self.inflation() # basic rule
 
         if self.rule_in_play("party_bonus") and self.keeper_in_play("the_party"):
-            draw += 1
+            draw += (1 + self.inflation())
 
         if self.rule_in_play("poor_bonus"):
             keeper_count = len(player.keepers)
             keeper_counts = [len(p.keepers) for p in self.players]
             if keeper_count == min(keeper_counts) and Counter(keeper_counts)[keeper_count] == 1:
-                draw += 1
+                draw += (1 + self.inflation())
 
         return draw
 
@@ -68,15 +49,15 @@ class Game:
         play = 0
         for rule in self.rules:
             if rule.play:
-                play += rule.play
+                play += (rule.play + self.inflation())
 
         if play == 0:
-            play = 1 # basic rule
+            play = 1 + self.inflation() # basic rule
 
         if self.rule_in_play("play_all"):
             play = player.cards_played + 1
 
-        if self.rule_in_play("play_all_but_1") and len(player.hand) > 1:
+        if self.rule_in_play("play_all_but_1") and len(player.hand) > 1 + (self.inflation()):
             play = player.cards_played + 1
 
         if self.rule_in_play("party_bonus") and self.keeper_in_play("the_party"):
@@ -86,7 +67,7 @@ class Game:
             keeper_count = len(player.keepers)
             keeper_counts = [len(p.keepers) for p in self.players]
             if keeper_count == max(keeper_counts) and Counter(keeper_counts)[keeper_count] == 1:
-                play += 1
+                play += (1 + self.inflation())
 
         return play
 
@@ -95,7 +76,7 @@ class Game:
         limit = None
         for rule in self.rules:
             if rule.keeper_limit is not None:
-                limit = rule.keeper_limit
+                limit = rule.keeper_limit + self.inflation()
 
         return limit
 
@@ -104,7 +85,7 @@ class Game:
         limit = None
         for rule in self.rules:
             if rule.hand_limit is not None:
-                limit = rule.hand_limit
+                limit = rule.hand_limit + self.inflation()
 
         return limit
 
@@ -252,7 +233,7 @@ class Game:
     def get_card_from_draw_pile(self) -> Card:
         """Get a card from the draw pile. Not the same as drawing a card."""
         card_drawn = self.draw_pile.pop()
-        print(f"[[ DRAWN '{card_drawn.name}' ]]")
+        game_messages.drawn_card(f"[[ DRAWN '{card_drawn.name}' ]]")
 
         if not self.draw_pile:
             random.shuffle(self.discard_pile)
@@ -282,13 +263,17 @@ class Game:
             self.draw(turn_player)
             turn_player.cards_drawn += 1
 
+        if draw_amount == 1 + (self.inflation()):
+            self.draw(turn_player)
+            turn_player.cards_drawn += 1
+
     def start_of_turn(self):
         """Apply start of turn effects, including drawing."""
         turn_player = self.players[self.player_turn]
 
         if self.rule_in_play("no_hand_bonus"):
             if len(turn_player.hand) == 0:
-                for i in range(3):
+                for i in range(3 + self.inflation()):
                     self.draw(turn_player)
 
         self.draw_for_turn()
@@ -326,20 +311,10 @@ class Game:
             return True
 
         # turn over if out of cards in hand + no free actions
-        if len(turn_player.hand) == 0: # TODO: free actions check
+        if len(turn_player.hand) == 0:
             return True
 
         return self.force_turn_over
-
-    # TODO: Document/formalize game state. Consider making a class for game state
-    def get_game_state(self):
-        return {
-            "player_count": self.player_count,
-            "players": self.players,
-            "goals": self.goals,
-            "rules": self.rules,
-            "player_turn": self.player_turn
-        }
 
     def get_available_free_actions(self):
         available_free_actions = []
@@ -371,6 +346,13 @@ class Game:
 
         return False
 
+    def inflation(self):
+        if self.rule_in_play("inflation"):
+            game_messages.notification("(Inflation bonus)")
+            return 1
+        else:
+            return 0
+
     def run_game(self):
         """Run the game."""
 
@@ -389,6 +371,7 @@ class Game:
             turn_agent = self.agents[self.player_turn]
             turn_player = self.players[self.player_turn]
 
+            game_messages.turn_start(f"PLAYER {self.player_turn} TURN")
             self.start_of_turn()
 
             while self.winner == -1:
@@ -416,7 +399,7 @@ class Game:
                 if self.rule_in_play("first_play_random"):
                     if self.get_play_rules(self.player_turn) > 1 and turn_player.cards_played == 0:
                         played_card = random.randint(0, len(turn_player.hand)-1)
-                        self.game_message(f"<<< 'First Play Random': PLAYED {turn_player.hand[played_card].name}! >>")
+                        game_messages.special_effect(f"<<< 'First Play Random': PLAYED {turn_player.hand[played_card].name}! >>")
 
                 if played_card is None:
                     played_card = turn_agent.play_card(self.get_game_state())
@@ -512,7 +495,6 @@ test_deck = [
     #Action("exchange_keepers"),
     #Action("empty_the_trash"),
     #Action("discard_and_draw"),
-    #Action("everybody_gets_1"),
     #Action("take_another_turn"),
     #Action("rotate_hands"),
 
@@ -526,11 +508,13 @@ test_deck = [
     #Rule("play_all_but_1", RulesOptions(play=-1)),
     #Rule("no_hand_bonus", RulesOptions()),
     #Rule("party_bonus", RulesOptions()),
-    Keeper("the_party"),
     Rule("poor_bonus", RulesOptions()),
     Rule("rich_bonus", RulesOptions()),
     Rule("double_agenda", RulesOptions()),
     Rule("first_play_random", RulesOptions()),
+
+    Action("everybody_gets_1"),
+    Rule("inflation", RulesOptions()),
 
 ]
 new_game = Game([PlayerControlledAgent(), PlayerControlledAgent()], test_deck)

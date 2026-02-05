@@ -32,41 +32,41 @@ class Agent(metaclass=abc.ABCMeta):
         )
 
     @abc.abstractmethod
-    def play_card(self, game_state):
+    def play_card(self, game):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def discard_keeper(self, game_state):
+    def discard_keeper(self, game):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def discard_from_hand(self, game_state):
+    def discard_from_hand(self, game):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def select_card(self, game_state, selection):
+    def select_card(self, game, selection):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def select_player_besides_self(self, game_state):
+    def select_player_besides_self(self, game):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def select_card_to_play(self, game_state, selection) -> int:
+    def select_card_to_play(self, game, selection) -> int:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def select_player_from_set(self, game_state, player_numbers: list[int]):
+    def select_player_from_set(self, game, player_numbers: list[int]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def select_player_rotation_direction(self, game_state):
+    def select_player_rotation_direction(self, game):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def play_free_action(self, game_state, available_free_actions: list[str]):
+    def play_free_action(self, game, available_free_actions: list[str]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def choose_to_discard(self, game_state):
+    def choose_to_discard(self, game):
         raise NotImplementedError

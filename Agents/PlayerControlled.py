@@ -8,46 +8,46 @@ col_size = 30
 class PlayerControlledAgent(Agent):
     def play_card(self, game_state):
         self.printout_state(game_state)
-        return int(input("Please choose a card to play >> "))
+        return int(input(f"(PLAYER {self.player_number}) Please choose a card to play >> "))
 
     def discard_keeper(self, game_state):
         self.printout_state(game_state)
-        return int(input("Please choose a KEEPER to discard >>"))
+        return int(input(f"(PLAYER {self.player_number}) Please choose a KEEPER to discard >>"))
 
     def discard_from_hand(self, game_state):
         self.printout_state(game_state)
-        return int(input("Please choose a CARD to discard from HAND >>"))
+        return int(input(f"(PLAYER {self.player_number}) Please choose a CARD to discard from HAND >>"))
 
     def select_card(self, game_state, selection):
         for card_name in selection:
             print(card_name)
 
-        return input("Please choose a CARD (type the name) from the following above >>")
+        return input(f"(PLAYER {self.player_number}) Please choose a CARD (type the name) from the following above >>")
 
     def select_player_besides_self(self, game_state):
         player_numbers = [i for i in range(len(game_state.players))]
         del player_numbers[self.player_number]
 
-        return int(input(f"Please choose a PLAYER NUMBER from the following: {player_numbers}>>"))
+        return int(input(f"(PLAYER {self.player_number}) Please choose a PLAYER NUMBER from the following: {player_numbers}>>"))
 
     def select_player_from_set(self, game_state, player_numbers: list[int]):
-        return int(input(f"Please choose a PLAYER NUMBER from the following: {player_numbers}"))
+        return int(input(f"(PLAYER {self.player_number}) Please choose a PLAYER NUMBER from the following: {player_numbers}"))
 
     def select_card_to_play(self, game_state, selection):
         for i, card in enumerate(selection):
             print(f"({i}) - {card.name}")
 
-        return int(input(f"Please choose a CARD NUMBER from the following above >>"))
+        return int(input(f"(PLAYER {self.player_number}) Please choose a CARD NUMBER from the following above >>"))
 
     def select_player_rotation_direction(self, game_state):
-        return int(input("Please select a ROTATION DIRECTION (-1 = left, 1 = right) >>"))
+        return int(input(f"(PLAYER {self.player_number}) Please select a ROTATION DIRECTION (-1 = left, 1 = right) >>"))
 
     def play_free_action(self, game_state, available_free_actions):
         for i, action in enumerate(available_free_actions):
             print(f"({i}) - {action}")
         print(f"({len(available_free_actions)}) - No free action")
 
-        choice = int(input(f"Please choose a FREE ACTION to play (or none)"))
+        choice = int(input(f"(PLAYER {self.player_number}) Please choose a FREE ACTION to play (or none)"))
 
         if choice == len(available_free_actions):
             return None
@@ -55,7 +55,7 @@ class PlayerControlledAgent(Agent):
             return choice
 
     def choose_to_discard(self, game_state):
-        return int(input("Choose to discard? [[0: NO, 1: YES]]>>"))
+        return int(input(f"(PLAYER {self.player_number}) Choose to discard? [[0: NO, 1: YES]]>>"))
 
     def printout_state(self, game_state):
         """Print out the game state"""
