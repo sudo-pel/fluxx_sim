@@ -112,6 +112,8 @@ class Game(GameSchema):
         self.discard_pile.append(player.keepers[keeper_to_discard])
         del player.keepers[keeper_to_discard]
 
+        self.check_for_winners()
+
     def limit_check_player(self, player_number: int):
         player = self.players[player_number]
 
@@ -168,16 +170,50 @@ class Game(GameSchema):
             return
 
         for current_goal in self.goals:
+            # TODO: special goal cards (cards in hand, etc)
+            if current_goal.name == "5_keepers":
+                keeper_counts = [len(p.keepers) for p in self.players]
+                for i, player in enumerate(self.players):
+                    keeper_count = len(player.keepers)
+                    if keeper_count >= 5 + self.inflation():
+                        if keeper_count == max(keeper_counts) and Counter(keeper_counts)[keeper_count] == 1:
+                            self.winner = i
+                            return
+                continue
+            elif current_goal.name == "10_cards_in_hand":
+                hand_counts = [len(p.hand) for p in self.players]
+                for i, player in enumerate(self.players):
+                    hand_count = len(player.hand)
+                    if hand_count >= 10 + self.inflation():
+                        if hand_count == max(hand_counts) and Counter(hand_counts)[hand_count] == 1:
+                            self.winner = i
+                            return
+                continue
+
             goal_keepers = set(current_goal.required_keepers)
 
             for i, player in enumerate(self.players):
-                keeper_names = [card.name for card in player.keepers if card.card_type == CardType.KEEPER]
-                if goal_keepers <= set(keeper_names):
-                    print(f"[[ THE GAME HAS BEEN WON BY PLAYER {i} !!! ]]")
-                    self.winner = i
-                    return
+                keeper_names = set([card.name for card in player.keepers if card.card_type == CardType.KEEPER])
+                if goal_keepers <= keeper_names:
 
-            # TODO: special goal cards (cards in hand, etc)
+                    win_cancelled = False
+                    for goal_keeper in current_goal.disallowed_keepers:
+                        if self.keeper_in_play(goal_keeper):
+                            win_cancelled = True
+
+                    optional_keepers = 0
+                    for options in current_goal.optional_keepers:
+                        for keeper in options:
+                            if keeper in keeper_names:
+                                optional_keepers += 1
+                                break
+
+                    if optional_keepers < len(current_goal.optional_keepers):
+                        win_cancelled = True
+
+                    if not win_cancelled:
+                        self.winner = i
+                        return
 
     def play_goal(self, player_number: int, goal: Goal):
         """Play a goal card. Does not perform validation."""
@@ -247,6 +283,7 @@ class Game(GameSchema):
         card_drawn = self.get_card_from_draw_pile()
 
         player.hand.append(card_drawn)
+        self.check_for_winners()
 
     def draw_for_turn(self):
         """Draw cards for the turn player."""
@@ -348,7 +385,7 @@ class Game(GameSchema):
 
     def inflation(self):
         if self.rule_in_play("inflation"):
-            game_messages.notification("(Inflation bonus)")
+            #game_messages.notification("(Inflation bonus)")
             return 1
         else:
             return 0
@@ -367,14 +404,14 @@ class Game(GameSchema):
         #random.shuffle(self.deck)
         #self.draw_pile = self.deck
 
-        while self.winner == -1:
+        while self.winner is None:
             turn_agent = self.agents[self.player_turn]
             turn_player = self.players[self.player_turn]
 
             game_messages.turn_start(f"PLAYER {self.player_turn} TURN")
             self.start_of_turn()
 
-            while self.winner == -1:
+            while self.winner is None:
                 if self.player_turn_over():
                     self.end_of_turn()
                     break
@@ -408,6 +445,8 @@ class Game(GameSchema):
                     raise Exception("Illegal action selected!")
 
                 self.play_card(self.player_turn, played_card)
+
+        game_messages.game_over(f"GAME OVER: WINNER IS PLAYER {self.winner}")
 
 
 
@@ -515,7 +554,8 @@ test_deck = [
 
     Action("everybody_gets_1"),
     Rule("inflation", RulesOptions()),
-
+    Goal("5_keepers", []),
+    Goal("10_cards_in_hand", []),
+    Goal("the_brain_no_tv", ["the_brain"], ["television"]),
+    Goal("party_snacks", ["the_party"], [], [["milk", "cookies", "chocolate", "bread"]]),
 ]
-new_game = Game([PlayerControlledAgent(), PlayerControlledAgent()], test_deck)
-new_game.run_game()

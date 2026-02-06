@@ -1,6 +1,3 @@
-# drawn card
-# card effect
-# extra turn
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -14,6 +11,7 @@ class bcolors:
     YELLOW_TEXT = '\x1b[93m'
     CYAN_TEXT = '\x1b[96m'
     GREEN_TEXT = '\x1b[92m'
+    RED_TEXT = '\x1b[91m'
 
 def special_effect(message: str):
     print(f"{bcolors.YELLOW_TEXT}{message}{bcolors.ENDC}")
@@ -26,3 +24,6 @@ def drawn_card(message: str):
 
 def turn_start(message: str):
     print(f"{bcolors.UNDERLINE}{bcolors.BOLD}{message}{bcolors.ENDC}")
+
+def game_over(message: str):
+    print(f"{bcolors.RED_TEXT}{message}{bcolors.ENDC}")

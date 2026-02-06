@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING
 from fluxx import GameSchema, game_messages
 from fluxx.Card import CardType
 
-
 def draw_and_play(game: GameSchema, user_number: int, draw_amount: int, play_amount: int, place_remainder: str):
     """
     Draw [draw_amount] cards (not into hand) and play [play_amount] cards. Put the unplayed cards into [place_remainder]

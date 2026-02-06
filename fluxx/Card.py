@@ -57,9 +57,19 @@ class Keeper(Card):
         super().__init__(name, CardType.KEEPER)
 
 class Goal(Card):
-    def __init__(self, name: str, required_keepers: list[str]):
+    def __init__(self, name: str, required_keepers: list[str], disallowed_keepers: list[str]=None, optional_keepers: list[list[str]]=None):
         super().__init__(name, CardType.GOAL)
         self.required_keepers = required_keepers
+
+        if disallowed_keepers is None:
+            self.disallowed_keepers = []
+        else:
+            self.disallowed_keepers = disallowed_keepers
+
+        if optional_keepers is None:
+            self.optional_keepers = [[]]
+        else:
+            self.optional_keepers = optional_keepers
 
 class Action(Card):
     def __init__(self, name: str):

@@ -7,7 +7,8 @@ from fluxx.Card import CardType
 if TYPE_CHECKING:
     from fluxx import Game
 
-from fluxx.utils.card_effect_utils import *
+from fluxx.utils.card_effect_utils import draw_and_play, trash_selected_card, get_selected_card, select_card
+from fluxx import game_messages
 
 def activate_action(action_name: str, game_state: 'Game', user_number: int):
     user_player = game_state.players[user_number]
