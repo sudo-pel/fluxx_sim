@@ -28,10 +28,10 @@ class PlayerControlledAgent(Agent):
         player_numbers = [i for i in range(len(game_state.players))]
         del player_numbers[self.player_number]
 
-        return int(input(f"(PLAYER {self.player_number}) Please choose a PLAYER NUMBER from the following: {player_numbers}>>"))
+        return int(input(f"(PLAYER {self.player_number}) Please choose a PLAYER NUMBER from the following: {player_numbers} >>"))
 
     def select_player_from_set(self, game_state, player_numbers: list[int]):
-        return int(input(f"(PLAYER {self.player_number}) Please choose a PLAYER NUMBER from the following: {player_numbers}"))
+        return int(input(f"(PLAYER {self.player_number}) Please choose a PLAYER NUMBER from the following: {player_numbers} >>"))
 
     def select_card_to_play(self, game_state, selection):
         for i, card in enumerate(selection):

@@ -67,7 +67,7 @@ class Goal(Card):
             self.disallowed_keepers = disallowed_keepers
 
         if optional_keepers is None:
-            self.optional_keepers = [[]]
+            self.optional_keepers = []
         else:
             self.optional_keepers = optional_keepers
 

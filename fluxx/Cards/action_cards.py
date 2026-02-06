@@ -213,7 +213,7 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
             chosen_player = game_state.players[chosen_player_number]
             chosen_player.hand.append(current_card)
 
-            del player_set[chosen_player_number]
+            del player_set[player_set.index(chosen_player_number)]
 
     elif action_name == "take_another_turn":
         game_messages.special_effect("<< Extra turn! >>")

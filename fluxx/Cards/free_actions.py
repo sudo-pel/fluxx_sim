@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from fluxx import Game
 
 from fluxx.utils.card_effect_utils import *
+from fluxx import game_messages
 
 def can_use_free_action(free_action_name: str, game_state: 'Game', player_number: int) -> bool:
     player = game_state.players[player_number]
@@ -37,7 +38,7 @@ def activate_free_action(free_action_name: str, game_state: 'Game', user_number:
 
     if free_action_name == "mystery_play":
         card = game_state.get_card_from_draw_pile()
-        game_state.game_message(f"<< Played {card.name}! >>")
+        game_messages.special_effect(f"<< Played {card.name}! >>")
         game_state.activate_card(user_number, card)
 
     elif free_action_name == "swap_plays_for_draws":
