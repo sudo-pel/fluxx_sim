@@ -292,17 +292,16 @@ class Game(GameSchema):
         # start-of-turn rule effects
         # draw
         draw_amount = self.get_draw_rules(self.player_turn)
-        # tba: special case re "play all but 1"
-
-        # TODO: special start of turn effects
+        previous_cards_in_hand = len(turn_player.hand)
 
         while turn_player.cards_drawn < draw_amount:
             self.draw(turn_player)
             turn_player.cards_drawn += 1
 
-        if draw_amount == 1 + (self.inflation()):
-            self.draw(turn_player)
-            turn_player.cards_drawn += 1
+        if self.rule_in_play("play_all_but_1"):
+            if previous_cards_in_hand == 0 and draw_amount == 1 + (self.inflation()):
+                self.draw(turn_player)
+                turn_player.cards_drawn += 1
 
     def start_of_turn(self):
         """Apply start of turn effects, including drawing."""
@@ -393,16 +392,8 @@ class Game(GameSchema):
     def run_game(self):
         """Run the game."""
 
-        # TODO: AUGMENTED GAME START RULES FOR TESTING PURPOSES
+        random.shuffle(self.deck)
         self.draw_pile = self.deck
-        for p in range(len(self.players)):
-            for i in range(5):
-                self.draw(self.players[p])
-
-        random.shuffle(self.draw_pile)
-
-        #random.shuffle(self.deck)
-        #self.draw_pile = self.deck
 
         while self.winner is None:
             turn_agent = self.agents[self.player_turn]
@@ -514,46 +505,45 @@ test_deck = [
     Goal("winning_the_lottery", ["dreams", "money"]),
     Goal("world_peace", ["dreams", "peace"]),
 
-    #Action("use_what_you_take"),
-    #Action("zap_a_card"),
+    Action("use_what_you_take"),
+    Action("zap_a_card"),
     Action("trash_a_new_rule"),
-    #Action("trash_a_keeper"),
-    #Action("trade_hands"),
-    #Action("todays_special"),
+    Action("trash_a_keeper"),
+    Action("trade_hands"),
+    Action("todays_special"),
     Action("draw_2_and_use_em"),
     Action("draw_3_play_2_of_them"),
-    #Action("steal_a_keeper"),
-    #Action("share_the_wealth"),
-    #Action("rules_reset"),
-    #Action("rock_paper_scissors_showdown"),
-    #Action("random_tax"),
-    #Action("no_limits"),
-    #Action("lets_simplify"),
-    #Action("lets_do_that_again"),
-    #Action("jackpot"),
-    #Action("exchange_keepers"),
-    #Action("empty_the_trash"),
-    #Action("discard_and_draw"),
-    #Action("take_another_turn"),
-    #Action("rotate_hands"),
+    Action("steal_a_keeper"),
+    Action("share_the_wealth"),
+    Action("rules_reset"),
+    Action("rock_paper_scissors_showdown"),
+    Action("random_tax"),
+    Action("no_limits"),
+    Action("lets_simplify"),
+    Action("lets_do_that_again"),
+    Action("jackpot"),
+    Action("exchange_keepers"),
+    Action("empty_the_trash"),
+    Action("discard_and_draw"),
+    Action("take_another_turn"),
+    Action("rotate_hands"),
+    Action("everybody_gets_1"),
 
-    #Rule("mystery_play", RulesOptions(free_action=True)),
-    #Rule("swap_plays_for_draws", RulesOptions(free_action=True)),
-    #Rule("get_on_with_it", RulesOptions(free_action=True)),
-    #Rule("recycling", RulesOptions(free_action=True)),
-    #Rule("goal_mill", RulesOptions(free_action=True)),
-
-    #Rule("play_all", RulesOptions(play=-1)),
-    #Rule("play_all_but_1", RulesOptions(play=-1)),
-    #Rule("no_hand_bonus", RulesOptions()),
-    #Rule("party_bonus", RulesOptions()),
+    Rule("mystery_play", RulesOptions(free_action=True)),
+    Rule("swap_plays_for_draws", RulesOptions(free_action=True)),
+    Rule("get_on_with_it", RulesOptions(free_action=True)),
+    Rule("recycling", RulesOptions(free_action=True)),
+    Rule("goal_mill", RulesOptions(free_action=True)),
+    Rule("play_all", RulesOptions(play=-1)),
+    Rule("play_all_but_1", RulesOptions(play=-1)),
+    Rule("no_hand_bonus", RulesOptions()),
+    Rule("party_bonus", RulesOptions()),
     Rule("poor_bonus", RulesOptions()),
     Rule("rich_bonus", RulesOptions()),
     Rule("double_agenda", RulesOptions()),
     Rule("first_play_random", RulesOptions()),
-
-    Action("everybody_gets_1"),
     Rule("inflation", RulesOptions()),
+
     Goal("5_keepers", []),
     Goal("10_cards_in_hand", []),
     Goal("the_brain_no_tv", ["the_brain"], ["television"]),
