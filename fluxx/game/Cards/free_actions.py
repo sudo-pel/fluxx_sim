@@ -1,14 +1,12 @@
 from typing import TYPE_CHECKING
 
-import random
-
 # avoiding circular import
-from fluxx.Card import CardType
 if TYPE_CHECKING:
-    from fluxx import Game
+    pass
 
-from fluxx.utils.card_effect_utils import draw_and_play, trash_selected_card, get_selected_card, select_card
-from fluxx import game_messages
+from fluxx.game.utils.card_effect_utils import trash_selected_card, select_card
+from fluxx.game import game_messages
+from fluxx.game.FluxxEnums import CardType, CardZone, ExtendedCardZone
 
 def can_use_free_action(free_action_name: str, game_state: 'Game', player_number: int) -> bool:
     player = game_state.players[player_number]
@@ -20,7 +18,7 @@ def can_use_free_action(free_action_name: str, game_state: 'Game', player_number
         return "swap_plays_for_draws" not in game_state.played_free_actions
 
     if free_action_name == "goal_mill":
-        goal_cards_in_hand = [card for card in player.hand if card.card_type.name == "GOAL"] # TODO: figure out how to get this enum to work properly
+        goal_cards_in_hand = [card for card in player.hand if card.card_type == CardType.GOAL]
         return "goal_mill" not in game_state.played_free_actions and len(goal_cards_in_hand) > 0
 
     if free_action_name == "get_on_with_it":
@@ -58,13 +56,13 @@ def activate_free_action(free_action_name: str, game_state: 'Game', user_number:
     elif free_action_name == "goal_mill":
         cards_to_draw = 0
         while True:
-            goal_cards_in_hand = [card for card in user.hand if card.card_type.name == "GOAL"]
+            goal_cards_in_hand = [card for card in user.hand if card.card_type == CardType.GOAL]
             if len(goal_cards_in_hand) == 0:
                 break
             discard_card = game_state.agents[user_number].choose_to_discard(game_state)
             if discard_card == 0:
                 break
-            selected_goal_location = select_card(game_state, user_number, ["hand"], [CardType.RULE, CardType.KEEPER, CardType.ACTION])
+            selected_goal_location = select_card(game_state, user_number, [CardZone.HAND], [CardType.RULE, CardType.KEEPER, CardType.ACTION])
             trash_selected_card(game_state, user_number, selected_goal_location, True)
             cards_to_draw += 1
 
@@ -81,7 +79,7 @@ def activate_free_action(free_action_name: str, game_state: 'Game', user_number:
         game_state.force_turn_over = True
 
     elif free_action_name == "recycling":
-        selected_keeper_location = select_card(game_state, user_number, ["own_keepers"])
+        selected_keeper_location = select_card(game_state, user_number, [ExtendedCardZone.OWN_KEEPERS])
         trash_selected_card(game_state, user_number, selected_keeper_location, True)
 
         for i in range(3 + game_state.inflation()):

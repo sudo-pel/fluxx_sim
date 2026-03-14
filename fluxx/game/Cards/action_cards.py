@@ -3,14 +3,17 @@ from typing import TYPE_CHECKING
 import random
 
 # avoiding circular import
-from fluxx.Card import CardType
+from fluxx.game.FluxxEnums import CardType, CardZone, ExtendedCardZone
+from fluxx.game.GameSchema import GameSchema
+
 if TYPE_CHECKING:
-    from fluxx import Game
+    pass
 
-from fluxx.utils.card_effect_utils import draw_and_play, trash_selected_card, get_selected_card, select_card
-from fluxx import game_messages
+from fluxx.game.utils.card_effect_utils import draw_and_play, trash_selected_card, get_selected_card, select_card
+from fluxx.game import game_messages
 
-def activate_action(action_name: str, game_state: 'Game', user_number: int):
+
+def activate_action(action_name: str, game_state: 'GameSchema', user_number: int):
     user_player = game_state.players[user_number]
     player_agent = game_state.agents[user_number]
     other_players = []
@@ -34,7 +37,7 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
             game_state.activate_card(user_number, card_to_play)
 
     elif action_name == "zap_a_card":
-        selected_card_location = select_card(game_state, user_number, ["rules", "keepers", "goals"])
+        selected_card_location = select_card(game_state, user_number, [CardZone.RULES, CardZone.KEEPERS, "goals"])
 
         if selected_card_location is None:
             return
@@ -44,7 +47,7 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
         trash_selected_card(game_state, user_number, selected_card_location, False)
 
     elif action_name == "trash_a_new_rule":
-        selected_card_location = select_card(game_state, user_number, ["rules"])
+        selected_card_location = select_card(game_state, user_number, [CardZone.RULES])
 
         if selected_card_location is None:
             return
@@ -52,7 +55,7 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
         trash_selected_card(game_state, user_number, selected_card_location, True)
 
     elif action_name == "trash_a_keeper":
-        selected_card_location = select_card(game_state, user_number, ["keepers"])
+        selected_card_location = select_card(game_state, user_number, [CardZone.KEEPERS])
 
         if selected_card_location is None:
             return
@@ -71,16 +74,16 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
         game_messages.special_effect(f"<< Player {user_number} traded hands with player {selected_player} >> ")
 
     elif action_name == "todays_special":
-        draw_and_play(game_state, user_number, 3+game_state.inflation(), 1+game_state.inflation(), "discard_pile")
+        draw_and_play(game_state, user_number, 3+game_state.inflation(), 1+game_state.inflation(), CardZone.DISCARD_PILE)
 
     elif action_name == "draw_2_and_use_em":
-        draw_and_play(game_state, user_number, 2+game_state.inflation(), 2+game_state.inflation(), "discard_pile")
+        draw_and_play(game_state, user_number, 2+game_state.inflation(), 2+game_state.inflation(), CardZone.DISCARD_PILE)
 
     elif action_name == "draw_3_play_2_of_them":
-        draw_and_play(game_state, user_number, 3+game_state.inflation(), 2+game_state.inflation(), "discard_pile")
+        draw_and_play(game_state, user_number, 3+game_state.inflation(), 2+game_state.inflation(), CardZone.DISCARD_PILE)
 
     elif action_name == "steal_a_keeper":
-        selected_card_location = select_card(game_state, user_number, ["enemy_keepers"])
+        selected_card_location = select_card(game_state, user_number, [ExtendedCardZone.ENEMY_KEEPERS])
 
         if selected_card_location is None:
             return
@@ -147,12 +150,12 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
     elif action_name == "lets_simplify":
         to_discard = (len(game_state.rules)+1) // 2
         for i in range(to_discard):
-            selected_card_location = select_card(game_state, user_number, ["rules"])
+            selected_card_location = select_card(game_state, user_number, [CardZone.RULES])
             trash_selected_card(game_state, user_number, selected_card_location, True)
 
     elif action_name == "lets_do_that_again":
         # Note: the discarded card should not be in the discard pile when it is played (in case it has its own discard interaction)
-        selected_card_location = select_card(game_state, user_number, ["discard_pile"], [CardType.GOAL, CardType.KEEPER])
+        selected_card_location = select_card(game_state, user_number, [CardZone.DISCARD_PILE], [CardType.GOAL, CardType.KEEPER])
         selected_card = get_selected_card(game_state, selected_card_location)
         trash_selected_card(game_state, user_number, selected_card_location, False)
         game_state.activate_card(user_number, selected_card)
@@ -163,8 +166,8 @@ def activate_action(action_name: str, game_state: 'Game', user_number: int):
             game_state.draw(user_player)
 
     elif action_name == "exchange_keepers":
-        keeper_to_give_location = select_card(game_state, user_number, ["own_keepers"])
-        keeper_to_take_location = select_card(game_state, user_number, ["enemy_keepers"])
+        keeper_to_give_location = select_card(game_state, user_number, [ExtendedCardZone.OWN_KEEPERS])
+        keeper_to_take_location = select_card(game_state, user_number, [ExtendedCardZone.ENEMY_KEEPERS])
 
         if keeper_to_give_location is None or keeper_to_take_location is None:
             return

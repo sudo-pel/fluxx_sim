@@ -3,21 +3,91 @@ import random
 from typing import Optional
 from collections import Counter
 
-from Card import CardType, Card, Rule, Goal, Keeper, Action, RulesOptions
+from fluxx.game.Card import Card, Rule, Goal, Keeper, Action, RulesOptions
+from fluxx.game.FluxxEnums import CardType
 
-from Player import Player
+from fluxx.game.Player import Player
 from Agents.Agent import Agent
-from Agents.PlayerControlled import PlayerControlledAgent
-from fluxx import game_messages
-from fluxx.Cards import action_cards
-from fluxx.Cards.free_actions import can_use_free_action, activate_free_action
-from fluxx.GameSchema import GameSchema
-from fluxx.utils import card_effect_utils
+from fluxx.game import game_messages
+from fluxx.game.Cards import action_cards
+from fluxx.game.Cards.free_actions import can_use_free_action, activate_free_action
+from fluxx.game.GameSchema import GameSchema
+from fluxx.game.utils import card_effect_utils
 
 
 class Game(GameSchema):
     def __init__(self, player_agents: list[Agent], deck: list[Card]):
         GameSchema.__init__(self, player_agents, deck)
+
+    def reset(self):
+        random.shuffle(self.deck)
+        self.draw_pile = self.deck
+
+        self.player_turn: int = 0
+        self.turn_count: int = 0
+        self.goals = []
+        self.discard_pile = []
+        self.draw_pile = []
+        self.force_turn_over = False
+        self.winner = None
+        self.extra_turn = False
+        self.played_free_actions = set()
+
+        for player in self.players:
+            player.hand = []
+            player.keepers = []
+            player.cards_drawn = 0
+            player.cards_played = 0
+
+    def run_game(self):
+        """Run the game."""
+
+        random.shuffle(self.deck)
+        self.draw_pile = self.deck
+
+        while self.winner is None:
+            turn_agent = self.agents[self.player_turn]
+            turn_player = self.players[self.player_turn]
+
+            game_messages.turn_start(f"PLAYER {self.player_turn} TURN")
+            self.start_of_turn()
+
+            while self.winner is None:
+                if self.player_turn_over():
+                    self.end_of_turn()
+                    break
+
+                available_free_actions = self.get_available_free_actions()
+                played_free_action = -1
+                while len(available_free_actions) > 0 and played_free_action is not None and not self.force_turn_over:
+                    played_free_action = turn_agent.play_free_action(self, available_free_actions)
+                    if played_free_action is not None:
+                        self.play_free_action(available_free_actions[played_free_action])
+                        available_free_actions = self.get_available_free_actions()
+
+                # Playing a free action can insta-end your turn
+                if self.player_turn_over():
+                    self.end_of_turn()
+                    break
+
+                self.draw_for_turn()
+
+                played_card = None
+
+                if self.rule_in_play("first_play_random"):
+                    if self.get_play_rules(self.player_turn) > 1 and turn_player.cards_played == 0:
+                        played_card = random.randint(0, len(turn_player.hand)-1)
+                        game_messages.special_effect(f"<<< 'First Play Random': PLAYED {turn_player.hand[played_card].name}! >>")
+
+                if played_card is None:
+                    played_card = turn_agent.play_card(self.get_game_state())
+
+                if not self.can_play_card(self.player_turn, played_card):
+                    raise Exception("Illegal action selected!")
+
+                self.play_card(self.player_turn, played_card)
+
+        game_messages.game_over(f"GAME OVER: WINNER IS PLAYER {self.winner}")
 
     def get_draw_rules(self, player_number):
         """Calculate, based on cards in play, how many cards should be drawn by a player."""
@@ -388,56 +458,6 @@ class Game(GameSchema):
             return 1
         else:
             return 0
-
-    def run_game(self):
-        """Run the game."""
-
-        random.shuffle(self.deck)
-        self.draw_pile = self.deck
-
-        while self.winner is None:
-            turn_agent = self.agents[self.player_turn]
-            turn_player = self.players[self.player_turn]
-
-            game_messages.turn_start(f"PLAYER {self.player_turn} TURN")
-            self.start_of_turn()
-
-            while self.winner is None:
-                if self.player_turn_over():
-                    self.end_of_turn()
-                    break
-
-                available_free_actions = self.get_available_free_actions()
-                played_free_action = -1
-                while len(available_free_actions) > 0 and played_free_action is not None and not self.force_turn_over:
-                    played_free_action = turn_agent.play_free_action(self, available_free_actions)
-                    if played_free_action is not None:
-                        self.play_free_action(available_free_actions[played_free_action])
-                        available_free_actions = self.get_available_free_actions()
-
-                # Playing a free action can insta-end your turn
-                if self.player_turn_over():
-                    self.end_of_turn()
-                    break
-
-                self.draw_for_turn()
-
-                played_card = None
-
-                if self.rule_in_play("first_play_random"):
-                    if self.get_play_rules(self.player_turn) > 1 and turn_player.cards_played == 0:
-                        played_card = random.randint(0, len(turn_player.hand)-1)
-                        game_messages.special_effect(f"<<< 'First Play Random': PLAYED {turn_player.hand[played_card].name}! >>")
-
-                if played_card is None:
-                    played_card = turn_agent.play_card(self.get_game_state())
-
-                if not self.can_play_card(self.player_turn, played_card):
-                    raise Exception("Illegal action selected!")
-
-                self.play_card(self.player_turn, played_card)
-
-        game_messages.game_over(f"GAME OVER: WINNER IS PLAYER {self.winner}")
 
 
 

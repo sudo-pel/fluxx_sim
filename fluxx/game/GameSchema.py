@@ -1,8 +1,8 @@
 import abc
 
-from Card import CardType, Card, Rule, Goal, Keeper, Action, RulesOptions
+from fluxx.game.Card import Card, Rule, Goal
 
-from Player import Player
+from fluxx.game.Player import Player
 from Agents.Agent import Agent
 
 class GameSchema(metaclass=abc.ABCMeta):
@@ -18,7 +18,7 @@ class GameSchema(metaclass=abc.ABCMeta):
         self.draw_pile: list[Card] = []
         self.force_turn_over: bool = False
         self.winner = None
-        self.deck = deck # for now, not the same as draw_pile
+        self.deck = deck # for now, not the same as draw_pil e
         self.extra_turn = False
         self.played_free_actions = set()
 

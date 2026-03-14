@@ -1,12 +1,6 @@
-from enum import Enum
-
-class CardType(Enum):
-    RULE = 1
-    KEEPER = 2
-    GOAL = 3
-    ACTION = 4
-
 # self-note: maybe worth adding something extra for Goals here
+from fluxx.game.FluxxEnums import CardType
+
 class Card:
     def __init__(self, name: str, card_type: CardType):
         self.name = name
