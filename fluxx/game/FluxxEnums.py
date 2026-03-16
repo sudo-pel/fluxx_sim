@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Union
 from enum import Enum
 
@@ -19,3 +20,23 @@ class ExtendedCardZone(Enum):
     OWN_KEEPERS = 2
 
 AnyCardZone = Union[CardZone, ExtendedCardZone]
+
+class GamePhaseType(Enum):
+    PLAY_CARD_FOR_TURN = 1,
+    POST_PLAY_CARD_FOR_TURN = 4,
+    DISCARD_CARD_FROM_HAND = 2,
+    DISCARD_KEEPER = 3
+
+@dataclass
+class GamePhase:
+    type: GamePhaseType
+    acting_player: int
+
+class GameActionType(Enum):
+    PLAY_CARD_FOR_TURN = 1,
+    DISCARD_CARD_FROM_HAND = 2,
+    DISCARD_KEEPER = 3,
+
+class GameAction:
+    type: GameActionType
+    card_name: str

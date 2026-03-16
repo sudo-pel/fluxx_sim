@@ -4,7 +4,7 @@ from typing import Optional
 from collections import Counter
 
 from fluxx.game.Card import Card, Rule, Goal, Keeper, Action, RulesOptions
-from fluxx.game.FluxxEnums import CardType
+from fluxx.game.FluxxEnums import CardType, GamePhase, GamePhaseType, GameAction, GameActionType
 
 from fluxx.game.Player import Player
 from Agents.Agent import Agent
@@ -13,6 +13,7 @@ from fluxx.game.Cards import action_cards
 from fluxx.game.Cards.free_actions import can_use_free_action, activate_free_action
 from fluxx.game.GameSchema import GameSchema
 from fluxx.game.utils import card_effect_utils
+from fluxx.game.utils.general_utils import index_of_card
 
 
 class Game(GameSchema):
@@ -32,6 +33,7 @@ class Game(GameSchema):
         self.winner = None
         self.extra_turn = False
         self.played_free_actions = set()
+        self.phase = GamePhase.PLAY_CARD
 
         for player in self.players:
             player.hand = []
@@ -39,12 +41,53 @@ class Game(GameSchema):
             player.cards_drawn = 0
             player.cards_played = 0
 
+    def check_current_phase(self) -> GamePhase:
+        if len(self.stack) == 0:
+            return GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn)
+        else:
+            return self.stack[-1]
+
+    def get_current_phase(self) -> GamePhase:
+        """
+        The same as check_current_phase, but pops from the phase stack
+        """
+        if len(self.stack) == 0:
+            return GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn)
+        else:
+            return self.stack.pop()
+
+    def is_action_valid(self, phase: GamePhase, action: GameAction):
+        pass # TODO: Implement action validation
+
+    # TODO: decide suitable restricted interface for action (enum? Something else..?)
+        # We note that the simulator will receive an integer and then decode it into something more complex for the game simulator to consume
+    def step(self, action: GameAction):
+        current_phase = self.get_current_phase()
+        acting_player = current_phase.acting_player
+
+        if not self.is_action_valid(current_phase, action):
+            raise Exception("Invalid action")
+
+        if action.type == GameActionType.PLAY_CARD_FOR_TURN:
+            card_to_play = action.card_name
+            self.play_card_from_hand(acting_player, card_to_play)
+        elif action.type == GameActionType.DISCARD_CARD_FROM_HAND:
+            card_to_discard = action.card_name
+            self.discard_card(acting_player, card_to_discard)
+        elif action.type == GameActionType.DISCARD_KEEPER:
+            keeper_to_discard = action.card_name
+            self.discard_keeper(acting_player, keeper_to_discard)
+
+        # TODO: Implement "actionless phases": for example, after playing a card, we want to return to post_play_card_for_turn which has some end-of-phase logic. To do this, we will append to the stack (POST_PLAY_FOR_TURN, player_number) immediately after processing PLAY_CARD_FOR_TURN. The simulator must then remember to deal with this in the future, whether it is immediately after playing this card (in most cases) or a long time after some action processing, discarding of cards, etc.
+        if self.check_current_phase().type == GamePhaseType.POST_PLAY_CARD_FOR_TURN:
+            pass
+            # TODO: Implement (see below for details)
+            # check if plays exhausted -> if not, apply any EoT actions and then return
+            # if plays exhausted, pass to next player's turn, mutating state and stack accordingly
+
+
     def run_game(self):
         """Run the game."""
-
-        random.shuffle(self.deck)
-        self.draw_pile = self.deck
-
         while self.winner is None:
             turn_agent = self.agents[self.player_turn]
             turn_player = self.players[self.player_turn]
@@ -62,7 +105,9 @@ class Game(GameSchema):
                 while len(available_free_actions) > 0 and played_free_action is not None and not self.force_turn_over:
                     played_free_action = turn_agent.play_free_action(self, available_free_actions)
                     if played_free_action is not None:
-                        self.play_free_action(available_free_actions[played_free_action])
+                        free_action_name = available_free_actions[played_free_action]
+
+                        self.play_free_action(free_action_name)
                         available_free_actions = self.get_available_free_actions()
 
                 # Playing a free action can insta-end your turn
@@ -174,13 +219,25 @@ class Game(GameSchema):
 
         return True
 
-    def discard_card(self, player: Player, card_to_discard: int):
-        self.discard_pile.append(player.hand[card_to_discard])
-        del player.hand[card_to_discard]
+    def discard_card(self, player_number: int, card_name: str):
+        """
+        Discard a card from a player's hand. Does not check whether the card is actually in the player's hand.
+        :param player_number:
+        :param card_name:
+        :return:
+        """
+        player = self.players[player_number]
 
-    def discard_keeper(self, player: Player, keeper_to_discard: int):
-        self.discard_pile.append(player.keepers[keeper_to_discard])
-        del player.keepers[keeper_to_discard]
+        card_index = index_of_card(player.hand, card_name)
+        self.discard_pile.append(player.hand[card_index])
+        del player.hand[card_index]
+
+    def discard_keeper(self, player_number: int, card_name: str):
+        player = self.players[player_number]
+        card_index = index_of_card(player.keepers, card_name)
+
+        self.discard_pile.append(player.keepers[card_index])
+        del player.keepers[card_index]
 
         self.check_for_winners()
 
@@ -323,16 +380,26 @@ class Game(GameSchema):
         else:
             raise Exception("Invalid card type")
 
-    def play_card(self, player_number: int, i: int):
+    def play_card_from_hand(self, player_number: int, card_name: str):
+        """
+        Assumes a validated input (will not check whether the card is actually in the player's hand), but will search the hand for it
+
+        Play a card from a player's hand. Discards it from the player's hand but does NOT add it to the discard pile.
+
+        :arguments:
+        - player_number: Index of the player in self.players who is playing the card
+        - card_name: The name of the card to play (as a string)
+        :return:
+        """
         player = self.players[player_number]
 
-        """Play a card. Does not include validation. Discards card from player hand but does NOT add it to the discard pile"""
-        card_to_play = player.hand[i]
+        i = index_of_card(player.hand, card_name)
+        card_in_hand = player.hand[i]
 
         del player.hand[i]
         player.cards_played += 1
 
-        self.activate_card(player_number, card_to_play)
+        self.activate_card(player_number, card_in_hand)
 
         self.check_for_winners()
 
@@ -426,13 +493,13 @@ class Game(GameSchema):
         available_free_actions = []
 
         for rule in self.rules:
-            if rule.free_action and can_use_free_action(rule.name, self, self.player_turn):
+            if rule.free_action and can_use_free_action(self, self.player_turn, rule.name):
                 available_free_actions.append(rule.name)
 
         return available_free_actions
 
     def play_free_action(self, free_action_name):
-        activate_free_action(free_action_name, self, self.player_turn)
+        activate_free_action(self, self.player_turn, free_action_name)
         self.played_free_actions.add(free_action_name)
 
         self.check_for_winners()

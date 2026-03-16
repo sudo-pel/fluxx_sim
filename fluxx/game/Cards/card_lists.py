@@ -1,4 +1,4 @@
-card_list = [
+base_deck = [
     # Rules - Draw/Play/Limits
     "hand_limit_2",
     "hand_limit_1",

@@ -1,6 +1,7 @@
 import abc
 
 from fluxx.game.Card import Card, Rule, Goal
+from fluxx.game.FluxxEnums import GamePhase
 
 from fluxx.game.Player import Player
 from Agents.Agent import Agent
@@ -21,6 +22,7 @@ class GameSchema(metaclass=abc.ABCMeta):
         self.deck = deck # for now, not the same as draw_pil e
         self.extra_turn = False
         self.played_free_actions = set()
+        self.stack: list[GamePhase] = []
 
         for i, agent in enumerate(self.agents):
             agent.set_player_number(i)
