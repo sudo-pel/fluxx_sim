@@ -25,7 +25,9 @@ class GamePhaseType(Enum):
     PLAY_CARD_FOR_TURN = 1,
     POST_PLAY_CARD_FOR_TURN = 4,
     DISCARD_CARD_FROM_HAND = 2,
-    DISCARD_KEEPER = 3
+    DISCARD_KEEPER = 3,
+    GAME_START = 5,
+    TURN_END = 6,
 
 @dataclass
 class GamePhase:

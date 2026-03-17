@@ -10,3 +10,11 @@ Cards are passed around as `string`s. Game actions assumed validated inputs: val
 ### Storage and passing of players
 Players are referred to by `player_number`. Functions get the `Player` object by indexing `Game.players`.
 
+## `Game.py` conventions
+
+Arguments are omitted when they are "obvious" (e.g `start_of_turn` will always refer to the player whose turn it is, so there is no `player_number` argument).
+
+<u>`Handle` functions vs. regular</u>
+
+Methods beginning with `handle_` are primarily for adding to the stack. Methods not beginning with `handle_` implement "concrete game logic"
+
