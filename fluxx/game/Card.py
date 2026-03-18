@@ -1,4 +1,5 @@
 # self-note: maybe worth adding something extra for Goals here
+from fluxx.game.Cards.card_data import CARD_DATA
 from fluxx.game.FluxxEnums import CardType
 
 class Card:
@@ -68,3 +69,17 @@ class Goal(Card):
 class Action(Card):
     def __init__(self, name: str):
         super().__init__(name, CardType.ACTION)
+
+def make_card(card_name: str):
+    card_data = CARD_DATA[card_name]
+
+    if card_data["card_type"] == "RULE":
+        return Rule(card_name, RulesOptions(**card_data["RulesOptions"]))
+    elif card_data["card_type"] == "KEEPER":
+        return Keeper(card_name)
+    elif card_data["card_type"] == "GOAL":
+        return Goal(card_name, card_data["required_keepers"], card_data.get("disallowed_keepers", []), card_data.get("optional_keepers", []))
+    elif card_data["card_type"] == "ACTION":
+        return Action(card_name)
+    else:
+        raise Exception("Invalid card type")

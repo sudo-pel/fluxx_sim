@@ -1,4 +1,5 @@
 # begin with implementing a two-player game.
+import math
 import random
 from typing import Optional
 from collections import Counter
@@ -7,7 +8,6 @@ from fluxx.game.Card import Card, Rule, Goal, Keeper, Action, RulesOptions
 from fluxx.game.FluxxEnums import CardType, GamePhase, GamePhaseType, GameAction, GameActionType
 
 from fluxx.game.Player import Player
-from Agents.Agent import Agent
 from fluxx.game import game_messages
 from fluxx.game.Cards import action_cards
 from fluxx.game.Cards.free_actions import can_use_free_action, activate_free_action
@@ -17,29 +17,12 @@ from fluxx.game.utils.general_utils import index_of_card
 
 
 class Game(GameSchema):
-    def __init__(self, player_agents: list[Agent], deck: list[Card]):
-        GameSchema.__init__(self, player_agents, deck)
+    def __init__(self, player_count: int, card_list: list[str]):
+        GameSchema.__init__(self, player_count, card_list)
 
     def reset(self):
-        random.shuffle(self.deck)
-        self.draw_pile = self.deck
-
-        self.player_turn: int = 0
-        self.turn_count: int = 0
-        self.goals = []
-        self.discard_pile = []
-        self.draw_pile = []
-        self.force_turn_over = False
-        self.winner = None
-        self.extra_turn = False
-        self.played_free_actions = set()
-        self.stack = [GamePhase(GamePhaseType.GAME_START, -1)]
-
-        for player in self.players:
-            player.hand = []
-            player.keepers = []
-            player.cards_drawn = 0
-            player.cards_played = 0
+        super().reset()
+        self.step(GameAction(GameActionType.NULL_ACTION, ""))
 
     def check_current_phase(self) -> GamePhase:
         if len(self.stack) == 0:
@@ -56,7 +39,7 @@ class Game(GameSchema):
         else:
             return self.stack.pop()
 
-    def is_action_valid(self, phase: GamePhase, action: GameAction) -> bool:
+    def is_action_valid(self, phase: GamePhase, action: GameAction) -> tuple[bool, Optional[str]]:
         """
         Given a GamePhase and a game state (implicit in the self-reference), validates a given GameAction.
 
@@ -64,35 +47,36 @@ class Game(GameSchema):
         """
 
         # Consider refactoring this into a dict with a list in the future
-        if GamePhase.type == GamePhaseType.PLAY_CARD_FOR_TURN and action.type != GameActionType.PLAY_CARD_FOR_TURN: return False
-        if GamePhase.type == GamePhaseType.DISCARD_CARD_FROM_HAND and action.type != GameActionType.DISCARD_CARD_FROM_HAND: return False
-        if GamePhase.type == GamePhaseType.DISCARD_KEEPER and action.type != GameActionType.DISCARD_KEEPER: return False
+        if phase.type == GamePhaseType.PLAY_CARD_FOR_TURN and action.type != GameActionType.PLAY_CARD_FOR_TURN: return False, "Invalid action type"
+        if phase.type == GamePhaseType.DISCARD_CARD_FROM_HAND and action.type != GameActionType.DISCARD_CARD_FROM_HAND: return False, "Invalid action type"
+        if phase.type == GamePhaseType.DISCARD_KEEPER and action.type != GameActionType.DISCARD_KEEPER: return False, "Invalid action type"
 
         # Specific action validation
         if action.type == GameActionType.PLAY_CARD_FOR_TURN:
             # is it this player's turn?
-            if self.player_turn != phase.acting_player: return False
+            if self.player_turn != phase.acting_player: return False, "Not this player's turn"
 
             # is the card in this player's hard?
-            if action.card_name not in self.players[phase.acting_player].hand: return False
+            if action.card_name not in self.get_cards_in_hand_by_name(phase.acting_player): return False, "Card to be played not in hand"
 
         elif action.type == GameActionType.DISCARD_CARD_FROM_HAND:
             # is the card in this player's hand?
-            if action.card_name not in self.players[phase.acting_player].hand: return False
+            if action.card_name not in self.get_cards_in_hand_by_name(phase.acting_player): return False, "Card to be discarded not in hand"
 
         elif action.type == GameActionType.DISCARD_KEEPER:
             # does the player own this keeper?
-            if action.card_name not in self.players[phase.acting_player].keepers: return False
+            if action.card_name not in self.get_keepers_by_name(phase.acting_player): return False, "Keeper to be discarded not owned"
 
-        return True
+        return True, None
 
     # We note that the simulator will receive an integer and then decode it into something more complex for the game simulator to consume
     def step(self, action: GameAction):
         current_phase = self.get_current_phase()
         acting_player = current_phase.acting_player
 
-        if not self.is_action_valid(current_phase, action):
-            raise Exception("Invalid action")
+        action_valid, error_message = self.is_action_valid(current_phase, action)
+        if not action_valid:
+            raise Exception(f"Invalid action: {error_message}")
 
         if action.type == GameActionType.PLAY_CARD_FOR_TURN:
             card_to_play = action.card_name
@@ -105,19 +89,21 @@ class Game(GameSchema):
             self.discard_keeper(acting_player, keeper_to_discard)
 
         # TODO: Implement "actionless phases": for example, after playing a card, we want to return to post_play_card_for_turn which has some end-of-phase logic. To do this, we will append to the stack (POST_PLAY_FOR_TURN, player_number) immediately after processing PLAY_CARD_FOR_TURN. The simulator must then remember to deal with this in the future, whether it is immediately after playing this card (in most cases) or a long time after some action processing, discarding of cards, etc.
-        if self.check_current_phase().type == GamePhaseType.GAME_START:
+        # caveat: GAME_START is an actionless phase, but it will be called at the start of the game via a step() function and therefore will not be at the top of the stack (it will have been popped into current_phase)
+        if current_phase.type == GamePhaseType.GAME_START:
             # Start of game: begin the turn of the first player
             self.start_of_turn()
-
             self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
-            self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, acting_player))
+            self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn))
 
         elif self.check_current_phase().type == GamePhaseType.POST_PLAY_CARD_FOR_TURN:
             self.get_current_phase()
             self.handle_turn_over()
 
         elif self.check_current_phase().type == GamePhaseType.TURN_END:
+            self.get_current_phase()
             self.end_of_turn()
+            self.start_of_turn()
             self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
             self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn))
 
@@ -319,11 +305,13 @@ class Game(GameSchema):
         keeper_limit = self.get_keeper_limit()
         hand_limit = self.get_hand_limit()
 
-        for i in range(len(player.keepers) - keeper_limit):
-            self.stack.append(GamePhase(GamePhaseType.DISCARD_KEEPER, player_number))
+        if keeper_limit is not None:
+            for i in range(len(player.keepers) - keeper_limit):
+                self.stack.append(GamePhase(GamePhaseType.DISCARD_KEEPER, player_number))
 
-        for i in range(len(player.hand) - hand_limit):
-            self.stack.append(GamePhase(GamePhaseType.DISCARD_CARD_FROM_HAND, player_number))
+        if hand_limit is not None:
+            for i in range(len(player.hand) - hand_limit):
+                self.stack.append(GamePhase(GamePhaseType.DISCARD_CARD_FROM_HAND, player_number))
 
     def get_keeper_limit(self, player_number: Optional[int]=None) -> Optional[int]:
         limit = None
@@ -340,6 +328,9 @@ class Game(GameSchema):
                 limit = rule.hand_limit + self.inflation()
 
         return limit
+
+    def get_keepers_by_name(self, player_number: int) -> list[str]:
+        return self.get_all_keepers_by_name()[player_number]
 
     def get_all_keepers_by_name(self) -> list[list[str]]:
         """
@@ -586,114 +577,3 @@ class Game(GameSchema):
             return 1
         else:
             return 0
-
-
-
-# test
-test_deck = [
-    Rule("hand_limit_2", RulesOptions(hand_limit=2)),
-    Rule("hand_limit_1", RulesOptions(hand_limit=1)),
-    Rule("hand_limit_0", RulesOptions(hand_limit=0)),
-    Rule("keeper_limit_4", RulesOptions(keeper_limit=4)),
-    Rule("keeper_limit_3", RulesOptions(keeper_limit=3)),
-    Rule("keeper_limit_2", RulesOptions(keeper_limit=2)),
-    Rule("draw_5", RulesOptions(draw=5)),
-    Rule("draw_4", RulesOptions(draw=4)),
-    Rule("draw_2", RulesOptions(draw=2)),
-    Rule("play_2", RulesOptions(play=2)),
-    Rule("draw_3", RulesOptions(draw=3)),
-    Rule("play_4", RulesOptions(play=4)),
-    Rule("play_3", RulesOptions(play=3)),
-
-
-    Keeper("the_sun"),
-    Keeper("the_party"),
-    Keeper("music"),
-    Keeper("dreams"),
-    Keeper("love"),
-    Keeper("peace"),
-    Keeper("sleep"),
-    Keeper("the_brain"),
-    Keeper("bread"),
-    Keeper("chocolate"),
-    Keeper("cookies"),
-    Keeper("milk"),
-    Keeper("time"),
-    Keeper("money"),
-    Keeper("the_eye"),
-    Keeper("the_moon"),
-    Keeper("the_rocket"),
-    Keeper("the_toaster"),
-    Keeper("television"),
-
-    Goal("the_appliances", ["the_toaster", "television"]),
-    Goal("baked_goods", ["bread", "cookies"]),
-    Goal("bed_time", ["sleep", "time"]),
-    Goal("bread_and_chocolate", ["bread", "chocolate"]),
-    Goal("cant_buy_me_love", ["money", "love"]),
-    Goal("chocolate_cookies", ["chocolate", "cookies"]),
-    Goal("chocolate_milk", ["chocolate", "milk"]),
-    Goal("day_dreams", ["the_sun", "dreams"]),
-    Goal("dreamland", ["sleep", "dreams"]),
-    Goal("the_eye_of_the_beholder", ["the_eye", "love"]),
-    Goal("great_theme_song", ["music", "television"]),
-    Goal("hearts_and_minds", ["love", "the_brain"]),
-    Goal("hippyism", ["peace", "love"]),
-    Goal("lullaby", ["sleep", "music"]),
-    Goal("milk_and_cookies", ["milk", "cookies"]),
-    Goal("the_minds_eye", ["the_brain", "the_eye"]),
-    Goal("night_and_day", ["the_sun", "the_moon"]),
-    Goal("party_time", ["the_party", "time"]),
-    Goal("rocket_science", ["the_rocket", "the_brain"]),
-    Goal("rocket_to_the_moon", ["the_rocket", "the_moon"]),
-    Goal("squishy_chocolate", ["chocolate", "the_sun"]),
-    Goal("time_is_money", ["time", "money"]),
-    Goal("toast", ["bread", "the_toasted"]),
-    Goal("turn_it_up", ["music", "the_party"]),
-    Goal("winning_the_lottery", ["dreams", "money"]),
-    Goal("world_peace", ["dreams", "peace"]),
-
-    Action("use_what_you_take"),
-    Action("zap_a_card"),
-    Action("trash_a_new_rule"),
-    Action("trash_a_keeper"),
-    Action("trade_hands"),
-    Action("todays_special"),
-    Action("draw_2_and_use_em"),
-    Action("draw_3_play_2_of_them"),
-    Action("steal_a_keeper"),
-    Action("share_the_wealth"),
-    Action("rules_reset"),
-    Action("rock_paper_scissors_showdown"),
-    Action("random_tax"),
-    Action("no_limits"),
-    Action("lets_simplify"),
-    Action("lets_do_that_again"),
-    Action("jackpot"),
-    Action("exchange_keepers"),
-    Action("empty_the_trash"),
-    Action("discard_and_draw"),
-    Action("take_another_turn"),
-    Action("rotate_hands"),
-    Action("everybody_gets_1"),
-
-    Rule("mystery_play", RulesOptions(free_action=True)),
-    Rule("swap_plays_for_draws", RulesOptions(free_action=True)),
-    Rule("get_on_with_it", RulesOptions(free_action=True)),
-    Rule("recycling", RulesOptions(free_action=True)),
-    Rule("goal_mill", RulesOptions(free_action=True)),
-    Rule("play_all", RulesOptions(play=-1)),
-    Rule("play_all_but_1", RulesOptions(play=-1)),
-    Rule("no_hand_bonus", RulesOptions()),
-    Rule("party_bonus", RulesOptions()),
-    Rule("poor_bonus", RulesOptions()),
-    Rule("rich_bonus", RulesOptions()),
-    Rule("double_agenda", RulesOptions()),
-    Rule("first_play_random", RulesOptions()),
-    Rule("inflation", RulesOptions()),
-
-    Goal("5_keepers", []),
-    Goal("10_cards_in_hand", []),
-    Goal("the_brain_no_tv", ["the_brain"], ["television"]),
-    Goal("party_snacks", ["the_party"], [], [["milk", "cookies", "chocolate", "bread"]]),
-]

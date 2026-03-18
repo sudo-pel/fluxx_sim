@@ -5,7 +5,7 @@ from pettingzoo import AECEnv
 from pettingzoo.utils import agent_selector, wrappers
 from typing import Optional
 
-from fluxx.game.FluxxEnums import GamePhaseType
+from fluxx.game.FluxxEnums import GamePhaseType, GameAction, GameActionType
 from fluxx.game.Game import Game
 """
 
@@ -75,8 +75,11 @@ class FluxxEnv(AECEnv):
 
         self.game = game
         self.card_vector_length = len(game.deck)
-        self.card_map = {
+        self.card_to_index: dict[str, int] = {
             card.name: i for i, card in enumerate(game.deck)
+        }
+        self.index_to_card = {
+            i: card.name for i, card in enumerate(game.deck)
         }
 
         self.num_players = num_players
@@ -125,9 +128,17 @@ class FluxxEnv(AECEnv):
         self.game.step(action)
 
         # TODO: Update rewards
+        # ...
         # TODO: Check termination
+        if self.game.winner is not None:
+            for agent in self.agents:
+                self.terminations[agent] = True
+
         # TODO: Accumulate rewards into _cumulative_rewards
+        # ...
         # TODO: Advance to next agent (just check whats on top of the game stack)
+        game_state = self.game.check_current_phase()
+        self.agent_selection = f"player_{game_state.acting_player}"
 
     def observe(self, agent):
         # TODO: return observation and action mask for this agent
@@ -154,8 +165,7 @@ class FluxxEnv(AECEnv):
         rules_in_play = self.game.get_rules_in_play_by_name()
         rules_in_play_vector = self.populate_card_vector(rules_in_play)
 
-        observation = cards_in_hand_vector
-        observation = np.concatenate((observation,agent_keeper_vector, other_keeper_vectors, goals_in_play_vector, rules_in_play_vector))
+        observation = np.concatenate((cards_in_hand_vector, agent_keeper_vector, *other_keeper_vectors, goals_in_play_vector, rules_in_play_vector))
 
         # ----
         # ACTION MASK
@@ -169,18 +179,28 @@ class FluxxEnv(AECEnv):
         discard_keeper_mask = np.zeros(self.card_vector_length, dtype=np.int8)
 
         # TODO: Mask *in* legal plays (cards in hand, keepers owned) and then return the concatenation of all
-        if current_phase == GamePhaseType.PLAY_CARD_FOR_TURN:
-            pass
-        elif current_phase == GamePhaseType.DISCARD_CARD_FROM_HAND:
-            pass
-        elif current_phase == GamePhaseType.DISCARD_KEEPER:
-            pass
+        if current_phase.type == GamePhaseType.PLAY_CARD_FOR_TURN:
+            play_card_mask = cards_in_hand_vector
+        elif current_phase.type == GamePhaseType.DISCARD_CARD_FROM_HAND:
+            discard_card_from_hand_mask = cards_in_hand_vector
+        elif current_phase.type == GamePhaseType.DISCARD_KEEPER:
+            discard_keeper_mask = agent_keeper_vector
+
+        action_mask = np.concatenate((play_card_mask, discard_card_from_hand_mask, discard_keeper_mask))
 
         # Get action_mask
         return {
             "observation": observation,
-            "action_mask": np.ones(self.card_vector_length, dtype=np.int8),
+            "action_mask": action_mask
         }
+
+    def decode_action(self, action_index: int) -> GameAction:
+        action_types = [GameActionType.PLAY_CARD_FOR_TURN, GameActionType.DISCARD_CARD_FROM_HAND, GameActionType.DISCARD_KEEPER]
+
+        action_type = action_index // self.card_vector_length
+        card_name = self.index_to_card[action_index % self.card_vector_length]
+
+        return GameAction(action_types[action_type], card_name)
 
     def observation_space(self, agent):
         return self.observation_spaces[agent]
@@ -205,5 +225,5 @@ class FluxxEnv(AECEnv):
 
         # TODO: vectorise this
         for card in card_list:
-            vector[self.card_map[card]] = 1
+            vector[self.card_to_index[card]] = 1
         return vector

@@ -38,7 +38,9 @@ class GameActionType(Enum):
     PLAY_CARD_FOR_TURN = 1,
     DISCARD_CARD_FROM_HAND = 2,
     DISCARD_KEEPER = 3,
+    NULL_ACTION = 4, # Called only by environment. Messy solution, may not keep
 
+@dataclass
 class GameAction:
     type: GameActionType
     card_name: str
