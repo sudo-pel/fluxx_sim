@@ -72,6 +72,7 @@ class Game(GameSchema):
     # We note that the simulator will receive an integer and then decode it into something more complex for the game simulator to consume
     def step(self, action: GameAction):
         current_phase = self.get_current_phase()
+        print(current_phase)
         acting_player = current_phase.acting_player
 
         action_valid, error_message = self.is_action_valid(current_phase, action)
@@ -88,24 +89,30 @@ class Game(GameSchema):
             keeper_to_discard = action.card_name
             self.discard_keeper(acting_player, keeper_to_discard)
 
-        # TODO: Implement "actionless phases": for example, after playing a card, we want to return to post_play_card_for_turn which has some end-of-phase logic. To do this, we will append to the stack (POST_PLAY_FOR_TURN, player_number) immediately after processing PLAY_CARD_FOR_TURN. The simulator must then remember to deal with this in the future, whether it is immediately after playing this card (in most cases) or a long time after some action processing, discarding of cards, etc.
-        # caveat: GAME_START is an actionless phase, but it will be called at the start of the game via a step() function and therefore will not be at the top of the stack (it will have been popped into current_phase)
+        # GAME_START is an actionless phase, but it will be called at the start of the game via ..
+        # .. a step() function and therefore will not be at the top of the stack (it will have been popped into current_phase)
         if current_phase.type == GamePhaseType.GAME_START:
-            # Start of game: begin the turn of the first player
-            self.start_of_turn()
-            self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
-            self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn))
+            self.stack.append(current_phase)
 
-        elif self.check_current_phase().type == GamePhaseType.POST_PLAY_CARD_FOR_TURN:
-            self.get_current_phase()
-            self.handle_turn_over()
+        while self.check_current_phase().type.is_actionless():
+            print("<< executing actionless phase >>")
+            if current_phase.type == GamePhaseType.GAME_START:
+                # Start of game: begin the turn of the first player
+                self.get_current_phase()
+                self.start_of_turn()
+                self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
+                self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn))
 
-        elif self.check_current_phase().type == GamePhaseType.TURN_END:
-            self.get_current_phase()
-            self.end_of_turn()
-            self.start_of_turn()
-            self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
-            self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn))
+            elif self.check_current_phase().type == GamePhaseType.POST_PLAY_CARD_FOR_TURN:
+                self.get_current_phase()
+                self.handle_turn_over()
+
+            elif self.check_current_phase().type == GamePhaseType.TURN_END:
+                self.get_current_phase()
+                self.end_of_turn()
+                self.start_of_turn()
+                self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
+                self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn))
 
     def handle_turn_over(self):
         """

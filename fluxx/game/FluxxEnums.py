@@ -29,6 +29,9 @@ class GamePhaseType(Enum):
     GAME_START = 5,
     TURN_END = 6,
 
+    def is_actionless(self):
+        return self in [GamePhaseType.GAME_START, GamePhaseType.TURN_END, GamePhaseType.POST_PLAY_CARD_FOR_TURN]
+
 @dataclass
 class GamePhase:
     type: GamePhaseType

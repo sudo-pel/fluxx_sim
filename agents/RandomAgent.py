@@ -7,5 +7,4 @@ class RandomAgent(Agent):
 
     def act(self, obs: dict) -> int:
         possible_actions = obs["action_mask"]
-        print(possible_actions)
         return np.random.choice(np.flatnonzero(possible_actions))
