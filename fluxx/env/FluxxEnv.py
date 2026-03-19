@@ -118,6 +118,9 @@ class FluxxEnv(AECEnv):
         # player 0 goes first
         self.agent_selection = "player_0"
 
+        # return observation for the first player to act
+        return self.observe(self.agent_selection)
+
     def step(self, action):
         agent = self.agent_selection
 
