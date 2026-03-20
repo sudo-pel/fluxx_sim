@@ -15,6 +15,7 @@ class PPO:
         self.env = env
         self.obs_dim = env.observation_spaces[agent_names[0]]["observation"].shape[0]
         self.act_dim = env.observation_spaces[agent_names[0]]["action_mask"].shape[0]
+        print(f"Observation space: {self.obs_dim}, Action space: {self.act_dim}")
         self.actor = FeedForwardNN(self.obs_dim, self.act_dim)
         self.actor_optim = Adam(self.actor.parameters(), lr=self.lr)
         self.critic = FeedForwardNN(self.obs_dim, 1)
@@ -33,7 +34,7 @@ class PPO:
     def _init_hyperparameters(self):
         self.max_timesteps_per_episode = 1600
         self.games_per_batch = 16
-        self.gamma = 0.95
+        self.gamma = 0.999
         self.updates_per_iteration = 5
         self.clip = 0.2
         self.lr = 0.005
@@ -44,16 +45,18 @@ class PPO:
         # timestep..?
         while current_timestep < total_timesteps:
             print(current_timestep)
-            batch_obs, batch_acts, batch_log_probs, batch_rewards_to_go, batch_lens = self.rollout()
+            batch_obs, batch_acts, batch_action_masks, batch_log_probs, batch_rewards_to_go, batch_lens = self.rollout()
+            print("rollout complete")
 
-            V, _= self.evaluate(batch_obs)
+            V, _= self.evaluate(batch_obs, batch_action_masks)
             advantages = batch_rewards_to_go - V.detach()
 
             # advantage normalization
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)
 
+
             for _ in range(self.updates_per_iteration):
-                V, current_log_probs = self.evaluate(batch_obs, batch_acts)
+                V, current_log_probs = self.evaluate(batch_obs, batch_action_masks)
                 ratios = torch.exp(current_log_probs - batch_log_probs)
                 surr1 = ratios * advantages
                 surr2 = torch.clamp(ratios, 1-self.clip, 1+self.clip) * advantages
@@ -72,15 +75,14 @@ class PPO:
 
             current_timestep += np.sum(batch_lens)
 
+        torch.save(self.actor.state_dict(), "actor.pt")
 
-    def evaluate(self, batch_obs, batch_acts):
+
+    def evaluate(self, batch_obs, batch_action_masks):
         V = self.critic(batch_obs).squeeze()
 
-        batch_observations = batch_obs["observation"]
-        batch_action_masks = batch_obs["action_mask"]
-
-        logits = self.actor(batch_observations)
-        logits[~batch_action_masks] = -float("inf")
+        logits = self.actor(batch_obs)
+        logits[batch_action_masks] = -float("inf")
 
         distribution = torch.distributions.Categorical(logits=logits)
 
@@ -92,6 +94,7 @@ class PPO:
     def rollout(self):
         batch_obs = []
         batch_acts = []
+        batch_action_masks = []
         batch_log_probs = []
         batch_rewards = []
         batch_rewards_to_go = []
@@ -122,13 +125,16 @@ class PPO:
                     # TODO: also collect training data from the opponent agent
                     if agent == "player_0":
                         batch_acts.append(action) # consider whether to decode before this
-                        batch_obs.append(obs)
-                        batch_rewards.append(reward)
+                        batch_action_masks.append(observation["action_mask"])
+                        batch_obs.append(observation["observation"])
+                        episode_rewards.append(reward)
                         batch_log_probs.append(log_probs)
 
                     action = self.env.decode_action(action)
 
                 self.env.step(action)
+
+            games_played += 1
 
             batch_lens.append(current_timestep + 1)
             batch_rewards.append(episode_rewards)
@@ -137,10 +143,11 @@ class PPO:
         batch_obs = torch.tensor(batch_obs, dtype=torch.float)
         batch_acts = torch.tensor(batch_acts, dtype=torch.float)
         batch_log_probs = torch.tensor(batch_log_probs, dtype=torch.float)
+        batch_action_masks = torch.tensor(batch_action_masks, dtype=torch.bool)
         # ALG STEP #4
         batch_rewards_to_go = self.compute_rewards_to_go(batch_rewards)
         # Return the batch data
-        return batch_obs, batch_acts, batch_log_probs, batch_rewards_to_go, batch_lens
+        return batch_obs, batch_acts, batch_action_masks, batch_log_probs, batch_rewards_to_go, batch_lens
 
     def compute_rewards_to_go(self, batch_rewards):
         """
@@ -150,7 +157,7 @@ class PPO:
         batch_rewards_to_go = []
         # Iterate through each episode backwards to maintain same order
         # in batch_rtgs
-        for ep_rewards in batch_rewards_to_go:
+        for ep_rewards in batch_rewards:
             discounted_reward = 0  # The discounted reward so far
             rewards_to_go = []
             for rew in reversed(ep_rewards):
@@ -162,4 +169,5 @@ class PPO:
 
         # Convert the rewards-to-go into a tensor
         batch_rtgs = torch.tensor(batch_rewards_to_go, dtype=torch.float)
+        print(batch_rtgs.shape)
         return batch_rtgs

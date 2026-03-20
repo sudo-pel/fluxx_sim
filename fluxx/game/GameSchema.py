@@ -29,7 +29,7 @@ class GameSchema(metaclass=abc.ABCMeta):
         random.shuffle(self.deck)
         self.draw_pile = [make_card(card_name) for card_name in self.deck]
 
-        self.player_turn: int = 0
+        self.player_turn: int = random.randint(0, self.player_count - 1)
         self.turn_count: int = 0
         self.goals = []
         self.discard_pile = []

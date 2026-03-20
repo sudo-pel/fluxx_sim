@@ -7,5 +7,4 @@ two_player_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_mes
 env = FluxxEnv(two_player_simple_fluxx, 2, render_mode="human")
 
 model = PPO(env, ["player_0", "player_1"])
-model.learn(1000)
-
+model.learn(100000)

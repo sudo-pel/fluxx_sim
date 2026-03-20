@@ -116,7 +116,7 @@ class FluxxEnv(AECEnv):
         self.game.reset()
 
         # player 0 goes first
-        self.agent_selection = "player_0"
+        self.agent_selection = f"player_{self.game.player_turn}"
 
         # return observation for the first player to act
         return self.observe(self.agent_selection)
@@ -132,14 +132,17 @@ class FluxxEnv(AECEnv):
 
         # TODO: Update rewards
         # ...
-        # TODO: Check termination
+        # Check termination
         if self.game.winner is not None:
             for agent in self.agents:
                 self.terminations[agent] = True
+            winner = self.determine_winner()
+            self.rewards[winner] = 1.0
 
-        # TODO: Accumulate rewards into _cumulative_rewards
-        # ...
-        # TODO: Advance to next agent (just check whats on top of the game stack)
+        # Accumulate rewards into _cumulative_rewards
+        self._accumulate_rewards()
+
+        # Advance to next agent (just check whats on top of the game stack)
         game_state = self.game.check_current_phase()
         self.agent_selection = f"player_{game_state.acting_player}"
 
@@ -230,3 +233,11 @@ class FluxxEnv(AECEnv):
         for card in card_list:
             vector[self.card_to_index[card]] = 1
         return vector
+
+    def determine_winner(self):
+        if self.game.winner == 0:
+            return "player_0"
+        elif self.game.winner == 1:
+            return "player_1"
+        else:
+            raise Exception("determine_winner called with invalid winner")
