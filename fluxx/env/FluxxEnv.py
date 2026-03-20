@@ -74,12 +74,12 @@ class FluxxEnv(AECEnv):
         super().__init__()
 
         self.game = game
-        self.card_vector_length = len(game.deck)
+        self.card_vector_length = len(game.card_list)
         self.card_to_index: dict[str, int] = {
-            card.name: i for i, card in enumerate(game.deck)
+            card: i for i, card in enumerate(game.card_list)
         }
         self.index_to_card = {
-            i: card.name for i, card in enumerate(game.deck)
+            i: card for i, card in enumerate(game.card_list)
         }
 
         self.num_players = num_players

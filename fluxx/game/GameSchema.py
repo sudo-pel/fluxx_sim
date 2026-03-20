@@ -7,7 +7,8 @@ from fluxx.game.Player import Player
 
 
 class GameSchema(metaclass=abc.ABCMeta):
-    def __init__(self, player_count: int, card_list: list[str]):
+    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool):
+        self.card_list = card_list # static, not shuffled
         self.player_count: int = player_count
         self.players: list[Player] = [Player(i) for i in range(player_count)]
         self.rules: list[Rule] = []
@@ -18,14 +19,15 @@ class GameSchema(metaclass=abc.ABCMeta):
         self.draw_pile: list[Card] = []
         self.force_turn_over: bool = False
         self.winner = None
-        self.deck = [   make_card(card_name) for card_name in card_list]
+        self.deck = card_list
         self.extra_turn = False
         self.played_free_actions = set()
         self.stack: list[GamePhase] = [GamePhase(GamePhaseType.GAME_START, -1)]
+        self.disable_game_messages = disable_game_messages
 
     def reset(self):
         random.shuffle(self.deck)
-        self.draw_pile = self.deck
+        self.draw_pile = [make_card(card_name) for card_name in self.deck]
 
         self.player_turn: int = 0
         self.turn_count: int = 0

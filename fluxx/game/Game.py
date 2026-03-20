@@ -17,8 +17,8 @@ from fluxx.game.utils.general_utils import index_of_card
 
 
 class Game(GameSchema):
-    def __init__(self, player_count: int, card_list: list[str]):
-        GameSchema.__init__(self, player_count, card_list)
+    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool = False):
+        GameSchema.__init__(self, player_count, card_list, disable_game_messages)
 
     def reset(self):
         super().reset()
@@ -72,7 +72,6 @@ class Game(GameSchema):
     # We note that the simulator will receive an integer and then decode it into something more complex for the game simulator to consume
     def step(self, action: GameAction):
         current_phase = self.get_current_phase()
-        print(current_phase)
         acting_player = current_phase.acting_player
 
         action_valid, error_message = self.is_action_valid(current_phase, action)
@@ -95,7 +94,6 @@ class Game(GameSchema):
             self.stack.append(current_phase)
 
         while self.check_current_phase().type.is_actionless():
-            print("<< executing actionless phase >>")
             if current_phase.type == GamePhaseType.GAME_START:
                 # Start of game: begin the turn of the first player
                 self.get_current_phase()
@@ -151,55 +149,6 @@ class Game(GameSchema):
             self.extra_turn = False
 
         self.turn_count += 1
-
-    # DEPRECATED
-    def run_game(self):
-        """Run the game."""
-        while self.winner is None:
-            turn_agent = self.agents[self.player_turn]
-            turn_player = self.players[self.player_turn]
-
-            game_messages.turn_start(f"PLAYER {self.player_turn} TURN")
-            self.start_of_turn()
-
-            while self.winner is None:
-                if self.player_turn_over():
-                    self.end_of_turn()
-                    break
-
-                available_free_actions = self.get_available_free_actions()
-                played_free_action = -1
-                while len(available_free_actions) > 0 and played_free_action is not None and not self.force_turn_over:
-                    played_free_action = turn_agent.play_free_action(self, available_free_actions)
-                    if played_free_action is not None:
-                        free_action_name = available_free_actions[played_free_action]
-
-                        self.play_free_action(free_action_name)
-                        available_free_actions = self.get_available_free_actions()
-
-                # Playing a free action can insta-end your turn
-                if self.player_turn_over():
-                    self.end_of_turn()
-                    break
-
-                self.draw_for_turn()
-
-                played_card = None
-
-                if self.rule_in_play("first_play_random"):
-                    if self.get_play_rules(self.player_turn) > 1 and turn_player.cards_played == 0:
-                        played_card = random.randint(0, len(turn_player.hand)-1)
-                        game_messages.special_effect(f"<<< 'First Play Random': PLAYED {turn_player.hand[played_card].name}! >>")
-
-                if played_card is None:
-                    played_card = turn_agent.play_card(self.get_game_state())
-
-                if not self.can_play_card(self.player_turn, played_card):
-                    raise Exception("Illegal action selected!")
-
-                self.play_card(self.player_turn, played_card)
-
-        game_messages.game_over(f"GAME OVER: WINNER IS PLAYER {self.winner}")
 
     def discard_card(self, player_number: int, card_name: str):
         """
@@ -514,7 +463,9 @@ class Game(GameSchema):
     def get_card_from_draw_pile(self) -> Card:
         """Get a card from the draw pile. Not the same as drawing a card."""
         card_drawn = self.draw_pile.pop()
-        game_messages.drawn_card(f"[[ DRAWN '{card_drawn.name}' ]]")
+
+        if not self.disable_game_messages:
+            game_messages.drawn_card(f"[[ DRAWN '{card_drawn.name}' ]]")
 
         if not self.draw_pile:
             random.shuffle(self.discard_pile)

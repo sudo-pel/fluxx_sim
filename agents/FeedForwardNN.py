@@ -16,10 +16,22 @@ class FeedForwardNN(nn.Module):
         if isinstance(obs, np.ndarray):
             obs = torch.tensor(obs, dtype=torch.float)
 
-        activation1 = F.relu(self.layer(obs))
+        activation1 = F.relu(self.layer1(obs))
         activation2 = F.relu(self.layer2(activation1))
         output = self.layer3(activation2)
 
         return output
 
     def act(self, state):
+        observation = state["observation"]
+        action_mask = state["action_mask"]
+
+        logits = self.forward(observation)
+        logits[action_mask == 0] = -float("inf")
+
+        distribution = torch.distributions.Categorical(logits=logits)
+
+        action = distribution.sample()
+        log_probs = distribution.log_prob(action)
+
+        return action.item(), log_probs
