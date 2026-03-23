@@ -1,4 +1,4 @@
-from agents.PPOAgent import PPO
+from agents.PPO import PPO
 from fluxx.env.FluxxEnv import FluxxEnv
 from fluxx.game.Cards import card_lists
 from fluxx.game.FluxxEnums import GameState
