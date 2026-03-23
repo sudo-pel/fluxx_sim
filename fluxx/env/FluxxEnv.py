@@ -136,6 +136,7 @@ class FluxxEnv(AECEnv):
         if self.game.winner is not None:
             for agent in self.agents:
                 self.terminations[agent] = True
+                self.rewards[agent] = -1.0
             winner = self.determine_winner()
             self.rewards[winner] = 1.0
 
@@ -147,7 +148,6 @@ class FluxxEnv(AECEnv):
         self.agent_selection = f"player_{game_state.acting_player}"
 
     def observe(self, agent):
-        # TODO: return observation and action mask for this agent
 
         # ----
         # OBSERVATION

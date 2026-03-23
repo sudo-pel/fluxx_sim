@@ -45,10 +45,11 @@ class PPO:
         # timestep..?
         while current_timestep < total_timesteps:
             print(current_timestep)
+            print(self.env.game.player_turn)
             batch_obs, batch_acts, batch_action_masks, batch_log_probs, batch_rewards_to_go, batch_lens = self.rollout()
             print("rollout complete")
 
-            V, _= self.evaluate(batch_obs, batch_action_masks)
+            V, _= self.evaluate(batch_obs, batch_acts, batch_action_masks)
             advantages = batch_rewards_to_go - V.detach()
 
             # advantage normalization
@@ -56,7 +57,7 @@ class PPO:
 
 
             for _ in range(self.updates_per_iteration):
-                V, current_log_probs = self.evaluate(batch_obs, batch_action_masks)
+                V, current_log_probs = self.evaluate(batch_obs, batch_acts, batch_action_masks)
                 ratios = torch.exp(current_log_probs - batch_log_probs)
                 surr1 = ratios * advantages
                 surr2 = torch.clamp(ratios, 1-self.clip, 1+self.clip) * advantages
@@ -78,16 +79,15 @@ class PPO:
         torch.save(self.actor.state_dict(), "actor.pt")
 
 
-    def evaluate(self, batch_obs, batch_action_masks):
+    def evaluate(self, batch_obs, batch_acts, batch_action_masks):
         V = self.critic(batch_obs).squeeze()
 
         logits = self.actor(batch_obs)
-        logits[batch_action_masks] = -float("inf")
+        logits[~batch_action_masks] = -float("inf")
 
         distribution = torch.distributions.Categorical(logits=logits)
 
-        action = distribution.sample()
-        log_probs = distribution.log_prob(action)
+        log_probs = distribution.log_prob(batch_acts)
 
         return V, log_probs
 
@@ -114,9 +114,12 @@ class PPO:
 
                 observation, reward, termination, truncation, info = self.env.last()
 
+                # .last() gets rewards from the previous action, whose entry in ep_rewards will have been appended in the previous iteration of the loop (see below)
+                if agent == "player_0" and len(episode_rewards) > 0:
+                    episode_rewards[-1] += reward
+
                 if termination or truncation:
                     action = None
-                    break
                 else:
                     # this is where you would insert your policy
                     action, log_probs = self.agents[agent].act(observation)
@@ -165,7 +168,6 @@ class PPO:
                 rewards_to_go.append(discounted_reward)
             rewards_to_go.reverse()
             batch_rewards_to_go.extend(rewards_to_go)
-        batch_rewards_to_go.reverse()
 
         # Convert the rewards-to-go into a tensor
         batch_rtgs = torch.tensor(batch_rewards_to_go, dtype=torch.float)

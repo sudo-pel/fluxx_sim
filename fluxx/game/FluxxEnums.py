@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, Optional
 from enum import Enum
 
 class CardType(Enum):
@@ -47,3 +47,17 @@ class GameActionType(Enum):
 class GameAction:
     type: GameActionType
     card_name: str
+
+# Note: probably a good idea to make some of the other fields in this class optional
+@dataclass
+class GameState:
+    """
+    Note that the order of the lists is important.
+    """
+    hands: list[list[str]]
+    keepers: list[list[str]]
+    goals: list[str]
+    discard_pile: list[str]
+    draw_pile: list[str]
+    rules: list[str]
+    starting_player: Optional[int] = None

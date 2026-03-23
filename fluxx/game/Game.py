@@ -5,7 +5,7 @@ from typing import Optional
 from collections import Counter
 
 from fluxx.game.Card import Card, Rule, Goal, Keeper, Action, RulesOptions
-from fluxx.game.FluxxEnums import CardType, GamePhase, GamePhaseType, GameAction, GameActionType
+from fluxx.game.FluxxEnums import CardType, GamePhase, GamePhaseType, GameAction, GameActionType, GameState
 
 from fluxx.game.Player import Player
 from fluxx.game import game_messages
@@ -17,8 +17,8 @@ from fluxx.game.utils.general_utils import index_of_card
 
 
 class Game(GameSchema):
-    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool = False):
-        GameSchema.__init__(self, player_count, card_list, disable_game_messages)
+    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool = False, force_game_state: Optional[GameState] = None):
+        GameSchema.__init__(self, player_count, card_list, disable_game_messages, force_game_state)
 
     def reset(self):
         super().reset()
@@ -460,23 +460,38 @@ class Game(GameSchema):
                         self.winner = i
                         return
 
-    def get_card_from_draw_pile(self) -> Card:
-        """Get a card from the draw pile. Not the same as drawing a card."""
+    def shuffle_discard_pile_into_draw(self):
+        random.shuffle(self.discard_pile)
+        self.draw_pile = self.discard_pile
+        self.discard_pile = []
+
+    def get_card_from_draw_pile(self) -> Optional[Card]:
+        """
+        Get a card from the draw pile. Not the same as drawing a card.
+        If both the draw pile and discard pile are empty, do not draw a card.
+        """
+        if not self.draw_pile:
+            self.shuffle_discard_pile_into_draw()
+
+        if not self.draw_pile:
+            return None
+
         card_drawn = self.draw_pile.pop()
 
         if not self.disable_game_messages:
             game_messages.drawn_card(f"[[ DRAWN '{card_drawn.name}' ]]")
 
         if not self.draw_pile:
-            random.shuffle(self.discard_pile)
-            self.draw_pile = self.discard_pile
-            self.discard_pile = []
+            self.shuffle_discard_pile_into_draw()
 
         return card_drawn
 
     def draw(self, player: Player):
         """Draw a card from the deck and add it to the hand of player 'player'. Does NOT increment player.cards_drawn"""
         card_drawn = self.get_card_from_draw_pile()
+
+        if card_drawn is None:
+            return
 
         player.hand.append(card_drawn)
         self.check_for_winners()
