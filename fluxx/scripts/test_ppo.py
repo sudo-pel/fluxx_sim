@@ -9,7 +9,7 @@ two_player_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_mes
 one_turn_win_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True, force_game_state=two_player_p0_one_turn_win)
 two_turn_win_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True, force_game_state=two_player_p0_two_turn_win)
 
-env = FluxxEnv(two_turn_win_simple_fluxx, 2, render_mode="human")
+env = FluxxEnv(two_player_simple_fluxx, 2, render_mode="human")
 
 model = PPO(env, ["player_0", "player_1"])
 model.learn(100000)

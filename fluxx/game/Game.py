@@ -285,6 +285,9 @@ class Game(GameSchema):
 
         return limit
 
+    def get_discard_pile_by_name(self) -> list[str]:
+        return [card.name for card in self.discard_pile]
+
     def get_keepers_by_name(self, player_number: int) -> list[str]:
         return self.get_all_keepers_by_name()[player_number]
 

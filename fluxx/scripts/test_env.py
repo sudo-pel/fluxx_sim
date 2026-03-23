@@ -7,13 +7,13 @@ from fluxx.game.Cards import card_lists
 from fluxx.game.Game import Game
 from fluxx.game_states import two_player_p0_one_turn_win, two_player_p0_two_turn_win
 
-actor = FeedForwardNN(310, 186)  # same architecture
+actor = FeedForwardNN(374, 186)  # same architecture
 actor.load_state_dict(torch.load("actor.pt"))
 actor.eval()
 
 agents = {
     "player_0": actor,
-    "player_1": actor
+    "player_1": RandomAgent()
 }
 
 def main(one_turn_win_simple_fluxx=None):
@@ -21,14 +21,14 @@ def main(one_turn_win_simple_fluxx=None):
     one_turn_win_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True, force_game_state=two_player_p0_one_turn_win)
     two_turn_win_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True, force_game_state=two_player_p0_two_turn_win)
 
-    env = FluxxEnv(two_turn_win_simple_fluxx, 2, render_mode="human")
+    env = FluxxEnv(two_player_simple_fluxx, 2, render_mode="human")
 
     victories = {
         "player_0": 0,
         "player_1": 0
     }
 
-    GAME_COUNT = 100
+    GAME_COUNT = 1000
 
     for i in range(5):
 

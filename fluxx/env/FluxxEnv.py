@@ -86,8 +86,8 @@ class FluxxEnv(AECEnv):
         self.render_mode = render_mode
         self.possible_agents = [f"player_{i}" for i in range(num_players)]
 
-        observed_zone_count = 3 + num_players # hand (for observing agent), goals, rules, keepers (for each agent)
-        observation_space_size = observed_zone_count * len(game.deck)
+        observed_zone_count = 4 + num_players # hand (for observing agent), goals, rules, keepers, discard pile (for each agent)
+        observation_space_size = observed_zone_count * len(game.deck) + 2 # +2 for draw pile size and opponent hand size
 
         possible_actions = 3 # play a card, discard a card, discard a keeper
         action_space_size = possible_actions * len(game.deck)
@@ -171,7 +171,21 @@ class FluxxEnv(AECEnv):
         rules_in_play = self.game.get_rules_in_play_by_name()
         rules_in_play_vector = self.populate_card_vector(rules_in_play)
 
-        observation = np.concatenate((cards_in_hand_vector, agent_keeper_vector, *other_keeper_vectors, goals_in_play_vector, rules_in_play_vector))
+        # Get discard pile
+        discard_pile = self.game.get_discard_pile_by_name()
+        discard_pile_vector = self.populate_card_vector(discard_pile)
+
+        # Get draw pile size
+        draw_pile_size = [len(self.game.draw_pile)]
+
+        # Get opponent hand size
+        # TODO: how to encode for variable opponent count? Is this worth doing?
+        opponent_hand_sizes = []
+        for i in range(self.num_players):
+            if i != self.get_player_number(agent):
+                opponent_hand_sizes.append(len(self.game.players[i].hand))
+
+        observation = np.concatenate((cards_in_hand_vector, agent_keeper_vector, *other_keeper_vectors, goals_in_play_vector, rules_in_play_vector, discard_pile_vector, draw_pile_size, opponent_hand_sizes))
 
         # ----
         # ACTION MASK
