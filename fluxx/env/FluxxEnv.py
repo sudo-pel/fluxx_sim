@@ -5,7 +5,7 @@ from pettingzoo import AECEnv
 from pettingzoo.utils import agent_selector, wrappers
 from typing import Optional
 
-from fluxx.game.FluxxEnums import GamePhaseType, GameAction, GameActionType
+from fluxx.game.FluxxEnums import GamePhaseType, GameAction, GameActionType, DecisionEncoding, DecisionEncodingType
 from fluxx.game.Game import Game
 """
 
@@ -26,9 +26,57 @@ Cards have no runtime state in Fluxx so this is actually pretty reasonable
 - Always encode the observing player's keepers first. The rest can be in any order
 
 - Action space: play a card, discard a card, discard a keeper (for now). Hot encode the card in question
+    (( Augmenting the action space for action card effects ))
+    - The action space is currently overcomplicated. The agent already knows what it is doing due to the presence of decision contexts, so there is no need to have copies ..
+    .. of the hot encoding for aforementioned actions. The game can deduce what exactly to do based on the current GamePhase.
+    
 
 - Intermediate reward: how close you are to winning the game (iterate over goals and take a %) minus how close opponents are to winning the game
 - Potentially a bonus for having a lot of cards in hand? Unsure
+
+(( Expanding the state encoding to include decision contexts ))
+Every card selection moves one card somewhere and "leaves" or "places" other cards elsewhere. The possible locations for being PLACED are:
+- "being played"
+- player hand
+- opponent hand
+- player keepers [* a keeper moving to this zone is not necessarily the same as playing it, e.g "steal a keeper"]
+- opponent keepers
+- discard pile
+- draw pile
+
+the possible locations for REMAINING are:
+- player hand
+- opponent hand
+- player keepers
+- opponent keepers
+- discard pile
+- draw pile
+
+Also important to include is the number of "decisions" left. This is encoded as metadata in GamePhase, but is not used at all by the simulator.
+
+Encoding is in this order:
+[
+PLACE
+0: being played
+1: player hand
+2: opponent hand
+3: player keepers
+4: opponent keepers
+5: discard pile
+6: draw pile
+7: in play [* goals and rules]
+REMAIN
+8: player hand
+9: opponent hand
+10: player keepers
+11: opponent keepers
+12: discard pile
+13: draw pile
+14: in play [* goals and rules]
+15: DECISIONS_LEFT
+]
+
+
 
 --- approach two ---
 Ideally, RL agent is able to learn that playing cards with related goals is good "in general", for this a more general encoding is needed than one-hot encoding each state
@@ -65,6 +113,13 @@ def env(**kwargs):
     raw_env = wrappers.OrderEnforcingWrapper(raw_env)
     return raw_env
 
+def convert_decision_encoding(self, decision_encoding: list[DecisionEncodingType], decisions_left: int) -> npt.NDArray[np.int8]:
+    decision_context_vector = np.zeros(15, dtype=np.int8)
+    for d in decision_encoding:
+        decision_context_vector[d.value] = 1
+    decision_context_vector[15] = decisions_left
+
+    return decision_context_vector
 
 class FluxxEnv(AECEnv):
 
@@ -86,11 +141,11 @@ class FluxxEnv(AECEnv):
         self.render_mode = render_mode
         self.possible_agents = [f"player_{i}" for i in range(num_players)]
 
+        decision_context_length = 16 # 7 PLACE zones + play a card, 7 REMAIN zone, 1 int for decisions left
         observed_zone_count = 4 + num_players # hand (for observing agent), goals, rules, keepers, discard pile (for each agent)
-        observation_space_size = observed_zone_count * len(game.deck) + 2 # +2 for draw pile size and opponent hand size
+        observation_space_size = observed_zone_count * len(game.deck) + decision_context_length + 2 # +2 for draw pile size and opponent hand size
 
-        possible_actions = 3 # play a card, discard a card, discard a keeper
-        action_space_size = possible_actions * len(game.deck)
+        action_space_size = len(game.deck)
 
         self.observation_spaces = {
             agent: spaces.Dict({
@@ -153,6 +208,16 @@ class FluxxEnv(AECEnv):
         # OBSERVATION
         # ----
 
+        decisions_left = self.game.check_current_phase().decisions_left
+
+        decision_context_vectors: dict[GamePhaseType,list[DecisionEncodingType]] = {
+            GamePhaseType.DISCARD_CARD_FROM_HAND: [DecisionEncoding.PLACE_DISCARD_PILE, DecisionEncoding.REMAIN_HAND],
+            GamePhaseType.PLAY_CARD_FOR_TURN: [DecisionEncoding.PLAY, DecisionEncoding.REMAIN_HAND],
+            GamePhaseType.DISCARD_KEEPER: [DecisionEncoding.PLACE_DISCARD_PILE, DecisionEncoding.REMAIN_KEEPERS],
+            GamePhaseType.DISCARD_RULE_IN_PLAY: [DecisionEncoding.PLACE_DISCARD_PILE, DecisionEncoding.REMAIN_IN_PLAY],
+        }
+        decision_context_vector = convert_decision_encoding(decision_context_vectors[self.game.check_current_phase().type], decisions_left)
+
         # Get all keepers in play
         keepers_in_play = self.game.get_all_keepers_by_name()
         keeper_vectors = [ self.populate_card_vector(keeper_list) for keeper_list in keepers_in_play ]
@@ -185,7 +250,7 @@ class FluxxEnv(AECEnv):
             if i != self.get_player_number(agent):
                 opponent_hand_sizes.append(len(self.game.players[i].hand))
 
-        observation = np.concatenate((cards_in_hand_vector, agent_keeper_vector, *other_keeper_vectors, goals_in_play_vector, rules_in_play_vector, discard_pile_vector, draw_pile_size, opponent_hand_sizes))
+        observation = np.concatenate((decision_context_vector, cards_in_hand_vector, agent_keeper_vector, *other_keeper_vectors, goals_in_play_vector, rules_in_play_vector, discard_pile_vector, draw_pile_size, opponent_hand_sizes))
 
         # ----
         # ACTION MASK
@@ -206,6 +271,7 @@ class FluxxEnv(AECEnv):
         elif current_phase.type == GamePhaseType.DISCARD_KEEPER:
             discard_keeper_mask = agent_keeper_vector
 
+
         action_mask = np.concatenate((play_card_mask, discard_card_from_hand_mask, discard_keeper_mask))
 
         # Get action_mask
@@ -215,6 +281,7 @@ class FluxxEnv(AECEnv):
         }
 
     def decode_action(self, action_index: int) -> GameAction:
+        # TODO: Remove GameActionType. It is redundant (can now only be inferred from checking the stack which the game validator checks it against)
         action_types = [GameActionType.PLAY_CARD_FOR_TURN, GameActionType.DISCARD_CARD_FROM_HAND, GameActionType.DISCARD_KEEPER]
 
         action_type = action_index // self.card_vector_length

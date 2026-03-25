@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 import random
 
 # avoiding circular import
-from fluxx.game.FluxxEnums import CardType, CardZone, ExtendedCardZone
+from fluxx.game.FluxxEnums import CardType, CardZone, ExtendedCardZone, GamePhase, GamePhaseType
 from fluxx.game.GameSchema import GameSchema
 
 if TYPE_CHECKING:
@@ -49,12 +49,9 @@ def activate_zap_a_card(game_state: 'GameSchema', user_number: int):
 
 
 def activate_trash_a_new_rule(game_state: 'GameSchema', user_number: int):
-    selected_card_location = select_card(game_state, user_number, [CardZone.RULES])
-
-    if selected_card_location is None:
+    if len(game_state.rules) == 0:
         return
-
-    trash_selected_card(game_state, user_number, selected_card_location, True)
+    game_state.stack.append(GamePhase(GamePhaseType.DISCARD_RULE_IN_PLAY, user_number))
 
 
 def activate_trash_a_keeper(game_state: 'GameSchema', user_number: int):

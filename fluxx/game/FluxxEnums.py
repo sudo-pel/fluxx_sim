@@ -28,6 +28,7 @@ class GamePhaseType(Enum):
     DISCARD_KEEPER = 3,
     GAME_START = 5,
     TURN_END = 6,
+    DISCARD_RULE_IN_PLAY = 7,
 
     def is_actionless(self):
         return self in [GamePhaseType.GAME_START, GamePhaseType.TURN_END, GamePhaseType.POST_PLAY_CARD_FOR_TURN]
@@ -36,12 +37,14 @@ class GamePhaseType(Enum):
 class GamePhase:
     type: GamePhaseType
     acting_player: int
+    decisions_left: Optional[int] = None
 
 class GameActionType(Enum):
     PLAY_CARD_FOR_TURN = 1,
     DISCARD_CARD_FROM_HAND = 2,
     DISCARD_KEEPER = 3,
     NULL_ACTION = 4, # Called only by environment. Messy solution, may not keep
+    DISCARD_RULE_IN_PLAY = 5,
 
 @dataclass
 class GameAction:
@@ -61,3 +64,20 @@ class GameState:
     draw_pile: list[str]
     rules: list[str]
     starting_player: Optional[int] = None
+
+class DecisionEncodingType(Enum):
+    PLAY = 0
+    PLACE_PLAYER_HAND = 1
+    PLACE_OPPONENT_HAND = 2
+    PLACE_PLAYER_KEEPERS = 3
+    PLACE_OPPONENT_KEEPERS = 4
+    PLACE_DISCARD_PILE = 5
+    PLACE_DRAW_PILE = 6
+    PLACE_IN_PLAY = 7
+    REMAIN_PLAYER_HAND = 8
+    REMAIN_OPPONENT_HAND = 9
+    REMAIN_PLAYER_KEEPERS = 10
+    REMAIN_OPPONENT_KEEPERS = 11
+    REMAIN_DISCARD_PILE = 12
+    REMAIN_DRAW_PILE = 13
+    REMAIN_IN_PLAY = 14
