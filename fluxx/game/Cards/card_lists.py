@@ -1,3 +1,32 @@
+for_action_testing = [
+    "draw_5",
+    "draw_4",
+    "draw_2",
+    "play_2",
+    "draw_3",
+    "play_4",
+    "play_3",
+
+    "lullaby",
+    "milk_and_cookies",
+    "the_minds_eye",
+    "night_and_day",
+    "party_time",
+
+    "rocket_to_the_moon",
+    "squishy_chocolate",
+    "time_is_money",
+    "toast",
+    "turn_it_up",
+    "winning_the_lottery",
+
+    "trash_a_new_rule",
+    "draw_3_play_2_of_them",
+    "zap_a_card",
+    "everybody_gets_1",
+    "lets_do_that_again"
+]
+
 simple_fluxx_deck = [
     # Rules - Draw/Play/Limits
     "hand_limit_2",

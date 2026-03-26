@@ -9,7 +9,7 @@ from fluxx.game.GameSchema import GameSchema
 if TYPE_CHECKING:
     pass
 
-from fluxx.game.utils.card_effect_utils import draw_and_play, trash_selected_card, get_selected_card, select_card
+from fluxx.game.utils.card_effect_utils import trash_selected_card, get_selected_card, select_card
 from fluxx.game import game_messages
 
 
@@ -36,22 +36,17 @@ def activate_use_what_you_take(game_state: 'GameSchema', user_number: int):
 
 
 def activate_zap_a_card(game_state: 'GameSchema', user_number: int):
-    user_player = game_state.players[user_number]
-
-    selected_card_location = select_card(game_state, user_number, [CardZone.RULES, CardZone.KEEPERS, CardZone.GOALS])
-
-    if selected_card_location is None:
+    if len(game_state.get_cards_in_play_by_name()) == 0:
         return
-
-    selected_card = get_selected_card(game_state, selected_card_location)
-    user_player.hand.append(selected_card)
-    trash_selected_card(game_state, user_number, selected_card_location, False)
+    game_state.stack.append(
+        GamePhase(GamePhaseType.ADD_CARD_IN_PLAY_TO_HAND, user_number, decisions_left=1)
+    )
 
 
 def activate_trash_a_new_rule(game_state: 'GameSchema', user_number: int):
     if len(game_state.rules) == 0:
         return
-    game_state.stack.append(GamePhase(GamePhaseType.DISCARD_RULE_IN_PLAY, user_number))
+    game_state.stack.append(GamePhase(GamePhaseType.DISCARD_RULE_IN_PLAY, user_number, decisions_left=1))
 
 
 def activate_trash_a_keeper(game_state: 'GameSchema', user_number: int):
@@ -87,8 +82,16 @@ def activate_draw_2_and_use_em(game_state: 'GameSchema', user_number: int):
 
 
 def activate_draw_3_play_2_of_them(game_state: 'GameSchema', user_number: int):
-    draw_and_play(game_state, user_number, 3 + game_state.inflation(), 2 + game_state.inflation(), CardZone.DISCARD_PILE)
-
+    latent_space = [game_state.get_card_from_draw_pile() for i in range(len(game_state.players))]
+    latent_space = [l for l in latent_space if l is not None]
+    if len(latent_space) == 0:
+        return
+    game_state.stack.append(GamePhase(
+        GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE,
+        user_number,
+        decisions_left=2,
+        latent_space=latent_space
+    ))
 
 def activate_steal_a_keeper(game_state: 'GameSchema', user_number: int):
     user_player = game_state.players[user_number]
@@ -176,13 +179,13 @@ def activate_lets_simplify(game_state: 'GameSchema', user_number: int):
 
 
 def activate_lets_do_that_again(game_state: 'GameSchema', user_number: int):
-    # Note: the discarded card should not be in the discard pile when it is played
-    # (in case it has its own discard interaction)
-    selected_card_location = select_card(game_state, user_number, [CardZone.DISCARD_PILE], [CardType.GOAL, CardType.KEEPER])
-    selected_card = get_selected_card(game_state, selected_card_location)
-    trash_selected_card(game_state, user_number, selected_card_location, False)
-    game_state.activate_card(user_number, selected_card)
-    game_state.discard_pile.append(selected_card)
+    if len([card for card in game_state.discard_pile if card.card_type == CardType.ACTION or card.card_type == CardType.RULE]) == 0:
+        return
+    game_state.stack.append(GamePhase(
+        GamePhaseType.PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE,
+        user_number,
+        decisions_left=1
+    ))
 
 
 def activate_jackpot(game_state: 'GameSchema', user_number: int):
@@ -231,29 +234,18 @@ def activate_discard_and_draw(game_state: 'GameSchema', user_number: int):
     for _ in range(draw_amount):
         game_state.draw(user_player)
 
-
 def activate_everybody_gets_1(game_state: 'GameSchema', user_number: int):
-    player_agent = game_state.agents[user_number]
-
-    latent_card_pile = [game_state.get_card_from_draw_pile() for _ in range((game_state.inflation() + 1) * len(game_state.players))]
-
-    for card in latent_card_pile:
-        game_messages.special_effect(f"<< Drawn {card.name} >>")
-
-    player_set = [player.id for player in game_state.players]
-    if game_state.inflation() == 1:
-        player_set.extend(player_set)
-
-    while player_set:
-        current_card = latent_card_pile.pop()
-        game_messages.notification(f"Please select a player to receive << {current_card.name} >>:")
-        chosen_player_number = player_agent.select_player_from_set(game_state, player_set)
-
-        chosen_player = game_state.players[chosen_player_number]
-        chosen_player.hand.append(current_card)
-
-        del player_set[player_set.index(chosen_player_number)]
-
+    # TODO: Will need to refactor this for multiplayer if project reaches that point
+    latent_space = [game_state.get_card_from_draw_pile() for i in range(len(game_state.players))]
+    latent_space = [l for l in latent_space if l is not None]
+    if len(latent_space) == 0:
+        return
+    game_state.stack.append(GamePhase(
+        GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND,
+        user_number,
+        decisions_left=1,
+        latent_space=latent_space
+    ))
 
 def activate_take_another_turn(game_state: 'GameSchema', user_number: int):
     game_messages.special_effect("<< Extra turn! >>")

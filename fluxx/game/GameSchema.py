@@ -23,7 +23,7 @@ class GameSchema(metaclass=abc.ABCMeta):
         self.deck = card_list.copy()
         self.extra_turn = False
         self.played_free_actions = set()
-        self.stack: list[GamePhase] = [GamePhase(GamePhaseType.GAME_START, -1)]
+        self.stack: list[GamePhase] = []
         self.disable_game_messages = disable_game_messages
         self.force_game_state = force_game_state
 

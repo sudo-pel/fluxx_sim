@@ -13,32 +13,6 @@ class CardLocation:
     index: int
     zone_index: Optional[int] = None
 
-def draw_and_play(game: GameSchema, user_number: int, draw_amount: int, play_amount: int, place_remainder: CardZone):
-    """
-    Draw [draw_amount] cards (not into hand) and play [play_amount] cards. Put the unplayed cards into [place_remainder]
-
-    :param game: 'GameSchema' object
-    :param user_number: Index of player drawing
-    :param draw_amount: Number of cards to draw
-    :param play_amount: Number of cards to play
-    :param place_remainder: String representing where to place unplayed cards
-        'discard_pile',
-        'hand'
-    :return: None
-    """
-    latent_card_pile = [game.get_card_from_draw_pile() for i in range(draw_amount)]
-
-    for i in range(play_amount):
-        selected_card_index = game.agents[user_number].select_card_to_play(game, latent_card_pile)
-        selected_card = latent_card_pile[selected_card_index]
-        game_messages.special_effect(f"<< PLAYED {selected_card.name} >>")
-        game.activate_card(user_number, selected_card)
-        del latent_card_pile[selected_card_index]
-
-    if place_remainder == CardZone.DISCARD_PILE:
-        for card in latent_card_pile:
-            game.discard_pile.append(card)
-
 def trash_selected_card(game: GameSchema, user_number: int, card_location: CardLocation, add_to_discard: bool):
     if card_location.zone == CardZone.RULES:
         rule_discarded = get_selected_card(game, card_location)
@@ -92,6 +66,22 @@ def get_selected_card(game: GameSchema, card_location: CardLocation):
         return game.players[card_location.zone_index].hand[card_location.index]
 
     raise Exception("Error: invalid card location")
+
+def find_card_in_play_by_name(game: GameSchema, card_name: str) -> Optional[CardLocation]:
+    for i, rule in enumerate(game.rules):
+        if rule.name == card_name:
+            return CardLocation(CardZone.RULES, i)
+    for i, player in enumerate(game.players):
+        for j, keeper in enumerate(player.keepers):
+            if keeper.name == card_name:
+                return CardLocation(CardZone.KEEPERS, j, i)
+    for i, goal in enumerate(game.goals):
+        if goal.name == card_name:
+            return CardLocation(CardZone.GOALS, i)
+    for i, card in enumerate(game.discard_pile):
+        if card.name == card_name:
+            return CardLocation(CardZone.DISCARD_PILE, i)
+    return None
 
 def select_card(game: GameSchema, user_number: int, select_from: list[AnyCardZone], exclude_types: list[CardType]=()):
     """

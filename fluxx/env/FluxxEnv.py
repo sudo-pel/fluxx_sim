@@ -5,7 +5,7 @@ from pettingzoo import AECEnv
 from pettingzoo.utils import agent_selector, wrappers
 from typing import Optional
 
-from fluxx.game.FluxxEnums import GamePhaseType, DecisionEncodingType
+from fluxx.game.FluxxEnums import GamePhaseType, DecisionEncodingType, CardType
 from fluxx.game.Game import Game
 """
 
@@ -215,6 +215,10 @@ class FluxxEnv(AECEnv):
             GamePhaseType.PLAY_CARD_FOR_TURN: [DecisionEncodingType.PLAY, DecisionEncodingType.REMAIN_PLAYER_HAND],
             GamePhaseType.DISCARD_KEEPER: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_PLAYER_KEEPERS],
             GamePhaseType.DISCARD_RULE_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_IN_PLAY],
+            GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE: [DecisionEncodingType.PLAY, DecisionEncodingType.PLACE_DISCARD_PILE],
+            GamePhaseType.ADD_CARD_IN_PLAY_TO_HAND: [DecisionEncodingType.PLACE_PLAYER_HAND, DecisionEncodingType.REMAIN_IN_PLAY],
+            GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND: [DecisionEncodingType.PLACE_PLAYER_HAND, DecisionEncodingType.REMAIN_OPPONENT_HAND],
+            GamePhaseType.PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE: [DecisionEncodingType.PLAY, DecisionEncodingType.REMAIN_DISCARD_PILE],
         }
         decision_context_vector = convert_decision_encoding(decision_context_vectors[self.game.check_current_phase().type], decisions_left)
 
@@ -268,6 +272,18 @@ class FluxxEnv(AECEnv):
             action_mask = cards_in_hand_vector
         elif current_phase.type == GamePhaseType.DISCARD_KEEPER:
             action_mask = agent_keeper_vector
+        elif current_phase.type == GamePhaseType.DISCARD_RULE_IN_PLAY:
+            action_mask = rules_in_play_vector
+        elif current_phase.type == GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE:
+            action_mask = self.populate_card_vector([card.name for card in current_phase.latent_space])
+        elif current_phase.type == GamePhaseType.ADD_CARD_IN_PLAY_TO_HAND:
+            action_mask = np.bitwise_or.reduce((*keeper_vectors, rules_in_play_vector, goals_in_play_vector))
+        elif current_phase.type == GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND:
+            action_mask = self.populate_card_vector([card.name for card in current_phase.latent_space])
+        elif current_phase.type == GamePhaseType.PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE:
+            action_mask = self.populate_card_vector(
+                [card.name for card in self.game.discard_pile if card.card_type == CardType.RULE or card.card_type == CardType.ACTION]
+            )
 
         return {
             "observation": observation,

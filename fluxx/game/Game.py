@@ -13,6 +13,7 @@ from fluxx.game.Cards import action_cards
 from fluxx.game.Cards.free_actions import can_use_free_action, activate_free_action
 from fluxx.game.GameSchema import GameSchema
 from fluxx.game.utils import card_effect_utils
+from fluxx.game.utils.card_effect_utils import find_card_in_play_by_name, get_selected_card, trash_selected_card
 from fluxx.game.utils.general_utils import index_of_card
 
 
@@ -20,13 +21,15 @@ class Game(GameSchema):
     def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool = False, force_game_state: Optional[GameState] = None):
         GameSchema.__init__(self, player_count, card_list, disable_game_messages, force_game_state)
 
+    def add_player_turn_to_stack(self):
+        self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
+        plays_left = self.get_play_rules(self.player_turn) - self.players[self.player_turn].cards_played
+        self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn, decisions_left=plays_left))
+
     def reset(self):
         super().reset()
         self.start_of_turn()
-        self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
-
-        plays_left = self.get_play_rules(self.player_turn) - self.players[self.player_turn].cards_played
-        self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn, decisions_left=plays_left))
+        self.add_player_turn_to_stack()
 
     def check_current_phase(self) -> GamePhase:
         if len(self.stack) == 0:
@@ -66,7 +69,50 @@ class Game(GameSchema):
             # does the player own this keeper?
             if card_name not in self.get_keepers_by_name(phase.acting_player): return False, "Keeper to be discarded not owned"
 
+        elif phase.type == GamePhaseType.DISCARD_RULE_IN_PLAY:
+            if card_name not in self.get_rules_in_play_by_name(): return False, "Rule to be discarded not in play"
+
+        elif phase.type == GamePhaseType.ADD_CARD_IN_PLAY_TO_HAND:
+            if card_name not in self.get_cards_in_play_by_name(): return False, "Card to be zapped not in play"
+
+        elif phase.type == GamePhaseType.PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE:
+            if card_name not in self.get_discard_pile_by_name(): return False, "Card to be played not in discard pile"
+            if self.discard_pile[index_of_card(self.discard_pile, card_name)].card_type not in [CardType.ACTION, CardType.RULE]: return False, "Card to be played not an action or rule"
+
+        elif phase.type.contains_latent_space():
+            if index_of_card(phase.latent_space, card_name) == -1: return False, "Card to be played not in latent space"
+
         return True, None
+
+    def assert_card_conservation(self):
+        total = (
+                len(self.draw_pile)
+                + len(self.discard_pile)
+                + sum(len(p.hand) for p in self.players)
+                + sum(len(p.keepers) for p in self.players)
+                + len(self.goals)
+                + len(self.rules)
+                + sum(
+            len(phase.latent_space)
+            for phase in self.stack
+            if hasattr(phase, 'latent_space') and phase.latent_space is not None
+        )
+                + sum(
+            1 for phase in self.stack
+            if hasattr(phase, 'card') and phase.card is not None
+        )
+        )
+        assert total == len(self.deck), (
+            f"Card conservation violated: expected {len(self.deck)}, found {total}. "
+            f"Draw: {len(self.draw_pile)}, "
+            f"Discard: {len(self.discard_pile)}, "
+            f"Hands: {[len(p.hand) for p in self.players]}, "
+            f"Keepers: {[len(p.keepers) for p in self.players]}, "
+            f"Goals: {len(self.goals)}, "
+            f"Rules: {len(self.rules)}, "
+            f"Stack latent: {sum(len(ph.latent_space) for ph in self.stack if hasattr(ph, 'latent_space') and ph.latent_space is not None)}, "
+            f"Stack cards: {sum(1 for ph in self.stack if hasattr(ph, 'card') and ph.card is not None)}"
+        )
 
     # We note that the simulator will receive an integer and then decode it into something more complex for the game simulator to consume
     def step(self, card_name: str):
@@ -78,29 +124,77 @@ class Game(GameSchema):
             raise Exception(f"Invalid action: {error_message}")
 
         if current_phase.type == GamePhaseType.PLAY_CARD_FOR_TURN:
-            card_to_play = card_name
-            self.play_card_from_hand(acting_player, card_to_play)
+            self.play_card_from_hand(acting_player, card_name)
+
         elif current_phase.type == GamePhaseType.DISCARD_CARD_FROM_HAND:
-            card_to_discard = card_name
-            self.discard_card(acting_player, card_to_discard)
+            self.discard_card(acting_player, card_name)
+
         elif current_phase.type == GamePhaseType.DISCARD_KEEPER:
-            keeper_to_discard = card_name
-            self.discard_keeper(acting_player, keeper_to_discard)
+            self.discard_keeper(acting_player, card_name)
+
+        elif current_phase.type == GamePhaseType.DISCARD_RULE_IN_PLAY:
+            i = index_of_card(self.rules, card_name)
+            self.discard_pile.append(self.rules[i])
+            del self.rules[i]
+
+        elif current_phase.type == GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE:
+            card_index = index_of_card(current_phase.latent_space, card_name)
+            card_to_play = current_phase.latent_space[card_index]
+            del current_phase.latent_space[card_index]
+            if current_phase.decisions_left > 1 and len(current_phase.latent_space) > 0:
+                current_phase.decisions_left -= 1
+                self.stack.append(current_phase)
+            else:
+                for card in current_phase.latent_space:
+                    self.stack.append(GamePhase(GamePhaseType.ADD_CARD_TO_DISCARD_PILE, acting_player, card=card))
+            self.activate_card(acting_player, card_to_play)
+
+        elif current_phase.type == GamePhaseType.ADD_CARD_IN_PLAY_TO_HAND:
+            # Fluxx decks have no duplicates, so can just try zapping the card from all locations
+            card_location = find_card_in_play_by_name(self, card_name)
+            card = get_selected_card(self, card_location)
+            trash_selected_card(self, acting_player, card_location, False)
+            self.players[acting_player].hand.append(card)
+
+        elif current_phase.type == GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND:
+            card_index = index_of_card(current_phase.latent_space, card_name)
+            card_to_draw = current_phase.latent_space[card_index]
+            del current_phase.latent_space[card_index]
+            if current_phase.decisions_left > 1 and len(current_phase.latent_space) > 0:
+                current_phase.decisions_left -= 1
+                self.stack.append(current_phase)
+            else:
+                self.players[acting_player ^ 1].hand.extend(current_phase.latent_space)
+            self.players[acting_player].hand.append(card_to_draw)
+
+        elif current_phase.type == GamePhaseType.PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE:
+            card_index = index_of_card(self.discard_pile, card_name)
+            card_to_play = self.discard_pile[card_index]
+            del self.discard_pile[card_index]
+            self.activate_card(acting_player, card_to_play)
+
+        # ---
+        # ACTIONLESS PHASES (some actions need to be deferred after prompts)
+        # ---
 
         while self.check_current_phase().type.is_actionless():
-            if self.check_current_phase().type == GamePhaseType.POST_PLAY_CARD_FOR_TURN:
-                self.get_current_phase()
+            current_phase = self.get_current_phase()
+            if current_phase.type == GamePhaseType.POST_PLAY_CARD_FOR_TURN:
                 self.handle_turn_over()
 
-            elif self.check_current_phase().type == GamePhaseType.TURN_END:
-                self.get_current_phase()
-
-                # TODO: this code fragment is duplicated. I think the "plays_left + append PLAY_CARD_FOR_TURN ... " should be a method
+            elif current_phase.type == GamePhaseType.TURN_END:
                 self.end_of_turn()
                 self.start_of_turn()
-                self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
-                plays_left = self.get_play_rules(self.player_turn) - self.players[self.player_turn].cards_played
-                self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn, decisions_left=plays_left))
+                self.add_player_turn_to_stack()
+
+            elif current_phase.type == GamePhaseType.ADD_CARD_TO_DISCARD_PILE:
+                self.discard_pile.append(current_phase.card)
+
+        # ---
+        # CORRECTNESS ASSERTION
+        # ---
+        # After each step, the total number of cards in all zones should be constant
+        self.assert_card_conservation()
 
     def handle_turn_over(self):
         """
@@ -110,9 +204,7 @@ class Game(GameSchema):
             self.handle_end_of_turn()
         else:
             # Allow the player to play another card
-            self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
-            plays_left = self.get_play_rules(self.player_turn) - self.players[self.player_turn].cards_played
-            self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn, decisions_left=plays_left))
+            self.add_player_turn_to_stack()
 
     def handle_end_of_turn(self):
         """
@@ -182,8 +274,8 @@ class Game(GameSchema):
         player.keepers.append(keeper)
 
     def play_action(self, player_number: int, action: Action):
+        self.stack.append(GamePhase(GamePhaseType.ADD_CARD_TO_DISCARD_PILE, player_number, card=action))
         action_cards.activate_action(action.name, self, player_number)
-        self.discard_pile.append(action)
 
     def activate_card(self, player_number: int, card_to_play):
         """Activate a card. Is the result of 'playing a card', but is not the same thing as it"""
@@ -202,7 +294,7 @@ class Game(GameSchema):
         """
         Assumes a validated input (will not check whether the card is actually in the player's hand), but will search the hand for it
 
-        Play a card from a player's hand. Discards it from the player's hand but does NOT add it to the discard pile.
+        Play a card from a player's hand. Does NOT add it to the discard pile
 
         :arguments:
         - player_number: Index of the player in self.players who is playing the card
@@ -298,6 +390,15 @@ class Game(GameSchema):
 
     def get_rules_in_play_by_name(self):
         return [rule.name for rule in self.rules]
+
+    def get_cards_in_play_by_name(self):
+        cards_in_play = []
+        for player in self.players:
+            cards_in_play.extend(player.keepers)
+        cards_in_play.extend(self.goals)
+        cards_in_play.extend(self.rules)
+        return [card.name for card in cards_in_play]
+
     # -----------------------------------------------------------
     # PRE REFACTOR CODE
     # -----------------------------------------------------------
@@ -376,7 +477,7 @@ class Game(GameSchema):
         contradictory_rules = []
         possible_contradictions = ["draw", "play", "keeper_limit", "hand_limit"]
         for option in possible_contradictions:
-            if card_played[option]:
+            if card_played[option] is not None:
                 contradictory_rules.append(option)
 
         new_rules = []
@@ -466,6 +567,7 @@ class Game(GameSchema):
         Get a card from the draw pile. Not the same as drawing a card.
         If both the draw pile and discard pile are empty, do not draw a card.
         """
+        print(len(self.draw_pile), len(self.discard_pile))
         if not self.draw_pile:
             self.shuffle_discard_pile_into_draw()
 

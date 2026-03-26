@@ -1,11 +1,6 @@
 # self-note: maybe worth adding something extra for Goals here
 from fluxx.game.Cards.card_data import CARD_DATA
-from fluxx.game.FluxxEnums import CardType
-
-class Card:
-    def __init__(self, name: str, card_type: CardType):
-        self.name = name
-        self.card_type = card_type
+from fluxx.game.FluxxEnums import CardType, Card
 
 """
 List of possible rules

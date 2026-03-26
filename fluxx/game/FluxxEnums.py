@@ -8,6 +8,11 @@ class CardType(Enum):
     GOAL = 3
     ACTION = 4
 
+class Card:
+    def __init__(self, name: str, card_type: CardType):
+        self.name = name
+        self.card_type = card_type
+
 class CardZone(Enum):
     RULES = 1,
     KEEPERS = 2,
@@ -29,15 +34,25 @@ class GamePhaseType(Enum):
     GAME_START = 5,
     TURN_END = 6,
     DISCARD_RULE_IN_PLAY = 7,
+    PLAY_CARD_FROM_LATENT_SPACE = 8,
+    ADD_CARD_IN_PLAY_TO_HAND = 9,
+    SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND = 10,
+    PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE = 11,
+    ADD_CARD_TO_DISCARD_PILE = 12,
 
     def is_actionless(self):
-        return self in [GamePhaseType.GAME_START, GamePhaseType.TURN_END, GamePhaseType.POST_PLAY_CARD_FOR_TURN]
+        return self in [GamePhaseType.GAME_START, GamePhaseType.TURN_END, GamePhaseType.POST_PLAY_CARD_FOR_TURN, GamePhaseType.ADD_CARD_TO_DISCARD_PILE]
+
+    def contains_latent_space(self):
+        return self in [GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE, GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND]
 
 @dataclass
 class GamePhase:
     type: GamePhaseType
     acting_player: int
     decisions_left: Optional[int] = None
+    latent_space: Optional[list[Card]] = None
+    card: Optional[Card] = None
 
 # Note: probably a good idea to make some of the other fields in this class optional
 @dataclass
