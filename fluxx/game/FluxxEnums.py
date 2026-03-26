@@ -39,18 +39,6 @@ class GamePhase:
     acting_player: int
     decisions_left: Optional[int] = None
 
-class GameActionType(Enum):
-    PLAY_CARD_FOR_TURN = 1,
-    DISCARD_CARD_FROM_HAND = 2,
-    DISCARD_KEEPER = 3,
-    NULL_ACTION = 4, # Called only by environment. Messy solution, may not keep
-    DISCARD_RULE_IN_PLAY = 5,
-
-@dataclass
-class GameAction:
-    type: GameActionType
-    card_name: str
-
 # Note: probably a good idea to make some of the other fields in this class optional
 @dataclass
 class GameState:

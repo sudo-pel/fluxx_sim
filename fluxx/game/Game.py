@@ -5,7 +5,7 @@ from typing import Optional
 from collections import Counter
 
 from fluxx.game.Card import Card, Rule, Goal, Keeper, Action, RulesOptions
-from fluxx.game.FluxxEnums import CardType, GamePhase, GamePhaseType, GameAction, GameActionType, GameState
+from fluxx.game.FluxxEnums import CardType, GamePhase, GamePhaseType, GameState
 
 from fluxx.game.Player import Player
 from fluxx.game import game_messages
@@ -22,7 +22,11 @@ class Game(GameSchema):
 
     def reset(self):
         super().reset()
-        self.step(GameAction(GameActionType.NULL_ACTION, ""))
+        self.start_of_turn()
+        self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
+
+        plays_left = self.get_play_rules(self.player_turn) - self.players[self.player_turn].cards_played
+        self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn, decisions_left=plays_left))
 
     def check_current_phase(self) -> GamePhase:
         if len(self.stack) == 0:
@@ -39,78 +43,64 @@ class Game(GameSchema):
         else:
             return self.stack.pop()
 
-    def is_action_valid(self, phase: GamePhase, action: GameAction) -> tuple[bool, Optional[str]]:
+    def is_action_valid(self, phase: GamePhase, card_name: str) -> tuple[bool, Optional[str]]:
         """
-        Given a GamePhase and a game state (implicit in the self-reference), validates a given GameAction.
+        Given a GamePhase and a game state (implicit in the self-reference), validates a given action.
 
-        First, checks whether the game action corresponds to the given phase. Then performs validation specific to the given GameAction.
+        All actions in the game refer to card names.
         """
-
-        # Consider refactoring this into a dict with a list in the future
-        if phase.type == GamePhaseType.PLAY_CARD_FOR_TURN and action.type != GameActionType.PLAY_CARD_FOR_TURN: return False, "Invalid action type"
-        if phase.type == GamePhaseType.DISCARD_CARD_FROM_HAND and action.type != GameActionType.DISCARD_CARD_FROM_HAND: return False, "Invalid action type"
-        if phase.type == GamePhaseType.DISCARD_KEEPER and action.type != GameActionType.DISCARD_KEEPER: return False, "Invalid action type"
 
         # Specific action validation
-        if action.type == GameActionType.PLAY_CARD_FOR_TURN:
+        if phase.type == GamePhaseType.PLAY_CARD_FOR_TURN:
             # is it this player's turn?
             if self.player_turn != phase.acting_player: return False, "Not this player's turn"
 
             # is the card in this player's hard?
-            if action.card_name not in self.get_cards_in_hand_by_name(phase.acting_player): return False, "Card to be played not in hand"
+            if card_name not in self.get_cards_in_hand_by_name(phase.acting_player): return False, "Card to be played not in hand"
 
-        elif action.type == GameActionType.DISCARD_CARD_FROM_HAND:
+        elif phase.type == GamePhaseType.DISCARD_CARD_FROM_HAND:
             # is the card in this player's hand?
-            if action.card_name not in self.get_cards_in_hand_by_name(phase.acting_player): return False, "Card to be discarded not in hand"
+            if card_name not in self.get_cards_in_hand_by_name(phase.acting_player): return False, "Card to be discarded not in hand"
 
-        elif action.type == GameActionType.DISCARD_KEEPER:
+        elif phase.type == GamePhaseType.DISCARD_KEEPER:
             # does the player own this keeper?
-            if action.card_name not in self.get_keepers_by_name(phase.acting_player): return False, "Keeper to be discarded not owned"
+            if card_name not in self.get_keepers_by_name(phase.acting_player): return False, "Keeper to be discarded not owned"
 
         return True, None
 
     # We note that the simulator will receive an integer and then decode it into something more complex for the game simulator to consume
-    def step(self, action: GameAction):
+    def step(self, card_name: str):
         current_phase = self.get_current_phase()
         acting_player = current_phase.acting_player
 
-        action_valid, error_message = self.is_action_valid(current_phase, action)
+        action_valid, error_message = self.is_action_valid(current_phase, card_name)
         if not action_valid:
             raise Exception(f"Invalid action: {error_message}")
 
-        if action.type == GameActionType.PLAY_CARD_FOR_TURN:
-            card_to_play = action.card_name
+        if current_phase.type == GamePhaseType.PLAY_CARD_FOR_TURN:
+            card_to_play = card_name
             self.play_card_from_hand(acting_player, card_to_play)
-        elif action.type == GameActionType.DISCARD_CARD_FROM_HAND:
-            card_to_discard = action.card_name
+        elif current_phase.type == GamePhaseType.DISCARD_CARD_FROM_HAND:
+            card_to_discard = card_name
             self.discard_card(acting_player, card_to_discard)
-        elif action.type == GameActionType.DISCARD_KEEPER:
-            keeper_to_discard = action.card_name
+        elif current_phase.type == GamePhaseType.DISCARD_KEEPER:
+            keeper_to_discard = card_name
             self.discard_keeper(acting_player, keeper_to_discard)
 
-        # GAME_START is an actionless phase, but it will be called at the start of the game via ..
-        # .. a step() function and therefore will not be at the top of the stack (it will have been popped into current_phase)
-        if current_phase.type == GamePhaseType.GAME_START:
-            self.stack.append(current_phase)
-
         while self.check_current_phase().type.is_actionless():
-            if current_phase.type == GamePhaseType.GAME_START:
-                # Start of game: begin the turn of the first player
-                self.get_current_phase()
-                self.start_of_turn()
-                self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
-                self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn))
-
-            elif self.check_current_phase().type == GamePhaseType.POST_PLAY_CARD_FOR_TURN:
+            if self.check_current_phase().type == GamePhaseType.POST_PLAY_CARD_FOR_TURN:
                 self.get_current_phase()
                 self.handle_turn_over()
 
             elif self.check_current_phase().type == GamePhaseType.TURN_END:
                 self.get_current_phase()
+
+                # TODO: this code fragment is duplicated. I think the "plays_left + append PLAY_CARD_FOR_TURN ... " should be a method
                 self.end_of_turn()
                 self.start_of_turn()
                 self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
-                self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn))
+                plays_left = self.get_play_rules(self.player_turn) - self.players[self.player_turn].cards_played
+                self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn, decisions_left=plays_left))
 
     def handle_turn_over(self):
         """
@@ -121,7 +111,8 @@ class Game(GameSchema):
         else:
             # Allow the player to play another card
             self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
-            self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn))
+            plays_left = self.get_play_rules(self.player_turn) - self.players[self.player_turn].cards_played
+            self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn, decisions_left=plays_left))
 
     def handle_end_of_turn(self):
         """
@@ -263,11 +254,13 @@ class Game(GameSchema):
 
         if keeper_limit is not None:
             for i in range(len(player.keepers) - keeper_limit):
-                self.stack.append(GamePhase(GamePhaseType.DISCARD_KEEPER, player_number))
+                discards_left = len(player.keepers) - keeper_limit - i
+                self.stack.append(GamePhase(GamePhaseType.DISCARD_KEEPER, player_number, decisions_left=discards_left))
 
         if hand_limit is not None:
             for i in range(len(player.hand) - hand_limit):
-                self.stack.append(GamePhase(GamePhaseType.DISCARD_CARD_FROM_HAND, player_number))
+                discards_left = len(player.hand) - hand_limit - i
+                self.stack.append(GamePhase(GamePhaseType.DISCARD_CARD_FROM_HAND, player_number, decisions_left=discards_left))
 
     def get_keeper_limit(self, player_number: Optional[int]=None) -> Optional[int]:
         limit = None

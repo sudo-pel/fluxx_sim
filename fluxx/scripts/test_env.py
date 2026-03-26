@@ -12,7 +12,7 @@ actor.load_state_dict(torch.load("actor.pt"))
 actor.eval()
 
 agents = {
-    "player_0": actor,
+    "player_0": RandomAgent(),
     "player_1": RandomAgent()
 }
 
@@ -28,7 +28,7 @@ def main(one_turn_win_simple_fluxx=None):
         "player_1": 0
     }
 
-    GAME_COUNT = 1000
+    GAME_COUNT = 10
 
     for i in range(5):
 
@@ -52,7 +52,7 @@ def main(one_turn_win_simple_fluxx=None):
                     #input("Press enter to continue...")
 
                 #print(f"Agent {agent} took action {action}")
-                env.step(action)
+                #env.step(action)
                 #printout_state(env.get_player_number(agent), env.game.get_game_state())
                 #print(env.game.stack)
 

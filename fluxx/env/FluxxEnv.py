@@ -5,7 +5,7 @@ from pettingzoo import AECEnv
 from pettingzoo.utils import agent_selector, wrappers
 from typing import Optional
 
-from fluxx.game.FluxxEnums import GamePhaseType, GameAction, GameActionType, DecisionEncoding, DecisionEncodingType
+from fluxx.game.FluxxEnums import GamePhaseType, DecisionEncodingType
 from fluxx.game.Game import Game
 """
 
@@ -113,8 +113,8 @@ def env(**kwargs):
     raw_env = wrappers.OrderEnforcingWrapper(raw_env)
     return raw_env
 
-def convert_decision_encoding(self, decision_encoding: list[DecisionEncodingType], decisions_left: int) -> npt.NDArray[np.int8]:
-    decision_context_vector = np.zeros(15, dtype=np.int8)
+def convert_decision_encoding(decision_encoding: list[DecisionEncodingType], decisions_left: int) -> npt.NDArray[np.int8]:
+    decision_context_vector = np.zeros(16, dtype=np.int8)
     for d in decision_encoding:
         decision_context_vector[d.value] = 1
     decision_context_vector[15] = decisions_left
@@ -211,10 +211,10 @@ class FluxxEnv(AECEnv):
         decisions_left = self.game.check_current_phase().decisions_left
 
         decision_context_vectors: dict[GamePhaseType,list[DecisionEncodingType]] = {
-            GamePhaseType.DISCARD_CARD_FROM_HAND: [DecisionEncoding.PLACE_DISCARD_PILE, DecisionEncoding.REMAIN_HAND],
-            GamePhaseType.PLAY_CARD_FOR_TURN: [DecisionEncoding.PLAY, DecisionEncoding.REMAIN_HAND],
-            GamePhaseType.DISCARD_KEEPER: [DecisionEncoding.PLACE_DISCARD_PILE, DecisionEncoding.REMAIN_KEEPERS],
-            GamePhaseType.DISCARD_RULE_IN_PLAY: [DecisionEncoding.PLACE_DISCARD_PILE, DecisionEncoding.REMAIN_IN_PLAY],
+            GamePhaseType.DISCARD_CARD_FROM_HAND: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_PLAYER_HAND],
+            GamePhaseType.PLAY_CARD_FOR_TURN: [DecisionEncodingType.PLAY, DecisionEncodingType.REMAIN_PLAYER_HAND],
+            GamePhaseType.DISCARD_KEEPER: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_PLAYER_KEEPERS],
+            GamePhaseType.DISCARD_RULE_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_IN_PLAY],
         }
         decision_context_vector = convert_decision_encoding(decision_context_vectors[self.game.check_current_phase().type], decisions_left)
 
@@ -259,35 +259,23 @@ class FluxxEnv(AECEnv):
         # Determine what actions are legal based on the game phase
         current_phase = self.game.check_current_phase()
 
-        play_card_mask = np.zeros(self.card_vector_length, dtype=np.int8)
-        discard_card_from_hand_mask = np.zeros(self.card_vector_length, dtype=np.int8)
-        discard_keeper_mask = np.zeros(self.card_vector_length, dtype=np.int8)
+        action_mask = np.zeros(self.card_vector_length, dtype=np.int8)
 
         # TODO: Mask *in* legal plays (cards in hand, keepers owned) and then return the concatenation of all
         if current_phase.type == GamePhaseType.PLAY_CARD_FOR_TURN:
-            play_card_mask = cards_in_hand_vector
+            action_mask = cards_in_hand_vector
         elif current_phase.type == GamePhaseType.DISCARD_CARD_FROM_HAND:
-            discard_card_from_hand_mask = cards_in_hand_vector
+            action_mask = cards_in_hand_vector
         elif current_phase.type == GamePhaseType.DISCARD_KEEPER:
-            discard_keeper_mask = agent_keeper_vector
+            action_mask = agent_keeper_vector
 
-
-        action_mask = np.concatenate((play_card_mask, discard_card_from_hand_mask, discard_keeper_mask))
-
-        # Get action_mask
         return {
             "observation": observation,
             "action_mask": action_mask
         }
 
-    def decode_action(self, action_index: int) -> GameAction:
-        # TODO: Remove GameActionType. It is redundant (can now only be inferred from checking the stack which the game validator checks it against)
-        action_types = [GameActionType.PLAY_CARD_FOR_TURN, GameActionType.DISCARD_CARD_FROM_HAND, GameActionType.DISCARD_KEEPER]
-
-        action_type = action_index // self.card_vector_length
-        card_name = self.index_to_card[action_index % self.card_vector_length]
-
-        return GameAction(action_types[action_type], card_name)
+    def decode_action(self, action_index: int) -> str:
+        return self.index_to_card[action_index]
 
     def observation_space(self, agent):
         return self.observation_spaces[agent]
