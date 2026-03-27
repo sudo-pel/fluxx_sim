@@ -79,6 +79,19 @@ class Game(GameSchema):
             if card_name not in self.get_discard_pile_by_name(): return False, "Card to be played not in discard pile"
             if self.discard_pile[index_of_card(self.discard_pile, card_name)].card_type not in [CardType.ACTION, CardType.RULE]: return False, "Card to be played not an action or rule"
 
+        elif phase.type == GamePhaseType.DISCARD_KEEPER_IN_PLAY:
+            if card_name not in self.get_all_keepers_by_name_flat(): return False, "Keeper to be discarded not in play"
+
+        elif phase.type == GamePhaseType.SELECT_KEEPER_TO_STEAL:
+            if card_name not in self.get_all_keepers_by_name()[phase.acting_player ^ 1]: return False, "Keeper to be stolen not owned (by opponent)"
+
+        elif phase.type == GamePhaseType.SELECT_OPPONENT_KEEPER_FOR_EXCHANGE:
+            if card_name not in self.get_all_keepers_by_name()[phase.acting_player ^ 1]: return False, "Keeper to be exchanged not owned (by opponent)"
+
+        elif phase.type == GamePhaseType.SELECT_PLAYER_KEEPER_FOR_EXCHANGE:
+            if card_name not in self.get_all_keepers_by_name()[phase.acting_player]: return False, "Keeper to be exchanged not owned (by player)"
+            if card_name == phase.labelled_card.name: return False, "Keeper to be exchanged cannot be exchanged for itself"
+
         elif phase.type.contains_latent_space():
             if index_of_card(phase.latent_space, card_name) == -1: return False, "Card to be played not in latent space"
 
@@ -173,6 +186,46 @@ class Game(GameSchema):
             del self.discard_pile[card_index]
             self.activate_card(acting_player, card_to_play)
 
+        elif current_phase.type == GamePhaseType.DISCARD_KEEPER_IN_PLAY:
+            card_location = find_card_in_play_by_name(self, card_name)
+            trash_selected_card(self, acting_player, card_location, True)
+
+        elif current_phase.type == GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT:
+            card_index = index_of_card(current_phase.latent_space, card_name)
+            card_to_play = current_phase.latent_space[card_index]
+            del current_phase.latent_space[card_index]
+            if current_phase.decisions_left > 1 and len(current_phase.latent_space) > 0:
+                current_phase.decisions_left -= 1
+                self.stack.append(current_phase)
+            else:
+                for card in current_phase.latent_space:
+                    # For safety, activation of each card is deferred until resolution of the prior one (hence the use of latent space here)
+                    self.stack.append(
+                        GamePhase(GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE, acting_player ^ 1, latent_space=[card], decisions_left=1) # acting player is taken to be the opponent
+                    )
+
+            self.activate_card(acting_player, card_to_play)
+
+        elif current_phase.type == GamePhaseType.SELECT_KEEPER_TO_STEAL:
+            card_location = find_card_in_play_by_name(self, card_name)
+            card = get_selected_card(self, card_location)
+            trash_selected_card(self, acting_player, card_location, False)
+            self.players[acting_player].keepers.append(card)
+
+        elif current_phase.type == GamePhaseType.SELECT_OPPONENT_KEEPER_FOR_EXCHANGE:
+            card_index = index_of_card(self.players[acting_player ^ 1].keepers, card_name)
+            card = self.players[acting_player ^ 1].keepers[card_index]
+            del self.players[acting_player ^ 1].keepers[card_index]
+            self.players[acting_player].keepers.append(card)
+
+            self.stack.append(GamePhase(GamePhaseType.SELECT_PLAYER_KEEPER_FOR_EXCHANGE, acting_player, decisions_left=1, labelled_card=card))
+
+        elif current_phase.type == GamePhaseType.SELECT_PLAYER_KEEPER_FOR_EXCHANGE:
+            card_index = index_of_card(self.players[acting_player].keepers, card_name)
+            card = self.players[acting_player].keepers[card_index]
+            del self.players[acting_player].keepers[card_index]
+            self.players[acting_player ^ 1].keepers.append(card)
+
         # ---
         # ACTIONLESS PHASES (some actions need to be deferred after prompts)
         # ---
@@ -227,9 +280,14 @@ class Game(GameSchema):
         self.played_free_actions = set()
 
         if not self.extra_turn:
+            if not self.disable_game_messages:
+                game_messages.special_effect(f"<< End of player {self.player_turn} turn >>")
             self.player_turn = (self.player_turn + 1) % self.player_count
+
         else:
             self.extra_turn = False
+            if not self.disable_game_messages:
+                game_messages.special_effect(f"<< Player {self.player_turn} extra turn >>")
 
         self.turn_count += 1
 
@@ -375,6 +433,9 @@ class Game(GameSchema):
 
     def get_keepers_by_name(self, player_number: int) -> list[str]:
         return self.get_all_keepers_by_name()[player_number]
+
+    def get_all_keepers_by_name_flat(self) -> list[str]:
+        return [k for players in self.get_all_keepers_by_name() for k in players]
 
     def get_all_keepers_by_name(self) -> list[list[str]]:
         """
@@ -567,7 +628,6 @@ class Game(GameSchema):
         Get a card from the draw pile. Not the same as drawing a card.
         If both the draw pile and discard pile are empty, do not draw a card.
         """
-        print(len(self.draw_pile), len(self.discard_pile))
         if not self.draw_pile:
             self.shuffle_discard_pile_into_draw()
 

@@ -40,7 +40,7 @@ class GameSchema(metaclass=abc.ABCMeta):
         self.winner = None
         self.extra_turn = False
         self.played_free_actions = set()
-        self.stack = [GamePhase(GamePhaseType.GAME_START, -1)]
+        self.stack = []
 
         for player in self.players:
             player.hand = []

@@ -114,10 +114,10 @@ def env(**kwargs):
     return raw_env
 
 def convert_decision_encoding(decision_encoding: list[DecisionEncodingType], decisions_left: int) -> npt.NDArray[np.int8]:
-    decision_context_vector = np.zeros(16, dtype=np.int8)
+    decision_context_vector = np.zeros(17, dtype=np.int8)
     for d in decision_encoding:
         decision_context_vector[d.value] = 1
-    decision_context_vector[15] = decisions_left
+    decision_context_vector[16] = decisions_left
 
     return decision_context_vector
 
@@ -141,7 +141,7 @@ class FluxxEnv(AECEnv):
         self.render_mode = render_mode
         self.possible_agents = [f"player_{i}" for i in range(num_players)]
 
-        decision_context_length = 16 # 7 PLACE zones + play a card, 7 REMAIN zone, 1 int for decisions left
+        decision_context_length = 17 # 7 PLACE zones + play a card, 7 REMAIN zone, 1 int for decisions left
         observed_zone_count = 4 + num_players # hand (for observing agent), goals, rules, keepers, discard pile (for each agent)
         observation_space_size = observed_zone_count * len(game.deck) + decision_context_length + 2 # +2 for draw pile size and opponent hand size
 
@@ -219,6 +219,11 @@ class FluxxEnv(AECEnv):
             GamePhaseType.ADD_CARD_IN_PLAY_TO_HAND: [DecisionEncodingType.PLACE_PLAYER_HAND, DecisionEncodingType.REMAIN_IN_PLAY],
             GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND: [DecisionEncodingType.PLACE_PLAYER_HAND, DecisionEncodingType.REMAIN_OPPONENT_HAND],
             GamePhaseType.PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE: [DecisionEncodingType.PLAY, DecisionEncodingType.REMAIN_DISCARD_PILE],
+            GamePhaseType.DISCARD_KEEPER_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_IN_PLAY],
+            GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT: [DecisionEncodingType.PLAY, DecisionEncodingType.PLAY_FOR_OPPONENT],
+            GamePhaseType.SELECT_KEEPER_TO_STEAL: [DecisionEncodingType.PLACE_PLAYER_KEEPERS, DecisionEncodingType.REMAIN_OPPONENT_KEEPERS],
+            GamePhaseType.SELECT_OPPONENT_KEEPER_FOR_EXCHANGE: [DecisionEncodingType.PLACE_PLAYER_KEEPERS, DecisionEncodingType.REMAIN_OPPONENT_KEEPERS],
+            GamePhaseType.SELECT_PLAYER_KEEPER_FOR_EXCHANGE: [DecisionEncodingType.PLACE_OPPONENT_KEEPERS, DecisionEncodingType.REMAIN_PLAYER_KEEPERS],
         }
         decision_context_vector = convert_decision_encoding(decision_context_vectors[self.game.check_current_phase().type], decisions_left)
 
@@ -284,6 +289,19 @@ class FluxxEnv(AECEnv):
             action_mask = self.populate_card_vector(
                 [card.name for card in self.game.discard_pile if card.card_type == CardType.RULE or card.card_type == CardType.ACTION]
             )
+        elif current_phase.type == GamePhaseType.DISCARD_KEEPER_IN_PLAY:
+            action_mask = np.bitwise_or.reduce(keeper_vectors)
+        elif current_phase.type == GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT:
+            action_mask = self.populate_card_vector([card.name for card in current_phase.latent_space])
+        elif current_phase.type == GamePhaseType.SELECT_KEEPER_TO_STEAL:
+            action_mask = np.bitwise_or.reduce(other_keeper_vectors)
+        elif current_phase.type == GamePhaseType.SELECT_OPPONENT_KEEPER_FOR_EXCHANGE:
+            action_mask = np.bitwise_or.reduce(other_keeper_vectors)
+        elif current_phase.type == GamePhaseType.SELECT_PLAYER_KEEPER_FOR_EXCHANGE:
+            action_mask = agent_keeper_vector
+            action_mask[self.card_to_index[current_phase.labelled_card.name]] = 0 # mask out the keeper that was stolen from the opponent in this exchange
+        else:
+            raise Exception(f"Invalid game phase type: {current_phase.type}")
 
         return {
             "observation": observation,

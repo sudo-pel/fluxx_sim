@@ -39,12 +39,17 @@ class GamePhaseType(Enum):
     SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND = 10,
     PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE = 11,
     ADD_CARD_TO_DISCARD_PILE = 12,
+    DISCARD_KEEPER_IN_PLAY = 13,
+    PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT = 14,
+    SELECT_KEEPER_TO_STEAL = 15,
+    SELECT_PLAYER_KEEPER_FOR_EXCHANGE = 16,
+    SELECT_OPPONENT_KEEPER_FOR_EXCHANGE = 17,
 
     def is_actionless(self):
         return self in [GamePhaseType.GAME_START, GamePhaseType.TURN_END, GamePhaseType.POST_PLAY_CARD_FOR_TURN, GamePhaseType.ADD_CARD_TO_DISCARD_PILE]
 
     def contains_latent_space(self):
-        return self in [GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE, GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND]
+        return self in [GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE, GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND, GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT]
 
 @dataclass
 class GamePhase:
@@ -53,6 +58,7 @@ class GamePhase:
     decisions_left: Optional[int] = None
     latent_space: Optional[list[Card]] = None
     card: Optional[Card] = None
+    labelled_card: Optional[Card] = None # "labelled_card is not counted in card conservation unlike regular "card", which is considered to be in "latent_space"
 
 # Note: probably a good idea to make some of the other fields in this class optional
 @dataclass
@@ -84,3 +90,4 @@ class DecisionEncodingType(Enum):
     REMAIN_DISCARD_PILE = 12
     REMAIN_DRAW_PILE = 13
     REMAIN_IN_PLAY = 14
+    PLAY_FOR_OPPONENT = 15

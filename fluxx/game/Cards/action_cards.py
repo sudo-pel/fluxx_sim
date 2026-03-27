@@ -1,3 +1,4 @@
+import math
 from typing import TYPE_CHECKING
 
 import random
@@ -14,25 +15,19 @@ from fluxx.game import game_messages
 
 
 def activate_use_what_you_take(game_state: 'GameSchema', user_number: int):
-    user_player = game_state.players[user_number]
-    other_players = []
-    for player_number, player in enumerate(game_state.players):
-        if player_number != user_number:
-            other_players.append(player)
+    # TODO: may need multiplayer refactoring
 
-    players_with_cards = [p for p in other_players if len(p.hand) > 0]
-    if len(players_with_cards) == 0:
-        game_messages.notification("No players have any cards in hand!")
-    else:
-        player_to_take = random.randint(0, len(players_with_cards) - 1)
-        card_to_take = random.randint(0, len(players_with_cards[player_to_take].hand) - 1)
+    other_player_number = user_number ^ 1
+    other_player = game_state.players[other_player_number]
 
-        card_to_play = players_with_cards[player_to_take].hand[card_to_take]
-        del players_with_cards[player_to_take].hand[card_to_take]
+    if len(other_player.hand) == 0:
+        return
 
-        game_messages.special_effect(f"<< ACTIVATING {card_to_play.name} >>")
-
-        game_state.activate_card(user_number, card_to_play)
+    card_to_take = random.randint(0, len(other_player.hand) - 1)
+    card_to_play = other_player.hand[card_to_take]
+    del other_player.hand[card_to_take]
+    game_messages.special_effect(f"<< ACTIVATING {card_to_play.name} >>")
+    game_state.activate_card(user_number, card_to_play)
 
 
 def activate_zap_a_card(game_state: 'GameSchema', user_number: int):
@@ -50,35 +45,49 @@ def activate_trash_a_new_rule(game_state: 'GameSchema', user_number: int):
 
 
 def activate_trash_a_keeper(game_state: 'GameSchema', user_number: int):
-    selected_card_location = select_card(game_state, user_number, [CardZone.KEEPERS])
-
-    if selected_card_location is None:
+    if len([k for player in game_state.get_all_keepers_by_name_flat() for k in player]) == 0:
+        if not game_state.disable_game_messages:
+            game_messages.notification("No keepers to trash!")
         return
-
-    trash_selected_card(game_state, user_number, selected_card_location, True)
+    game_state.stack.append(GamePhase(GamePhaseType.DISCARD_KEEPER_IN_PLAY, user_number, decisions_left=1))
 
 
 def activate_trade_hands(game_state: 'GameSchema', user_number: int):
+    # TODO: if multiplayer implemented, need player selection here
     user_player = game_state.players[user_number]
-    player_agent = game_state.agents[user_number]
 
-    selected_player = player_agent.select_player_besides_self(game_state)
-    if selected_player > len(game_state.players) or selected_player == user_number:
-        raise Exception("Error: invalid player selection")
-
-    temp = game_state.players[selected_player].hand
-    game_state.players[selected_player].hand = user_player.hand
+    temp = game_state.players[user_number ^ 1].hand
+    game_state.players[user_number ^ 1].hand= user_player.hand
     user_player.hand = temp
 
-    game_messages.special_effect(f"<< Player {user_number} traded hands with player {selected_player} >> ")
+    if not game_state.disable_game_messages:
+        game_messages.special_effect(f"<< Player {user_number} traded hands with player {user_number ^ 1} >> ")
 
 
 def activate_todays_special(game_state: 'GameSchema', user_number: int):
-    draw_and_play(game_state, user_number, 3 + game_state.inflation(), 1 + game_state.inflation(), CardZone.DISCARD_PILE)
+    latent_space = [game_state.get_card_from_draw_pile() for i in range(3)]
+    latent_space = [l for l in latent_space if l is not None]
+    if len(latent_space) == 0:
+        return
+    game_state.stack.append(GamePhase(
+        GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE,
+        user_number,
+        decisions_left=1,
+        latent_space=latent_space
+    ))
 
 
 def activate_draw_2_and_use_em(game_state: 'GameSchema', user_number: int):
-    draw_and_play(game_state, user_number, 2 + game_state.inflation(), 2 + game_state.inflation(), CardZone.DISCARD_PILE)
+    latent_space = [game_state.get_card_from_draw_pile() for i in range(2)]
+    latent_space = [l for l in latent_space if l is not None]
+    if len(latent_space) == 0:
+        return
+    game_state.stack.append(GamePhase(
+        GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE,
+        user_number,
+        decisions_left=2,
+        latent_space=latent_space
+    ))
 
 
 def activate_draw_3_play_2_of_them(game_state: 'GameSchema', user_number: int):
@@ -94,16 +103,11 @@ def activate_draw_3_play_2_of_them(game_state: 'GameSchema', user_number: int):
     ))
 
 def activate_steal_a_keeper(game_state: 'GameSchema', user_number: int):
-    user_player = game_state.players[user_number]
-
-    selected_card_location = select_card(game_state, user_number, [ExtendedCardZone.ENEMY_KEEPERS])
-
-    if selected_card_location is None:
+    if len(game_state.players[user_number ^ 1].keepers) == 0:
         return
-
-    selected_card = get_selected_card(game_state, selected_card_location)
-    user_player.keepers.append(selected_card)
-    trash_selected_card(game_state, user_number, selected_card_location, False)
+    game_state.stack.append(
+        GamePhase(GamePhaseType.SELECT_KEEPER_TO_STEAL, user_number, decisions_left=1)
+    )
 
 
 def activate_share_the_wealth(game_state: 'GameSchema', user_number: int):
@@ -111,10 +115,15 @@ def activate_share_the_wealth(game_state: 'GameSchema', user_number: int):
     for player in game_state.players:
         player.keepers = []
 
-    for i in range(len(all_keepers)):
-        game_state.players[i % len(game_state.players)].keepers.append(all_keepers[i])
+    if len(all_keepers) == 0:
+        return
 
-    game_messages.special_effect("<< Keepers redistributed! >>")
+    game_state.stack.append(GamePhase(
+        GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT,
+        user_number,
+        decisions_left = int(math.ceil(len(all_keepers) / 2)),
+        latent_space = all_keepers
+    ))
 
 
 def activate_rules_reset(game_state: 'GameSchema', user_number: int):
@@ -126,9 +135,8 @@ def activate_rules_reset(game_state: 'GameSchema', user_number: int):
 
 def activate_rock_paper_scissors_showdown(game_state: 'GameSchema', user_number: int):
     user_player = game_state.players[user_number]
-    player_agent = game_state.agents[user_number]
 
-    selected_player_number = player_agent.select_player_besides_self(game_state)
+    selected_player_number = user_number ^ 1
     selected_player = game_state.players[selected_player_number]
 
     coin = random.randint(0, 1)
@@ -167,15 +175,16 @@ def activate_no_limits(game_state: 'GameSchema', user_number: int):
     for rule in game_state.rules:
         if rule.keeper_limit is None and rule.hand_limit is None:
             new_rules.append(rule)
+        else:
+            game_state.discard_pile.append(rule)
 
     game_state.rules = new_rules
 
 
 def activate_lets_simplify(game_state: 'GameSchema', user_number: int):
     to_discard = (len(game_state.rules) + 1) // 2
-    for _ in range(to_discard):
-        selected_card_location = select_card(game_state, user_number, [CardZone.RULES])
-        trash_selected_card(game_state, user_number, selected_card_location, True)
+    for i in range(to_discard):
+        game_state.stack.append(GamePhase(GamePhaseType.DISCARD_RULE_IN_PLAY, user_number, decisions_left=to_discard - i))
 
 
 def activate_lets_do_that_again(game_state: 'GameSchema', user_number: int):
@@ -196,23 +205,9 @@ def activate_jackpot(game_state: 'GameSchema', user_number: int):
 
 
 def activate_exchange_keepers(game_state: 'GameSchema', user_number: int):
-    user_player = game_state.players[user_number]
-
-    keeper_to_give_location = select_card(game_state, user_number, [ExtendedCardZone.OWN_KEEPERS])
-    keeper_to_take_location = select_card(game_state, user_number, [ExtendedCardZone.ENEMY_KEEPERS])
-
-    if keeper_to_give_location is None or keeper_to_take_location is None:
+    if len(game_state.players[user_number].keepers) == 0 or len(game_state.players[user_number ^ 1].keepers) == 0:
         return
-
-    keeper_to_give = get_selected_card(game_state, keeper_to_give_location)
-    keeper_to_take = get_selected_card(game_state, keeper_to_take_location)
-
-    trash_selected_card(game_state, user_number, keeper_to_give_location, False)
-    trash_selected_card(game_state, user_number, keeper_to_take_location, False)
-    user_player.keepers.append(keeper_to_take)
-    game_state.players[keeper_to_take_location[1]].keepers.append(keeper_to_give)
-
-    game_messages.special_effect(f"<< Swapped {keeper_to_give.name} for {keeper_to_take.name}! >>")
+    game_state.stack.append(GamePhase(GamePhaseType.SELECT_OPPONENT_KEEPER_FOR_EXCHANGE, user_number, decisions_left=1))
 
 
 def activate_empty_the_trash(game_state: 'GameSchema', user_number: int):
@@ -253,9 +248,8 @@ def activate_take_another_turn(game_state: 'GameSchema', user_number: int):
 
 
 def activate_rotate_hands(game_state: 'GameSchema', user_number: int):
-    player_agent = game_state.agents[user_number]
-
-    rotation_direction = player_agent.select_player_rotation_direction(game_state)
+    # TODO: choice of rotation direction matters if multiple players are ever added
+    rotation_direction = 1
     n = len(game_state.players)
 
     current_index = 0
