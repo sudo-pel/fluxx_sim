@@ -5,15 +5,17 @@ from typing import Optional
 from collections import Counter
 
 from fluxx.game.Card import Card, Rule, Goal, Keeper, Action, RulesOptions
-from fluxx.game.FluxxEnums import CardType, GamePhase, GamePhaseType, GameState
+from fluxx.game.FluxxEnums import CardType, GamePhase, GamePhaseType, GameState, CardZone
 
 from fluxx.game.Player import Player
 from fluxx.game import game_messages
 from fluxx.game.Cards import action_cards
 from fluxx.game.Cards.free_actions import can_use_free_action, activate_free_action
 from fluxx.game.GameSchema import GameSchema
+from fluxx.game.game_messages import GameMessageType
 from fluxx.game.utils import card_effect_utils
-from fluxx.game.utils.card_effect_utils import find_card_in_play_by_name, get_selected_card, trash_selected_card
+from fluxx.game.utils.card_effect_utils import find_card_in_play_by_name, get_selected_card, trash_selected_card, \
+    CardLocation
 from fluxx.game.utils.general_utils import index_of_card
 
 
@@ -21,13 +23,43 @@ class Game(GameSchema):
     def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool = False, force_game_state: Optional[GameState] = None):
         GameSchema.__init__(self, player_count, card_list, disable_game_messages, force_game_state)
 
-    def add_player_turn_to_stack(self):
-        self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
-        if len(self.get_available_free_actions()) > 0:
+    def game_message(self, message: str, message_type: GameMessageType):
+        if self.disable_game_messages:
+            return
+        if message_type == GameMessageType.SPECIAL_EFFECT:
+            game_messages.special_effect(message)
+        elif message_type == GameMessageType.NOTIFICATION:
+            game_messages.notification(message)
+        elif message_type == GameMessageType.GAME_OVER:
+            game_messages.game_over(message)
+        elif message_type == GameMessageType.DRAWN_CARD:
+            game_messages.drawn_card(message)
+        elif message_type == GameMessageType.TURN_START:
+            game_messages.turn_start(message)
+
+
+    def add_player_turn_to_stack(self, skip_free_action: bool = False):
+        turn_player = self.players[self.player_turn]
+
+        # if free action was skipped, then there will already be a POST_PLAY_CARD_FOR_TURN on the stack from the previous call to add_player_turn_to_stack, that added ACTIVATE_FREE_ACTION in the first place!
+        if not skip_free_action:
+            self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
+        if len(self.get_available_free_actions()) > 0 and not skip_free_action:
             self.stack.append(GamePhase(GamePhaseType.ACTIVATE_FREE_ACTION, self.player_turn, decisions_left=1))
         else:
+            if self.rule_in_play("first_play_random") and len(turn_player.hand) > 0:
+                if turn_player.cards_played == 0 and self.get_play_rules(self.player_turn) > 1:
+                    card_index = random.randint(0, len(turn_player.hand) - 1)
+                    card_name = turn_player.hand[card_index].name
+                    self.game_message(f"<< (First Play Random) played {card_name} >>", GameMessageType.SPECIAL_EFFECT)
+                    self.play_card_from_hand(self.player_turn, card_name)
+                    return
+
             plays_left = self.get_play_rules(self.player_turn) - self.players[self.player_turn].cards_played
-            self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn, decisions_left=plays_left))
+
+            # Immediately goto end of turn if player has no cards left to play, and does not want to play a free action
+            if len(turn_player.hand) > 0 and plays_left > 0:
+                self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn, decisions_left=plays_left))
 
     def reset(self):
         super().reset()
@@ -107,6 +139,9 @@ class Game(GameSchema):
                 if card_index == -1: return False, "Card to be discarded not in player hand"
                 if self.players[phase.acting_player].hand[card_index].card_type not in phase.card_types: return False, "Card to be discarded not of the correct type"
 
+        elif phase.type == GamePhaseType.DISCARD_GOAL_IN_PLAY:
+            if card_name not in self.get_goals_in_play_by_name(): return False, "Goal to be discarded not in play"
+
         elif phase.type.contains_latent_space():
             if index_of_card(phase.latent_space, card_name) == -1: return False, "Card to be played not in latent space"
 
@@ -161,9 +196,9 @@ class Game(GameSchema):
             self.discard_keeper(acting_player, card_name)
 
         elif current_phase.type == GamePhaseType.DISCARD_RULE_IN_PLAY:
-            i = index_of_card(self.rules, card_name)
-            self.discard_pile.append(self.rules[i])
-            del self.rules[i]
+            card_index = index_of_card(self.rules, card_name)
+            card_loc = CardLocation(CardZone.RULES, card_index)
+            trash_selected_card(self, acting_player, card_loc, True)
 
         elif current_phase.type == GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE:
             card_index = index_of_card(current_phase.latent_space, card_name)
@@ -245,7 +280,7 @@ class Game(GameSchema):
             if card_name != "no_free_action":
                 self.play_free_action(card_name)
             else:
-                self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, acting_player, decisions_left=1))
+                self.add_player_turn_to_stack(skip_free_action=True)
 
         elif current_phase.type == GamePhaseType.DISCARD_OWN_KEEPER_IN_PLAY:
             card_index = index_of_card(self.players[acting_player].keepers, card_name)
@@ -265,12 +300,21 @@ class Game(GameSchema):
 
                 self.stack.append(GamePhase(GamePhaseType.DISCARD_VARIABLE_CARDS_FROM_HAND, acting_player, decisions_left=0, card_types=current_phase.card_types, counter=current_phase.counter + 1, on_complete=current_phase.on_complete))
 
+        elif current_phase.type == GamePhaseType.DISCARD_GOAL_IN_PLAY:
+            card_index = index_of_card(self.goals, card_name)
+            card = self.goals[card_index]
+            del self.goals[card_index]
+            self.discard_pile.append(card)
+
+
         # ---
         # ACTIONLESS PHASES (some actions need to be deferred after prompts)
         # ---
 
         while self.check_current_phase().type.is_actionless():
             current_phase = self.get_current_phase()
+            acting_player = current_phase.acting_player
+
             if current_phase.type == GamePhaseType.POST_PLAY_CARD_FOR_TURN:
                 self.handle_turn_over()
 
@@ -285,6 +329,9 @@ class Game(GameSchema):
             elif current_phase.type == GamePhaseType.DEFERRED_DRAW_CARD:
                 for i in range(current_phase.decisions_left):
                     self.draw(self.players[acting_player])
+
+            elif current_phase.type == GamePhaseType.DEFERRED_PLAY_GOAL:
+                self.goals.append(current_phase.card)
 
         # ---
         # CORRECTNESS ASSERTION
@@ -323,14 +370,13 @@ class Game(GameSchema):
         self.played_free_actions = set()
 
         if not self.extra_turn:
-            if not self.disable_game_messages:
-                game_messages.special_effect(f"<< End of player {self.player_turn} turn >>")
+            self.extra_turns_taken = 0
+            self.game_message(f"<< End of player {self.player_turn} turn >>", GameMessageType.SPECIAL_EFFECT)
             self.player_turn = (self.player_turn + 1) % self.player_count
 
         else:
             self.extra_turn = False
-            if not self.disable_game_messages:
-                game_messages.special_effect(f"<< Player {self.player_turn} extra turn >>")
+            self.game_message(f"<< Player {self.player_turn} extra turn >>", GameMessageType.SPECIAL_EFFECT)
 
         self.turn_count += 1
 
@@ -355,18 +401,17 @@ class Game(GameSchema):
 
     def play_goal(self, player_number: int, goal: Goal):
         """Play a goal card. Does not perform validation."""
-        player = self.players[player_number]
-
         if self.rule_in_play("double_agenda"):
             if len(self.goals) == 2:
-                goal_location = card_effect_utils.select_card(self, player_number, ["goals"])
-                card_effect_utils.trash_selected_card(self, player_number, goal_location, True)
+                self.stack.append(GamePhase(GamePhaseType.DEFERRED_PLAY_GOAL, player_number, decisions_left=1, card=goal))
+                self.stack.append(GamePhase(GamePhaseType.DISCARD_GOAL_IN_PLAY, player_number, decisions_left=1))
+            else:
+                self.goals.append(goal)
         else:
             if len(self.goals) == 1:
                 self.discard_pile.append(self.goals[0])
                 del self.goals[0]
-
-        self.goals.append(goal)
+            self.goals.append(goal)
 
     def play_keeper(self, player_number: int, keeper: Keeper):
         """Play a keeper card. Does not perform validation."""
@@ -552,7 +597,7 @@ class Game(GameSchema):
             play = player.cards_played + 1
 
         if self.rule_in_play("party_bonus") and self.keeper_in_play("the_party"):
-            play += 1
+            play += 1 + self.inflation()
 
         if self.rule_in_play("rich_bonus"):
             keeper_count = len(player.keepers)
@@ -657,7 +702,7 @@ class Game(GameSchema):
                                 optional_keepers += 1
                                 break
 
-                    if optional_keepers < len(current_goal.optional_keepers):
+                    if optional_keepers < len(current_goal.optional_keepers) + self.inflation():
                         win_cancelled = True
 
                     if not win_cancelled:
@@ -682,8 +727,7 @@ class Game(GameSchema):
 
         card_drawn = self.draw_pile.pop()
 
-        if not self.disable_game_messages:
-            game_messages.drawn_card(f"[[ DRAWN '{card_drawn.name}' ]]")
+        self.game_message(f"[[ DRAW '{card_drawn.name}' ]]", GameMessageType.DRAWN_CARD)
 
         if not self.draw_pile:
             self.shuffle_discard_pile_into_draw()
@@ -748,7 +792,11 @@ class Game(GameSchema):
 
         return False
 
-    def inflation(self):
+    def inflation(self) -> int:
+        """
+        Returns 1 or 0 depending on whether rule card "inflation" is in play.
+        :return:
+        """
         if self.rule_in_play("inflation"):
             #game_messages.notification("(Inflation bonus)")
             return 1

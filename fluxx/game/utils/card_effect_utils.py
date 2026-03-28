@@ -1,7 +1,7 @@
 from typing import Optional, Union
 
 from fluxx.game import GameSchema, game_messages
-from fluxx.game.FluxxEnums import CardType, CardZone, ExtendedCardZone, AnyCardZone
+from fluxx.game.FluxxEnums import CardType, CardZone, ExtendedCardZone, AnyCardZone, GamePhase, GamePhaseType
 from dataclasses import dataclass
 
 @dataclass
@@ -17,9 +17,7 @@ def trash_selected_card(game: GameSchema, user_number: int, card_location: CardL
     if card_location.zone == CardZone.RULES:
         rule_discarded = get_selected_card(game, card_location)
         if rule_discarded.name == "double_agenda" and len(game.goals) == 2:
-            goal_to_discard = select_card(game, user_number, [CardZone.GOALS])
-            trash_selected_card(game, user_number, goal_to_discard, True)
-
+            game.stack.append(GamePhase(GamePhaseType.DISCARD_GOAL_IN_PLAY, user_number, decisions_left=1))
         if add_to_discard:
             game.discard_pile.append(game.rules[card_location.index])
         del game.rules[card_location.index]

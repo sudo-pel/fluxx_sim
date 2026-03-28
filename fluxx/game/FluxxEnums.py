@@ -48,9 +48,11 @@ class GamePhaseType(Enum):
     DISCARD_OWN_KEEPER_IN_PLAY = 19,
     DEFERRED_DRAW_CARD = 20, # Exists when card draw needs to be deferred (e.g "recycling")
     DISCARD_VARIABLE_CARDS_FROM_HAND = 21,
+    DISCARD_GOAL_IN_PLAY = 22,
+    DEFERRED_PLAY_GOAL = 23,
 
     def is_actionless(self):
-        return self in {GamePhaseType.GAME_START, GamePhaseType.TURN_END, GamePhaseType.POST_PLAY_CARD_FOR_TURN, GamePhaseType.DEFERRED_ADD_CARD_TO_DISCARD_PILE, GamePhaseType.DEFERRED_DRAW_CARD}
+        return self in {GamePhaseType.GAME_START, GamePhaseType.TURN_END, GamePhaseType.POST_PLAY_CARD_FOR_TURN, GamePhaseType.DEFERRED_ADD_CARD_TO_DISCARD_PILE, GamePhaseType.DEFERRED_DRAW_CARD, GamePhaseType.DEFERRED_PLAY_GOAL}
 
     def contains_latent_space(self):
         return self in {GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE, GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND, GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT}

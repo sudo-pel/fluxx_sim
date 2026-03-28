@@ -1,11 +1,12 @@
 from typing import TYPE_CHECKING
 
+from fluxx.game.game_messages import GameMessageType
+
 # avoiding circular import
 if TYPE_CHECKING:
     pass
 
 from fluxx.game.utils.card_effect_utils import trash_selected_card, select_card
-from fluxx.game import game_messages
 from fluxx.game.FluxxEnums import CardType, CardZone, ExtendedCardZone, GamePhase, GamePhaseType, OnCompleteBehaviour
 
 
@@ -42,7 +43,7 @@ def activate_mystery_play(game_state: "Game", user_number: int):
     card = game_state.get_card_from_draw_pile()
     if card is None:
         return
-    game_messages.special_effect(f"<< Played {card.name}! >>")
+    game_state.game_message(f"<< Played {card.name}! >>", GameMessageType.SPECIAL_EFFECT)
     game_state.activate_card(user_number, card)
 
 def activate_swap_plays_for_draws(game_state: "Game", user_number: int):
@@ -88,7 +89,7 @@ def activate_recycling(game_state: "Game", user_number: int):
     game_state.stack.append(GamePhase(
         GamePhaseType.DEFERRED_DRAW_CARD,
         user_number,
-        decisions_left=3,
+        decisions_left=3+game_state.inflation(),
     ))
     game_state.stack.append(GamePhase(
         GamePhaseType.DISCARD_OWN_KEEPER_IN_PLAY,

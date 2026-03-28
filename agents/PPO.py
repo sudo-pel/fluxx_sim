@@ -171,5 +171,4 @@ class PPO:
 
         # Convert the rewards-to-go into a tensor
         batch_rtgs = torch.tensor(batch_rewards_to_go, dtype=torch.float)
-        print(batch_rtgs.shape)
         return batch_rtgs

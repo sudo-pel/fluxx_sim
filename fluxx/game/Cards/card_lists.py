@@ -29,7 +29,8 @@ for_action_testing = [
     "the_sun",
     "the_party",
 
-    "no_hand_bonus",
+    "double_agenda",
+    "lets_simplify"
 ]
 
 simple_fluxx_deck = [

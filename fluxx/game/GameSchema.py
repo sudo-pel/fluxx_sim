@@ -26,6 +26,7 @@ class GameSchema(metaclass=abc.ABCMeta):
         self.stack: list[GamePhase] = []
         self.disable_game_messages = disable_game_messages
         self.force_game_state = force_game_state
+        self.extra_turns_taken = 0
 
     def reset(self):
         random.shuffle(self.deck)
@@ -41,6 +42,7 @@ class GameSchema(metaclass=abc.ABCMeta):
         self.extra_turn = False
         self.played_free_actions = set()
         self.stack = []
+        self.extra_turns_taken = 0
 
         for player in self.players:
             player.hand = []

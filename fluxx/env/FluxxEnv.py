@@ -7,6 +7,8 @@ from typing import Optional
 
 from fluxx.game.FluxxEnums import GamePhaseType, DecisionEncodingType, CardType, OnCompleteBehaviour
 from fluxx.game.Game import Game
+from fluxx.scripts import debug_utils
+
 """
 
 [[ Encoding game state ]]
@@ -237,6 +239,7 @@ class FluxxEnv(AECEnv):
             GamePhaseType.ACTIVATE_FREE_ACTION: [DecisionEncodingType.PLAY, DecisionEncodingType.REMAIN_IN_PLAY],
             GamePhaseType.DISCARD_OWN_KEEPER_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_IN_PLAY],
             GamePhaseType.DISCARD_VARIABLE_CARDS_FROM_HAND: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_PLAYER_HAND],
+            GamePhaseType.DISCARD_GOAL_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_IN_PLAY],
         }
         decision_context_vector = convert_decision_encoding(decision_context_vectors[self.game.check_current_phase().type], decisions_left, current_phase.counter, current_phase.on_complete)
 
@@ -273,12 +276,16 @@ class FluxxEnv(AECEnv):
                 opponent_hand_sizes.append(len(self.game.players[i].hand))
 
         observation = np.concatenate((decision_context_vector, cards_in_hand_vector, agent_keeper_vector, *other_keeper_vectors, goals_in_play_vector, rules_in_play_vector, discard_pile_vector, draw_pile_size, opponent_hand_sizes))
+        assert len(observation) == self.observation_spaces[agent]["observation"].shape[0], \
+            f"Observation size mismatch: built {len(observation)}, expected {self.observation_spaces[agent]['observation'].shape[0]}"
 
         # ----
         # ACTION MASK
         # ----
 
-        action_mask = np.zeros(self.card_vector_length + 1, dtype=np.int8)
+        action_mask = np.zeros(self.card_vector_length, dtype=np.int8)
+
+        no_free_action_legal = False
 
         # TODO: Mask *in* legal plays (cards in hand, keepers owned) and then return the concatenation of all
         if current_phase.type == GamePhaseType.PLAY_CARD_FOR_TURN:
@@ -312,7 +319,7 @@ class FluxxEnv(AECEnv):
             action_mask[self.card_to_index[current_phase.labelled_card.name]] = 0 # mask out the keeper that was stolen from the opponent in this exchange
         elif current_phase.type == GamePhaseType.ACTIVATE_FREE_ACTION:
             action_mask = self.populate_card_vector([free_action_name for free_action_name in self.game.get_available_free_actions()])
-            action_mask[-1] = 1 # always allowed to say "no free action"
+            no_free_action_legal = True
         elif current_phase.type == GamePhaseType.DISCARD_OWN_KEEPER_IN_PLAY:
             action_mask = agent_keeper_vector
         elif current_phase.type == GamePhaseType.DISCARD_VARIABLE_CARDS_FROM_HAND:
@@ -321,9 +328,22 @@ class FluxxEnv(AECEnv):
                 if card.card_type in current_phase.card_types:
                     valid_cards_in_hand.append(card.name)
             action_mask = self.populate_card_vector(valid_cards_in_hand)
-            action_mask[-1] = 1 # always allowed to say "no more cards"
+            no_free_action_legal = True
+        elif current_phase.type == GamePhaseType.DISCARD_GOAL_IN_PLAY:
+            action_mask = goals_in_play_vector
         else:
             raise Exception(f"Invalid game phase type: {current_phase.type}")
+
+        action_mask = np.append(action_mask, 0)
+        if no_free_action_legal:
+            action_mask[-1] = 1
+
+        if sum(action_mask) == 0:
+            print(self.game.stack)
+            debug_utils.printout_state(self.get_player_number(agent), self.game.get_game_state())
+            print(f"discard pile size: {len(self.game.discard_pile)}")
+            print(f"draw pile size: {len(self.game.draw_pile)}")
+            raise Exception("No legal actions available")
 
         return {
             "observation": observation,
@@ -354,7 +374,7 @@ class FluxxEnv(AECEnv):
         return self.possible_agents.index(agent)
 
     def populate_card_vector(self, card_list: list[str]) -> npt.NDArray[np.int8]:
-        vector = np.zeros(self.card_vector_length + 1, dtype=np.int8)
+        vector = np.zeros(self.card_vector_length, dtype=np.int8)
 
         # TODO: vectorise this
         for card in card_list:

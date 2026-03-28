@@ -1,3 +1,6 @@
+from enum import Enum
+
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -12,6 +15,13 @@ class bcolors:
     CYAN_TEXT = '\x1b[96m'
     GREEN_TEXT = '\x1b[92m'
     RED_TEXT = '\x1b[91m'
+
+class GameMessageType(Enum):
+    SPECIAL_EFFECT = 0,
+    NOTIFICATION = 1,
+    DRAWN_CARD = 2,
+    TURN_START = 3,
+    GAME_OVER = 4
 
 def special_effect(message: str):
     print(f"{bcolors.YELLOW_TEXT}{message}{bcolors.ENDC}")

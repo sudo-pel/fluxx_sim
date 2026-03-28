@@ -6,6 +6,7 @@ import random
 # avoiding circular import
 from fluxx.game.FluxxEnums import CardType, CardZone, ExtendedCardZone, GamePhase, GamePhaseType
 from fluxx.game.GameSchema import GameSchema
+from fluxx.game.game_messages import GameMessageType
 
 if TYPE_CHECKING:
     pass
@@ -26,7 +27,7 @@ def activate_use_what_you_take(game_state: 'GameSchema', user_number: int):
     card_to_take = random.randint(0, len(other_player.hand) - 1)
     card_to_play = other_player.hand[card_to_take]
     del other_player.hand[card_to_take]
-    game_messages.special_effect(f"<< ACTIVATING {card_to_play.name} >>")
+    game_state.game_message(f"<< (p{user_number}): ACTIVATING {card_to_play.name} >>", GameMessageType.SPECIAL_EFFECT)
     game_state.activate_card(user_number, card_to_play)
 
 
@@ -46,8 +47,7 @@ def activate_trash_a_new_rule(game_state: 'GameSchema', user_number: int):
 
 def activate_trash_a_keeper(game_state: 'GameSchema', user_number: int):
     if len([k for player in game_state.get_all_keepers_by_name_flat() for k in player]) == 0:
-        if not game_state.disable_game_messages:
-            game_messages.notification("No keepers to trash!")
+        game_state.game_message("No keepers to trash!", GameMessageType.NOTIFICATION)
         return
     game_state.stack.append(GamePhase(GamePhaseType.DISCARD_KEEPER_IN_PLAY, user_number, decisions_left=1))
 
@@ -60,45 +60,44 @@ def activate_trade_hands(game_state: 'GameSchema', user_number: int):
     game_state.players[user_number ^ 1].hand= user_player.hand
     user_player.hand = temp
 
-    if not game_state.disable_game_messages:
-        game_messages.special_effect(f"<< Player {user_number} traded hands with player {user_number ^ 1} >> ")
+    game_state.game_message(f"<< Player {user_number} traded hands with player {user_number ^ 1} >> ", GameMessageType.SPECIAL_EFFECT)
 
 
 def activate_todays_special(game_state: 'GameSchema', user_number: int):
-    latent_space = [game_state.get_card_from_draw_pile() for i in range(3)]
+    latent_space = [game_state.get_card_from_draw_pile() for i in range(3+game_state.inflation())]
     latent_space = [l for l in latent_space if l is not None]
     if len(latent_space) == 0:
         return
     game_state.stack.append(GamePhase(
         GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE,
         user_number,
-        decisions_left=1,
+        decisions_left=1+game_state.inflation(),
         latent_space=latent_space
     ))
 
 
 def activate_draw_2_and_use_em(game_state: 'GameSchema', user_number: int):
-    latent_space = [game_state.get_card_from_draw_pile() for i in range(2)]
+    latent_space = [game_state.get_card_from_draw_pile() for i in range(2+game_state.inflation())]
     latent_space = [l for l in latent_space if l is not None]
     if len(latent_space) == 0:
         return
     game_state.stack.append(GamePhase(
         GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE,
         user_number,
-        decisions_left=2,
+        decisions_left=2+game_state.inflation(),
         latent_space=latent_space
     ))
 
 
 def activate_draw_3_play_2_of_them(game_state: 'GameSchema', user_number: int):
-    latent_space = [game_state.get_card_from_draw_pile() for i in range(len(game_state.players))]
+    latent_space = [game_state.get_card_from_draw_pile() for i in range(3 + game_state.inflation())]
     latent_space = [l for l in latent_space if l is not None]
     if len(latent_space) == 0:
         return
     game_state.stack.append(GamePhase(
         GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE,
         user_number,
-        decisions_left=2,
+        decisions_left=2 + game_state.inflation(),
         latent_space=latent_space
     ))
 
@@ -147,7 +146,7 @@ def activate_rock_paper_scissors_showdown(game_state: 'GameSchema', user_number:
         winner = selected_player
         loser = user_player
 
-    game_messages.special_effect(f"<< Player {winner.id} defeated {loser.id} in RPS! >>")
+    game_state.game_message(f"<< Player {winner.id} defeated {loser.id} in RPS! >>", GameMessageType.SPECIAL_EFFECT)
 
     winner.hand += loser.hand
     loser.hand = []
@@ -164,7 +163,7 @@ def activate_random_tax(game_state: 'GameSchema', user_number: int):
             index_to_take = random.randint(0, len(player.hand) - 1)
             card_to_take = player.hand[index_to_take]
 
-            game_messages.special_effect(f"<< Stolen {card_to_take.name} from Player {player_number}! >>")
+            game_state.game_message(f"<< Player {player_number} took {card_to_take.name} from their hand >>", GameMessageType.SPECIAL_EFFECT)
 
             user_player.hand.append(card_to_take)
             del player.hand[index_to_take]
@@ -215,7 +214,7 @@ def activate_empty_the_trash(game_state: 'GameSchema', user_number: int):
     discard_pile_size = len(game_state.discard_pile)
     game_state.discard_pile = []
     random.shuffle(game_state.draw_pile)
-    game_messages.special_effect(f"<< Shuffled {discard_pile_size} cards from discard pile into deck! >>")
+    game_state.game_message(f"<< Shuffled {discard_pile_size} cards from discard pile into deck! >>", GameMessageType.SPECIAL_EFFECT)
 
 
 def activate_discard_and_draw(game_state: 'GameSchema', user_number: int):
@@ -231,20 +230,22 @@ def activate_discard_and_draw(game_state: 'GameSchema', user_number: int):
 
 def activate_everybody_gets_1(game_state: 'GameSchema', user_number: int):
     # TODO: Will need to refactor this for multiplayer if project reaches that point
-    latent_space = [game_state.get_card_from_draw_pile() for i in range(len(game_state.players))]
+    latent_space = [game_state.get_card_from_draw_pile() for i in range((1+game_state.inflation()) * len(game_state.players))]
     latent_space = [l for l in latent_space if l is not None]
     if len(latent_space) == 0:
         return
     game_state.stack.append(GamePhase(
         GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND,
         user_number,
-        decisions_left=1,
+        decisions_left=1+game_state.inflation(),
         latent_space=latent_space
     ))
 
 def activate_take_another_turn(game_state: 'GameSchema', user_number: int):
-    game_messages.special_effect("<< Extra turn! >>")
-    game_state.extra_turn = True
+    if game_state.extra_turns_taken < 2:
+        game_state.extra_turns_taken += 1
+        game_state.game_message("<< Extra turn! >>", GameMessageType.SPECIAL_EFFECT)
+        game_state.extra_turn = True
 
 
 def activate_rotate_hands(game_state: 'GameSchema', user_number: int):
