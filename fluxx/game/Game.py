@@ -23,8 +23,11 @@ class Game(GameSchema):
 
     def add_player_turn_to_stack(self):
         self.stack.append(GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, self.player_turn))
-        plays_left = self.get_play_rules(self.player_turn) - self.players[self.player_turn].cards_played
-        self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn, decisions_left=plays_left))
+        if len(self.get_available_free_actions()) > 0:
+            self.stack.append(GamePhase(GamePhaseType.ACTIVATE_FREE_ACTION, self.player_turn, decisions_left=1))
+        else:
+            plays_left = self.get_play_rules(self.player_turn) - self.players[self.player_turn].cards_played
+            self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn, decisions_left=plays_left))
 
     def reset(self):
         super().reset()
@@ -91,6 +94,18 @@ class Game(GameSchema):
         elif phase.type == GamePhaseType.SELECT_PLAYER_KEEPER_FOR_EXCHANGE:
             if card_name not in self.get_all_keepers_by_name()[phase.acting_player]: return False, "Keeper to be exchanged not owned (by player)"
             if card_name == phase.labelled_card.name: return False, "Keeper to be exchanged cannot be exchanged for itself"
+
+        elif phase.type == GamePhaseType.ACTIVATE_FREE_ACTION:
+            if card_name != "no_free_action" and card_name not in self.get_available_free_actions(): return False, "Free action to be activated not available"
+
+        elif phase.type == GamePhaseType.DISCARD_OWN_KEEPER_IN_PLAY:
+            if card_name not in self.get_keepers_by_name(phase.acting_player): return False, "Keeper to be discarded not owned (by player)"
+
+        elif phase.type == GamePhaseType.DISCARD_VARIABLE_CARDS_FROM_HAND:
+            if card_name != "no_free_action":
+                card_index = index_of_card(self.players[phase.acting_player].hand, card_name)
+                if card_index == -1: return False, "Card to be discarded not in player hand"
+                if self.players[phase.acting_player].hand[card_index].card_type not in phase.card_types: return False, "Card to be discarded not of the correct type"
 
         elif phase.type.contains_latent_space():
             if index_of_card(phase.latent_space, card_name) == -1: return False, "Card to be played not in latent space"
@@ -159,7 +174,7 @@ class Game(GameSchema):
                 self.stack.append(current_phase)
             else:
                 for card in current_phase.latent_space:
-                    self.stack.append(GamePhase(GamePhaseType.ADD_CARD_TO_DISCARD_PILE, acting_player, card=card))
+                    self.stack.append(GamePhase(GamePhaseType.DEFERRED_ADD_CARD_TO_DISCARD_PILE, acting_player, card=card))
             self.activate_card(acting_player, card_to_play)
 
         elif current_phase.type == GamePhaseType.ADD_CARD_IN_PLAY_TO_HAND:
@@ -226,6 +241,30 @@ class Game(GameSchema):
             del self.players[acting_player].keepers[card_index]
             self.players[acting_player ^ 1].keepers.append(card)
 
+        elif current_phase.type == GamePhaseType.ACTIVATE_FREE_ACTION:
+            if card_name != "no_free_action":
+                self.play_free_action(card_name)
+            else:
+                self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, acting_player, decisions_left=1))
+
+        elif current_phase.type == GamePhaseType.DISCARD_OWN_KEEPER_IN_PLAY:
+            card_index = index_of_card(self.players[acting_player].keepers, card_name)
+            card = self.players[acting_player].keepers[card_index]
+            del self.players[acting_player].keepers[card_index]
+            self.discard_pile.append(card)
+
+        elif current_phase.type == GamePhaseType.DISCARD_VARIABLE_CARDS_FROM_HAND:
+            if card_name == "no_free_action":
+                for i in range(current_phase.counter):
+                    self.draw(self.players[acting_player])
+            else:
+                card_index = index_of_card(self.players[acting_player].hand, card_name)
+                card = self.players[acting_player].hand[card_index]
+                del self.players[acting_player].hand[card_index]
+                self.discard_pile.append(card)
+
+                self.stack.append(GamePhase(GamePhaseType.DISCARD_VARIABLE_CARDS_FROM_HAND, acting_player, decisions_left=0, card_types=current_phase.card_types, counter=current_phase.counter + 1, on_complete=current_phase.on_complete))
+
         # ---
         # ACTIONLESS PHASES (some actions need to be deferred after prompts)
         # ---
@@ -240,8 +279,12 @@ class Game(GameSchema):
                 self.start_of_turn()
                 self.add_player_turn_to_stack()
 
-            elif current_phase.type == GamePhaseType.ADD_CARD_TO_DISCARD_PILE:
+            elif current_phase.type == GamePhaseType.DEFERRED_ADD_CARD_TO_DISCARD_PILE:
                 self.discard_pile.append(current_phase.card)
+
+            elif current_phase.type == GamePhaseType.DEFERRED_DRAW_CARD:
+                for i in range(current_phase.decisions_left):
+                    self.draw(self.players[acting_player])
 
         # ---
         # CORRECTNESS ASSERTION
@@ -332,7 +375,7 @@ class Game(GameSchema):
         player.keepers.append(keeper)
 
     def play_action(self, player_number: int, action: Action):
-        self.stack.append(GamePhase(GamePhaseType.ADD_CARD_TO_DISCARD_PILE, player_number, card=action))
+        self.stack.append(GamePhase(GamePhaseType.DEFERRED_ADD_CARD_TO_DISCARD_PILE, player_number, card=action))
         action_cards.activate_action(action.name, self, player_number)
 
     def activate_card(self, player_number: int, card_to_play):
@@ -442,6 +485,9 @@ class Game(GameSchema):
         :return: 2d array indexed by player number. get_all_keepers_by_name[player_number] returns a list of the names of all keepers in play held by said keeper
         """
         return [ [keeper.name for keeper in player.keepers] for player in self.players ]
+
+    def get_cards_in_hand(self, player_number: int) -> list[Card]:
+        return self.players[player_number].hand
 
     def get_cards_in_hand_by_name(self, player_number: int) -> list[str]:
         return [card.name for card in self.players[player_number].hand]
@@ -682,8 +728,8 @@ class Game(GameSchema):
         return available_free_actions
 
     def play_free_action(self, free_action_name):
-        activate_free_action(self, self.player_turn, free_action_name)
         self.played_free_actions.add(free_action_name)
+        activate_free_action(self, self.player_turn, free_action_name)
 
         self.check_for_winners()
 

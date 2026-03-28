@@ -6,7 +6,8 @@ if TYPE_CHECKING:
 
 from fluxx.game.utils.card_effect_utils import trash_selected_card, select_card
 from fluxx.game import game_messages
-from fluxx.game.FluxxEnums import CardType, CardZone, ExtendedCardZone
+from fluxx.game.FluxxEnums import CardType, CardZone, ExtendedCardZone, GamePhase, GamePhaseType, OnCompleteBehaviour
+
 
 # ---------------------
 # FREE ACTION USABILITY CHECKS
@@ -39,6 +40,8 @@ def can_use_recycling(game_state: 'Game', player_number: int) -> bool:
 
 def activate_mystery_play(game_state: "Game", user_number: int):
     card = game_state.get_card_from_draw_pile()
+    if card is None:
+        return
     game_messages.special_effect(f"<< Played {card.name}! >>")
     game_state.activate_card(user_number, card)
 
@@ -61,22 +64,14 @@ def activate_swap_plays_for_draws(game_state: "Game", user_number: int):
 def activate_goal_mill(game_state: "Game", user_number: int):
     user = game_state.players[user_number]
 
-    game_state.force_turn_over = True
-    cards_to_draw = 0
-    while True:
-        goal_cards_in_hand = [card for card in user.hand if card.card_type == CardType.GOAL]
-        if len(goal_cards_in_hand) == 0:
-            break
-        discard_card = game_state.agents[user_number].choose_to_discard(game_state)
-        if discard_card == 0:
-            break
-        selected_goal_location = select_card(game_state, user_number, [CardZone.HAND],
-                                             [CardType.RULE, CardType.KEEPER, CardType.ACTION])
-        trash_selected_card(game_state, user_number, selected_goal_location, True)
-        cards_to_draw += 1
-
-    for i in range(cards_to_draw):
-        game_state.draw(user)
+    game_state.stack.append(GamePhase(
+        GamePhaseType.DISCARD_VARIABLE_CARDS_FROM_HAND,
+        user_number,
+        decisions_left=0,
+        counter=0,
+        card_types={CardType.GOAL},
+        on_complete=OnCompleteBehaviour.DRAW
+    ))
 
 def activate_get_on_with_it(game_state: "Game", user_number: int):
     user = game_state.players[user_number]
@@ -90,13 +85,16 @@ def activate_get_on_with_it(game_state: "Game", user_number: int):
     game_state.force_turn_over = True
 
 def activate_recycling(game_state: "Game", user_number: int):
-    user = game_state.players[user_number]
-
-    selected_keeper_location = select_card(game_state, user_number, [ExtendedCardZone.OWN_KEEPERS])
-    trash_selected_card(game_state, user_number, selected_keeper_location, True)
-
-    for i in range(3 + game_state.inflation()):
-        game_state.draw(user)
+    game_state.stack.append(GamePhase(
+        GamePhaseType.DEFERRED_DRAW_CARD,
+        user_number,
+        decisions_left=3,
+    ))
+    game_state.stack.append(GamePhase(
+        GamePhaseType.DISCARD_OWN_KEEPER_IN_PLAY,
+        user_number,
+        decisions_left=1,
+    ))
 
 
 FREE_ACTIONS = {

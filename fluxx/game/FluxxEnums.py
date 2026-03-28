@@ -38,18 +38,25 @@ class GamePhaseType(Enum):
     ADD_CARD_IN_PLAY_TO_HAND = 9,
     SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND = 10,
     PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE = 11,
-    ADD_CARD_TO_DISCARD_PILE = 12,
+    DEFERRED_ADD_CARD_TO_DISCARD_PILE = 12,
     DISCARD_KEEPER_IN_PLAY = 13,
     PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT = 14,
     SELECT_KEEPER_TO_STEAL = 15,
     SELECT_PLAYER_KEEPER_FOR_EXCHANGE = 16,
     SELECT_OPPONENT_KEEPER_FOR_EXCHANGE = 17,
+    ACTIVATE_FREE_ACTION = 18,
+    DISCARD_OWN_KEEPER_IN_PLAY = 19,
+    DEFERRED_DRAW_CARD = 20, # Exists when card draw needs to be deferred (e.g "recycling")
+    DISCARD_VARIABLE_CARDS_FROM_HAND = 21,
 
     def is_actionless(self):
-        return self in [GamePhaseType.GAME_START, GamePhaseType.TURN_END, GamePhaseType.POST_PLAY_CARD_FOR_TURN, GamePhaseType.ADD_CARD_TO_DISCARD_PILE]
+        return self in {GamePhaseType.GAME_START, GamePhaseType.TURN_END, GamePhaseType.POST_PLAY_CARD_FOR_TURN, GamePhaseType.DEFERRED_ADD_CARD_TO_DISCARD_PILE, GamePhaseType.DEFERRED_DRAW_CARD}
 
     def contains_latent_space(self):
-        return self in [GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE, GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND, GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT]
+        return self in {GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE, GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND, GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT}
+
+class OnCompleteBehaviour(Enum):
+    DRAW = 1
 
 @dataclass
 class GamePhase:
@@ -59,6 +66,9 @@ class GamePhase:
     latent_space: Optional[list[Card]] = None
     card: Optional[Card] = None
     labelled_card: Optional[Card] = None # "labelled_card is not counted in card conservation unlike regular "card", which is considered to be in "latent_space"
+    counter: Optional[int] = None
+    card_types: Optional[set[CardType]] = None
+    on_complete: Optional[OnCompleteBehaviour] = None
 
 # Note: probably a good idea to make some of the other fields in this class optional
 @dataclass
