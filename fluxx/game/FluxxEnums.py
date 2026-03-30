@@ -103,3 +103,8 @@ class DecisionEncodingType(Enum):
     REMAIN_DRAW_PILE = 13
     REMAIN_IN_PLAY = 14
     PLAY_FOR_OPPONENT = 15
+
+@dataclass
+class GamePhaseHistory:
+    phase: list[GamePhase]
+    game_state: GameState

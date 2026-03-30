@@ -2,7 +2,7 @@ import abc, random
 from typing import Optional
 
 from fluxx.game.Card import Card, Rule, Goal, make_card
-from fluxx.game.FluxxEnums import GamePhaseType, GamePhase, GameState
+from fluxx.game.FluxxEnums import GamePhaseType, GamePhase, GameState, GamePhaseHistory
 
 from fluxx.game.Player import Player
 
@@ -28,6 +28,9 @@ class GameSchema(metaclass=abc.ABCMeta):
         self.force_game_state = force_game_state
         self.extra_turns_taken = 0
 
+        # TODO: strongly consider removing (exists for debugging purposes)
+        self.game_history: list[GamePhaseHistory] = []
+
     def reset(self):
         random.shuffle(self.deck)
         self.draw_pile = [make_card(card_name) for card_name in self.deck]
@@ -49,6 +52,8 @@ class GameSchema(metaclass=abc.ABCMeta):
             player.keepers = []
             player.cards_drawn = 0
             player.cards_played = 0
+
+        self.game_history = []
 
         if self.force_game_state is not None:
             self.draw_pile = []
@@ -76,7 +81,6 @@ class GameSchema(metaclass=abc.ABCMeta):
             if self.force_game_state.starting_player is not None:
                 self.player_turn = self.force_game_state.starting_player
 
-    # TODO: Document/formalize game state. Consider making a class for game state
     # there is a class for game state although it is not currently used.
     def get_game_state(self):
         return {

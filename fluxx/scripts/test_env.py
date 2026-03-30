@@ -8,17 +8,17 @@ from fluxx.game.Game import Game
 from fluxx.game_states import two_player_p0_one_turn_win, two_player_p0_two_turn_win
 from fluxx.scripts.debug_utils import printout_state
 
-actor = FeedForwardNN(374, 186)  # same architecture
+actor = FeedForwardNN(615, 100)  # same architecture
 actor.load_state_dict(torch.load("actor.pt"))
 actor.eval()
 
 agents = {
-    "player_0": RandomAgent(),
+    "player_0": actor,
     "player_1": RandomAgent()
 }
 
 def main(one_turn_win_simple_fluxx=None):
-    two_player_fluxx = Game(2, card_lists.base_deck, disable_game_messages=False)
+    two_player_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True)
     two_player_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True)
     one_turn_win_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True, force_game_state=two_player_p0_one_turn_win)
     two_turn_win_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True, force_game_state=two_player_p0_two_turn_win)
@@ -32,7 +32,7 @@ def main(one_turn_win_simple_fluxx=None):
         "player_1": 0
     }
 
-    GAME_COUNT = 10
+    GAME_COUNT = 100
 
     for i in range(5):
 
@@ -53,12 +53,12 @@ def main(one_turn_win_simple_fluxx=None):
                     # this is where you would insert your policy
                     action, _= agents[agent].act(observation)
                     action = env.decode_action(action)
-                    input("Press enter to continue...")
+                    #input("Press enter to continue...")
 
-                print(f"Agent {agent} took action {action}")
+                #print(f"Agent {agent} took action {action}")
                 env.step(action)
-                printout_state(env.get_player_number(agent), env.game.get_game_state())
-                print(env.game.stack)
+                #printout_state(env.get_player_number(agent), env.game.get_game_state())
+                #print(env.game.stack)
 
             #print(env.game.winner)
             round_victories[f"player_{env.game.winner}"] += 1

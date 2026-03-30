@@ -1,11 +1,12 @@
 # begin with implementing a two-player game.
+import copy
 import math
 import random
 from typing import Optional
 from collections import Counter
 
 from fluxx.game.Card import Card, Rule, Goal, Keeper, Action, RulesOptions
-from fluxx.game.FluxxEnums import CardType, GamePhase, GamePhaseType, GameState, CardZone
+from fluxx.game.FluxxEnums import CardType, GamePhase, GamePhaseType, GameState, CardZone, GamePhaseHistory
 
 from fluxx.game.Player import Player
 from fluxx.game import game_messages
@@ -60,26 +61,43 @@ class Game(GameSchema):
             # Immediately goto end of turn if player has no cards left to play, and does not want to play a free action
             if len(turn_player.hand) > 0 and plays_left > 0:
                 self.stack.append(GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn, decisions_left=plays_left))
+                assert self.player_turn == self.stack[-1].acting_player
 
     def reset(self):
         super().reset()
+        for player in self.players:
+            for i in range(3):
+                self.draw(player)
         self.start_of_turn()
         self.add_player_turn_to_stack()
 
+    def assert_nonempty_stack(self):
+        assert len(self.stack) > 0, (
+            f"Stack unexpectedly empty. "
+            f"Turn: {self.player_turn}, "
+            f"Hand: {[c.name for c in self.players[self.player_turn].hand]}, "
+            f"Cards played: {self.players[self.player_turn].cards_played}, "
+            f"Plays allowed: {self.get_play_rules(self.player_turn)}, "
+            f"Force turn over: {self.force_turn_over}, "
+            f"Rules: {self.get_rules_in_play_by_name()}"
+        )
+
     def check_current_phase(self) -> GamePhase:
-        if len(self.stack) == 0:
-            return GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn)
-        else:
-            return self.stack[-1]
+        self.assert_nonempty_stack()
+        return self.stack[-1]
 
     def get_current_phase(self) -> GamePhase:
         """
         The same as check_current_phase, but pops from the phase stack
         """
-        if len(self.stack) == 0:
-            return GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, self.player_turn)
-        else:
-            return self.stack.pop()
+
+        self.game_history.append(GamePhaseHistory(
+            copy.deepcopy(self.stack),
+            copy.deepcopy(self.get_game_state())
+        ))
+
+        self.assert_nonempty_stack()
+        return self.stack.pop()
 
     def is_action_valid(self, phase: GamePhase, card_name: str) -> tuple[bool, Optional[str]]:
         """
@@ -191,9 +209,13 @@ class Game(GameSchema):
 
         elif current_phase.type == GamePhaseType.DISCARD_CARD_FROM_HAND:
             self.discard_card(acting_player, card_name)
+            if current_phase.decisions_left > 1 and len(self.players[acting_player].hand) > 0:
+                self.stack.append(GamePhase(GamePhaseType.DISCARD_CARD_FROM_HAND, acting_player, decisions_left=current_phase.decisions_left - 1))
 
         elif current_phase.type == GamePhaseType.DISCARD_KEEPER:
             self.discard_keeper(acting_player, card_name)
+            if current_phase.decisions_left > 1 and len(self.players[acting_player].keepers) > 0:
+                self.stack.append(GamePhase(GamePhaseType.DISCARD_KEEPER, acting_player, decisions_left=current_phase.decisions_left - 1))
 
         elif current_phase.type == GamePhaseType.DISCARD_RULE_IN_PLAY:
             card_index = index_of_card(self.rules, card_name)
@@ -339,6 +361,25 @@ class Game(GameSchema):
         # After each step, the total number of cards in all zones should be constant
         self.assert_card_conservation()
 
+        next_phase = self.check_current_phase()
+        if next_phase.type == GamePhaseType.PLAY_CARD_FOR_TURN:
+            player = self.players[next_phase.acting_player]
+            assert len(player.hand) > 0, (
+                f"PLAY_CARD_FOR_TURN with empty hand. "
+                f"acting_player: {next_phase.acting_player}, "
+                f"player_turn: {self.player_turn}, "
+                f"cards_played: {player.cards_played}, "
+                f"cards_drawn: {player.cards_drawn}, "
+                f"plays_allowed: {self.get_play_rules(next_phase.acting_player)}, "
+                f"draw_rules: {self.get_draw_rules(next_phase.acting_player)}, "
+                f"draw_pile: {len(self.draw_pile)}, "
+                f"discard: {len(self.discard_pile)}, "
+                f"stack: {[(p.type.name, p.acting_player) for p in self.stack]}, "
+                f"force_turn_over: {self.force_turn_over}, "
+                f"rules: {self.get_rules_in_play_by_name()}, "
+                f"free_actions_played: {self.played_free_actions}"
+            )
+
     def handle_turn_over(self):
         """
         Checks whether the turn player's turn is over, advancing the turn if so and adding another PLAY+POST_CARD_FOR_TURN to the stack otherwise
@@ -364,12 +405,18 @@ class Game(GameSchema):
         turn_player = self.players[self.player_turn]
 
         # reset turn statistics
-        turn_player.cards_drawn = 0
-        turn_player.cards_played = 0
         self.force_turn_over = False
         self.played_free_actions = set()
 
         if not self.extra_turn:
+
+            old_player = self.player_turn
+            for phase in self.stack:
+                assert not (phase.type == GamePhaseType.PLAY_CARD_FOR_TURN and phase.acting_player == old_player), (
+                    f"Stale PLAY_CARD_FOR_TURN for player {old_player} still on stack at turn end. "
+                    f"Stack: {[(p.type.name, p.acting_player) for p in self.stack]}"
+                )
+
             self.extra_turns_taken = 0
             self.game_message(f"<< End of player {self.player_turn} turn >>", GameMessageType.SPECIAL_EFFECT)
             self.player_turn = (self.player_turn + 1) % self.player_count
@@ -463,10 +510,17 @@ class Game(GameSchema):
         """Apply start of turn effects, including drawing."""
         turn_player = self.players[self.player_turn]
 
+        turn_player.cards_played = 0
+        turn_player.cards_drawn = 0
+
         if self.rule_in_play("no_hand_bonus"):
             if len(turn_player.hand) == 0:
                 for i in range(3 + self.inflation()):
                     self.draw(turn_player)
+
+        assert turn_player.cards_drawn == 0, (
+            f"cards_drawn not reset: {turn_player.cards_drawn} for player {self.player_turn}"
+        )
 
         self.draw_for_turn()
 
@@ -491,14 +545,12 @@ class Game(GameSchema):
         hand_limit = self.get_hand_limit()
 
         if keeper_limit is not None:
-            for i in range(len(player.keepers) - keeper_limit):
-                discards_left = len(player.keepers) - keeper_limit - i
-                self.stack.append(GamePhase(GamePhaseType.DISCARD_KEEPER, player_number, decisions_left=discards_left))
+            if len(player.keepers) - keeper_limit > 0:
+                self.stack.append(GamePhase(GamePhaseType.DISCARD_KEEPER, player_number, decisions_left=len(player.keepers) - keeper_limit))
 
         if hand_limit is not None:
-            for i in range(len(player.hand) - hand_limit):
-                discards_left = len(player.hand) - hand_limit - i
-                self.stack.append(GamePhase(GamePhaseType.DISCARD_CARD_FROM_HAND, player_number, decisions_left=discards_left))
+            if len(player.hand) - hand_limit > 0:
+                self.stack.append(GamePhase(GamePhaseType.DISCARD_CARD_FROM_HAND, player_number, decisions_left=len(player.hand) - hand_limit))
 
     def get_keeper_limit(self, player_number: Optional[int]=None) -> Optional[int]:
         limit = None
@@ -738,6 +790,9 @@ class Game(GameSchema):
         """Draw a card from the deck and add it to the hand of player 'player'. Does NOT increment player.cards_drawn"""
         card_drawn = self.get_card_from_draw_pile()
 
+        if card_drawn is None and len(self.draw_pile) > 0:
+            raise Exception("No card drawn even though there are cards in the draw pile")
+
         if card_drawn is None:
             return
 
@@ -761,6 +816,14 @@ class Game(GameSchema):
             if previous_cards_in_hand == 0 and draw_amount == 1 + (self.inflation()):
                 self.draw(turn_player)
                 turn_player.cards_drawn += 1
+
+        if len(self.draw_pile) > 0:
+            assert len(turn_player.hand) > previous_cards_in_hand, (
+                f"Hand shrank/didnt increase during draw_for_turn: was {previous_cards_in_hand}, now {len(turn_player.hand)}. "
+                f"Player: {self.player_turn}, draw_amount: {draw_amount}, "
+                f"cards_drawn: {turn_player.cards_drawn}, "
+                f"draw_pile: {len(self.draw_pile)}, discard: {len(self.discard_pile)}"
+            )
 
     def get_available_free_actions(self):
         available_free_actions = []

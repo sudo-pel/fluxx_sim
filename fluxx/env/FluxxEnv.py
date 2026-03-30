@@ -180,8 +180,18 @@ class FluxxEnv(AECEnv):
 
         self.game.reset()
 
-        # player 0 goes first
-        self.agent_selection = f"player_{self.game.player_turn}"
+        # get player to move first
+        acting_player = self.game.check_current_phase().acting_player
+        self.agent_selection = f"player_{acting_player}"
+
+        # Verify consistency
+        phase = self.game.check_current_phase()
+        assert self.game.player_turn == phase.acting_player, (
+            f"Reset inconsistency: player_turn={self.game.player_turn}, "
+            f"phase.acting_player={phase.acting_player}, "
+            f"phase.type={phase.type.name}, "
+            f"stack: {[(p.type.name, p.acting_player) for p in self.game.stack]}"
+        )
 
         # return observation for the first player to act
         return self.observe(self.agent_selection)
@@ -195,7 +205,7 @@ class FluxxEnv(AECEnv):
 
         self.game.step(action)
 
-        # TODO: Update rewards
+        # TODO: Intermediate rewards?
         # ...
         # Check termination
         if self.game.winner is not None:
@@ -212,13 +222,32 @@ class FluxxEnv(AECEnv):
         game_state = self.game.check_current_phase()
         self.agent_selection = f"player_{game_state.acting_player}"
 
+
     def observe(self, agent):
+
+        if self.terminations.get(agent, False) or self.truncations.get(agent, False):
+            dummy_obs = np.zeros(self.observation_spaces[agent]["observation"].shape[0], dtype=np.int8)
+            dummy_mask = np.zeros(self.action_spaces[agent].n, dtype=np.int8)
+            return {
+                "observation": dummy_obs,
+                "action_mask": dummy_mask,
+            }
+
+        current_phase = self.game.check_current_phase()
+
+        if self.get_player_number(agent) != current_phase.acting_player:
+            raise Exception(
+                f"observe() called for {agent} but phase is for player {current_phase.acting_player}. "
+                f"Phase: {current_phase.type.name}, "
+                f"player_turn: {self.game.player_turn}, "
+                f"agent_selection: {agent}, "
+                f"stack: {[(p.type.name, p.acting_player) for p in self.game.stack]}"
+                f"get_player_number(agent): {self.get_player_number(agent)}"
+            )
 
         # ----
         # OBSERVATION
         # ----
-
-        current_phase = self.game.check_current_phase()
 
         decisions_left = current_phase.decisions_left
 
@@ -339,10 +368,25 @@ class FluxxEnv(AECEnv):
             action_mask[-1] = 1
 
         if sum(action_mask) == 0:
+            print(" ... PRINTING GAME ... ")
+            for state in self.game.game_history:
+                for i in range(len(self.game.players)):
+                    debug_utils.printout_state(i, state.game_state)
+                print(state.phase)
+
             print(self.game.stack)
             debug_utils.printout_state(self.get_player_number(agent), self.game.get_game_state())
             print(f"discard pile size: {len(self.game.discard_pile)}")
             print(f"draw pile size: {len(self.game.draw_pile)}")
+            print(self.game.draw_pile)
+            for i, player in enumerate(self.game.players):
+                print(f"p{i} cards drawn: {player.cards_drawn}")
+            print(f"current player turn: {self.game.player_turn}")
+            print(self.game.players[self.game.player_turn].hand)
+            print(f"current agent: {agent}, {self.get_player_number(agent)}")
+            print(f"printing current phase (acting plasyer: {current_phase.acting_player}): {current_phase.type}")
+            print(current_phase)
+
             raise Exception("No legal actions available")
 
         return {

@@ -46,7 +46,7 @@ def activate_trash_a_new_rule(game_state: 'GameSchema', user_number: int):
 
 
 def activate_trash_a_keeper(game_state: 'GameSchema', user_number: int):
-    if len([k for player in game_state.get_all_keepers_by_name_flat() for k in player]) == 0:
+    if len(game_state.get_all_keepers_by_name_flat()) == 0:
         game_state.game_message("No keepers to trash!", GameMessageType.NOTIFICATION)
         return
     game_state.stack.append(GamePhase(GamePhaseType.DISCARD_KEEPER_IN_PLAY, user_number, decisions_left=1))
