@@ -2,7 +2,7 @@ import abc, random
 from typing import Optional
 
 from fluxx.game.Card import Card, Rule, Goal, make_card
-from fluxx.game.FluxxEnums import GamePhaseType, GamePhase, GameState, GamePhaseHistory
+from fluxx.game.FluxxEnums import GamePhaseType, GamePhase, GameState, GamePhaseHistory, GameConfig
 
 from fluxx.game.Player import Player
 
@@ -27,6 +27,10 @@ class GameSchema(metaclass=abc.ABCMeta):
         self.disable_game_messages = disable_game_messages
         self.force_game_state = force_game_state
         self.extra_turns_taken = 0
+        self.game_config = GameConfig(
+            player_count,
+            card_list
+        )
 
         # TODO: strongly consider removing (exists for debugging purposes)
         self.game_history: list[GamePhaseHistory] = []
@@ -80,16 +84,6 @@ class GameSchema(metaclass=abc.ABCMeta):
 
             if self.force_game_state.starting_player is not None:
                 self.player_turn = self.force_game_state.starting_player
-
-    # there is a class for game state although it is not currently used.
-    def get_game_state(self):
-        return {
-            "player_count": self.player_count,
-            "players": self.players,
-            "goals": self.goals,
-            "rules": self.rules,
-            "player_turn": self.player_turn
-        }
 
     @abc.abstractmethod
     def get_card_from_draw_pile(self):

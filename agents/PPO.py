@@ -5,24 +5,25 @@ import numpy as np
 
 from agents.Agent import Agent
 from agents.FeedForwardNN import FeedForwardNN
+from agents.PPOAgent import PPOAgent
+
 
 class PPO:
     def __init__(self, env, agent_names: list[str]):
         super().__init__()
         self._init_hyperparameters()
 
-        self.agent_names = agent_names # needed to access the correct obs/action spaces from the environment
+        self.agent_names = agent_names
         self.env = env
-        self.obs_dim = env.observation_spaces[agent_names[0]]["observation"].shape[0]
-        self.act_dim = env.observation_spaces[agent_names[0]]["action_mask"].shape[0]
-        print(f"Observation space: {self.obs_dim}, Action space: {self.act_dim}")
-        self.actor = FeedForwardNN(self.obs_dim, self.act_dim)
+
+        self.actor = PPOAgent(env.game.game_config, 0)
         self.actor_optim = Adam(self.actor.parameters(), lr=self.lr)
-        self.critic = FeedForwardNN(self.obs_dim, 1)
+
+        self.critic = FeedForwardNN(self.actor.observation_space["observation"].shape[0], 1)
         self.critic_optim = Adam(self.critic.parameters(), lr=self.lr)
 
         # TODO: dynamic opponent selection
-        self.opponent = FeedForwardNN(self.obs_dim, self.act_dim)
+        self.opponent = PPOAgent(env.game.game_config, 1)
         self.agents = {
             "player_0": self.actor,
             "player_1": self.opponent
@@ -121,8 +122,7 @@ class PPO:
                 if termination or truncation:
                     action = None
                 else:
-                    # this is where you would insert your policy
-                    action, log_probs = self.agents[agent].act(observation)
+                    action, log_probs, observation = self.agents[agent].act(observation)
 
                     # (For now) only collect training data from the actor agent
                     # TODO: also collect training data from the opponent agent

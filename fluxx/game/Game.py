@@ -24,6 +24,21 @@ class Game(GameSchema):
     def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool = False, force_game_state: Optional[GameState] = None):
         GameSchema.__init__(self, player_count, card_list, disable_game_messages, force_game_state)
 
+    # there is a class for game state although it is not currently used.
+    def get_game_state(self) -> GameState:
+        return GameState(
+            [self.get_cards_in_hand_by_name(i) for i in range(self.player_count)],
+            [self.get_keepers_by_name(i) for i in range(self.player_count)],
+            self.get_goals_in_play_by_name(),
+            self.get_discard_pile_by_name(),
+            self.get_draw_pile_by_name(),
+            self.get_rules_in_play_by_name(),
+            self.stack,
+            self.get_available_free_actions(),
+            self.winner is not None,
+            starting_player = None
+        )
+
     def game_message(self, message: str, message_type: GameMessageType):
         if self.disable_game_messages:
             return
@@ -568,6 +583,9 @@ class Game(GameSchema):
 
         return limit
 
+    def get_draw_pile_by_name(self) -> list[str]:
+        return [card.name for card in self.draw_pile]
+
     def get_discard_pile_by_name(self) -> list[str]:
         return [card.name for card in self.discard_pile]
 
@@ -825,7 +843,7 @@ class Game(GameSchema):
                 f"draw_pile: {len(self.draw_pile)}, discard: {len(self.discard_pile)}"
             )
 
-    def get_available_free_actions(self):
+    def get_available_free_actions(self) -> list[str]:
         available_free_actions = []
 
         for rule in self.rules:

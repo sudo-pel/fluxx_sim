@@ -13,6 +13,9 @@ two_player_p0_one_turn_win = GameState(
     [],
     [],
     [],
+    [],
+    [],
+    False,
     0
 )
 
@@ -33,5 +36,8 @@ two_player_p0_two_turn_win = GameState(
     [],
     ["time_is_money", "keeper_limit_4", "time", "keeper_limit_4"],
     [],
+    [],
+    [],
+    False,
     0
 )

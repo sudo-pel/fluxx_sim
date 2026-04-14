@@ -84,7 +84,15 @@ class GameState:
     discard_pile: list[str]
     draw_pile: list[str]
     rules: list[str]
+    stack: list[GamePhase]
+    available_free_actions: list[str]
+    game_over: bool
     starting_player: Optional[int] = None
+
+@dataclass
+class GameConfig:
+    player_count: int
+    card_list: list[str]
 
 class DecisionEncodingType(Enum):
     PLAY = 0

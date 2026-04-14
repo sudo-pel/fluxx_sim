@@ -1,0 +1,44 @@
+Compare LLM performance in the games against RL: carefully engineer prompts to get specific outputs from the LLM, can make this automatic
+	(another type of Heuristic bot)
+	Compare to giving it the state, giving the state + the manual)
+	[Frame it as an extension]
+	
+Simple Fluxx worth talking about in paper (David said "3-4 pages"?)
+
+[ STANDARDISED GYM ENVIRONMENT] 
+https://gymnasium.farama.org/introduction/create_custom_env/
+- Keep RL algorithm the same, just swap out the ENTIRE environment
+
+[ CUSTOM STATE ENCODING ]
+- Possible actions:
+	- act on card
+	- goto next card
+	- keeping track of which cards you currently have?
+		- observation could be a set of all cards in the game
+
+- Possible state encoding:
+	- all cards (currently in the game):
+		- 
+		
+[ CLOUD COMPUTING ]
+function ssh_tunnel_gxp06() {
+        ssh -N -f -L localhost:$1\:localhost:$1 dgk27@gxp06.cl.cam.ac.uk
+}
+
+^ in David's bash rc
+
+~/.bashrc
+ssh_tunnel_gxp06 3334
+This opens a localhost tunnel between my machine and gxp06
+
+I first need to log into gxp06 and `kinit` and make sure the jupyter lab is running on port 3334
+
+^ allows you to access the machine's jupyter lab: **Then you can just access via localhost:3334 in your own browser**
+
+Make sure you tmux BEFORE running jupyter lab, this persists your session on the lab machine when you exit ssh
+
+
+https://arxiv.org/pdf/2407.05879v1
+could encode card zones as M x N dimensional vectors, where N is the size of one card embedding vector and M is the number of possible cards (in a game?). Use an embedding network to convert this into a common vector for analysis by the primary decision-making agent
+
+

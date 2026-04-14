@@ -1,15 +1,18 @@
+import torch
 from gymnasium import spaces
-
-from agents import nn_utils
-from agents.Agent import Agent
+from torch import nn
+import torch.nn.functional as F
 import numpy as np
 
-from fluxx.game.FluxxEnums import GameState, GameConfig
+from agents import nn_utils
+from agents.FeedForwardNN import FeedForwardNN
+from fluxx.game.FluxxEnums import GameState
 
 
-class RandomAgent(Agent):
-    def __init__(self, game_config: GameConfig, player_number: int):
-        super().__init__()
+class PPOAgent(nn.Module):
+    def __init__(self, game_config, player_number):
+        super(PPOAgent, self).__init__()
+
         self.game_config = game_config
         self.player_number = player_number
 
@@ -26,13 +29,39 @@ class RandomAgent(Agent):
 
         self.action_space = spaces.Discrete(action_space_size)
 
-    def act(self, state: GameState) -> tuple[int, list[float], dict[str, np.ndarray]]:
+        in_dim = observation_space_size
+        out_dim = action_space_size
+
+        self.layer1 = nn.Linear(in_dim, 64)
+        self.layer2 = nn.Linear(64, 64)
+        self.layer3 = nn.Linear(64, out_dim)
+
+    def forward(self, obs):
+        # Convert observation to tensor if given as a numpy array
+        if isinstance(obs, np.ndarray):
+            obs = torch.tensor(obs, dtype=torch.float)
+
+        activation1 = F.relu(self.layer1(obs))
+        activation2 = F.relu(self.layer2(activation1))
+        output = self.layer3(activation2)
+
+        return output
+
+    def act(self, state):
         obs = self.encode(state)
 
-        # agent.act() must return log probs for training, but we will never train a RandomAgent, so just return an empty list
-        # TODO: return the actual correct type here
-        possible_actions = obs["action_mask"]
-        return np.random.choice(np.flatnonzero(possible_actions)), [], obs
+        observation = obs["observation"]
+        action_mask = obs["action_mask"]
+
+        logits = self.forward(observation)
+        logits[action_mask == 0] = -float("inf")
+
+        distribution = torch.distributions.Categorical(logits=logits)
+
+        action = distribution.sample()
+        log_probs = distribution.log_prob(action)
+
+        return action.item(), log_probs, obs
 
     def encode(self, state: GameState):
         if state.game_over:
@@ -44,3 +73,4 @@ class RandomAgent(Agent):
             }
         else:
             return nn_utils.observe(self, state, self.game_config)
+

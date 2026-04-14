@@ -115,27 +115,11 @@ def env(**kwargs):
     raw_env = wrappers.OrderEnforcingWrapper(raw_env)
     return raw_env
 
-def convert_decision_encoding(decision_encoding: list[DecisionEncodingType], decisions_left: int, counter: Optional[int] = 0, on_complete: Optional[OnCompleteBehaviour]=OnCompleteBehaviour.DRAW) -> npt.NDArray[np.int8]:
-    decision_context_vector = np.zeros(19, dtype=np.int8)
-    for d in decision_encoding:
-        decision_context_vector[d.value] = 1
-    decision_context_vector[16] = decisions_left
-
-    if counter is None:
-        decision_context_vector[17] = 0
-    else:
-        decision_context_vector[17] = counter
-
-    if on_complete == OnCompleteBehaviour.DRAW:
-        decision_context_vector[18] = 1
-
-    return decision_context_vector
-
 class FluxxEnv(AECEnv):
 
     metadata = {"render_modes": ["human"], "name": "card_game_v0"}
 
-    def __init__(self, game: Game, num_players: int = 2, render_mode=None):
+    def __init__(self, game: Game, num_players: int = 2, observation_spaces = None, action_spaces = None, render_mode=None):
         super().__init__()
 
         self.game = game
@@ -150,25 +134,6 @@ class FluxxEnv(AECEnv):
         self.num_players = num_players
         self.render_mode = render_mode
         self.possible_agents = [f"player_{i}" for i in range(num_players)]
-
-        decision_context_length = 19 # 7 PLACE zones + play a card + play for opponent, 7 REMAIN zone, 1 int for decisions left, 1 int for counter, 1 int for on_complete [draw]
-        observed_zone_count = 4 + num_players # hand (for observing agent), goals, rules, keepers, discard pile (for each agent)
-        observation_space_size = observed_zone_count * len(game.deck) + decision_context_length + 2 # +2 for draw pile size and opponent hand size
-
-        action_space_size = len(game.deck) + 1 # +1 for "don't use a free action"
-
-        self.observation_spaces = {
-            agent: spaces.Dict({
-                "observation": spaces.Box(low=0, high=1, shape=(observation_space_size,), dtype=np.int8),
-                "action_mask": spaces.Box(low=0, high=1, shape=(action_space_size,), dtype=np.int8),
-            })
-            for agent in self.possible_agents
-        }
-
-        self.action_spaces = {
-            agent: spaces.Discrete(action_space_size)
-            for agent in self.possible_agents
-        }
 
     def reset(self, seed=None, options=None):
         self.agents = self.possible_agents[:]
@@ -222,177 +187,8 @@ class FluxxEnv(AECEnv):
         game_state = self.game.check_current_phase()
         self.agent_selection = f"player_{game_state.acting_player}"
 
-
     def observe(self, agent):
-
-        if self.terminations.get(agent, False) or self.truncations.get(agent, False):
-            dummy_obs = np.zeros(self.observation_spaces[agent]["observation"].shape[0], dtype=np.int8)
-            dummy_mask = np.zeros(self.action_spaces[agent].n, dtype=np.int8)
-            return {
-                "observation": dummy_obs,
-                "action_mask": dummy_mask,
-            }
-
-        current_phase = self.game.check_current_phase()
-
-        if self.get_player_number(agent) != current_phase.acting_player:
-            raise Exception(
-                f"observe() called for {agent} but phase is for player {current_phase.acting_player}. "
-                f"Phase: {current_phase.type.name}, "
-                f"player_turn: {self.game.player_turn}, "
-                f"agent_selection: {agent}, "
-                f"stack: {[(p.type.name, p.acting_player) for p in self.game.stack]}"
-                f"get_player_number(agent): {self.get_player_number(agent)}"
-            )
-
-        # ----
-        # OBSERVATION
-        # ----
-
-        decisions_left = current_phase.decisions_left
-
-        decision_context_vectors: dict[GamePhaseType,list[DecisionEncodingType]] = {
-            GamePhaseType.DISCARD_CARD_FROM_HAND: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_PLAYER_HAND],
-            GamePhaseType.PLAY_CARD_FOR_TURN: [DecisionEncodingType.PLAY, DecisionEncodingType.REMAIN_PLAYER_HAND],
-            GamePhaseType.DISCARD_KEEPER: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_PLAYER_KEEPERS],
-            GamePhaseType.DISCARD_RULE_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_IN_PLAY],
-            GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE: [DecisionEncodingType.PLAY, DecisionEncodingType.PLACE_DISCARD_PILE],
-            GamePhaseType.ADD_CARD_IN_PLAY_TO_HAND: [DecisionEncodingType.PLACE_PLAYER_HAND, DecisionEncodingType.REMAIN_IN_PLAY],
-            GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND: [DecisionEncodingType.PLACE_PLAYER_HAND, DecisionEncodingType.REMAIN_OPPONENT_HAND],
-            GamePhaseType.PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE: [DecisionEncodingType.PLAY, DecisionEncodingType.REMAIN_DISCARD_PILE],
-            GamePhaseType.DISCARD_KEEPER_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_IN_PLAY],
-            GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT: [DecisionEncodingType.PLAY, DecisionEncodingType.PLAY_FOR_OPPONENT],
-            GamePhaseType.SELECT_KEEPER_TO_STEAL: [DecisionEncodingType.PLACE_PLAYER_KEEPERS, DecisionEncodingType.REMAIN_OPPONENT_KEEPERS],
-            GamePhaseType.SELECT_OPPONENT_KEEPER_FOR_EXCHANGE: [DecisionEncodingType.PLACE_PLAYER_KEEPERS, DecisionEncodingType.REMAIN_OPPONENT_KEEPERS],
-            GamePhaseType.SELECT_PLAYER_KEEPER_FOR_EXCHANGE: [DecisionEncodingType.PLACE_OPPONENT_KEEPERS, DecisionEncodingType.REMAIN_PLAYER_KEEPERS],
-            GamePhaseType.ACTIVATE_FREE_ACTION: [DecisionEncodingType.PLAY, DecisionEncodingType.REMAIN_IN_PLAY],
-            GamePhaseType.DISCARD_OWN_KEEPER_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_IN_PLAY],
-            GamePhaseType.DISCARD_VARIABLE_CARDS_FROM_HAND: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_PLAYER_HAND],
-            GamePhaseType.DISCARD_GOAL_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_IN_PLAY],
-        }
-        decision_context_vector = convert_decision_encoding(decision_context_vectors[self.game.check_current_phase().type], decisions_left, current_phase.counter, current_phase.on_complete)
-
-        # Get all keepers in play
-        keepers_in_play = self.game.get_all_keepers_by_name()
-        keeper_vectors = [ self.populate_card_vector(keeper_list) for keeper_list in keepers_in_play ]
-        agent_keeper_vector = keeper_vectors[self.get_player_number(agent)]
-        other_keeper_vectors = keeper_vectors[:self.get_player_number(agent)] + keeper_vectors[self.get_player_number(agent)+1:]
-
-        # Get cards in hand
-        cards_in_hand = self.game.get_cards_in_hand_by_name(self.get_player_number(agent))
-        cards_in_hand_vector = self.populate_card_vector(cards_in_hand)
-
-        # Get goals in play
-        goals_in_play = self.game.get_goals_in_play_by_name()
-        goals_in_play_vector = self.populate_card_vector(goals_in_play)
-
-        # Get rules in play
-        rules_in_play = self.game.get_rules_in_play_by_name()
-        rules_in_play_vector = self.populate_card_vector(rules_in_play)
-
-        # Get discard pile
-        discard_pile = self.game.get_discard_pile_by_name()
-        discard_pile_vector = self.populate_card_vector(discard_pile)
-
-        # Get draw pile size
-        draw_pile_size = [len(self.game.draw_pile)]
-
-        # Get opponent hand size
-        # TODO: how to encode for variable opponent count? Is this worth doing?
-        opponent_hand_sizes = []
-        for i in range(self.num_players):
-            if i != self.get_player_number(agent):
-                opponent_hand_sizes.append(len(self.game.players[i].hand))
-
-        observation = np.concatenate((decision_context_vector, cards_in_hand_vector, agent_keeper_vector, *other_keeper_vectors, goals_in_play_vector, rules_in_play_vector, discard_pile_vector, draw_pile_size, opponent_hand_sizes))
-        assert len(observation) == self.observation_spaces[agent]["observation"].shape[0], \
-            f"Observation size mismatch: built {len(observation)}, expected {self.observation_spaces[agent]['observation'].shape[0]}"
-
-        # ----
-        # ACTION MASK
-        # ----
-
-        action_mask = np.zeros(self.card_vector_length, dtype=np.int8)
-
-        no_free_action_legal = False
-
-        # TODO: Mask *in* legal plays (cards in hand, keepers owned) and then return the concatenation of all
-        if current_phase.type == GamePhaseType.PLAY_CARD_FOR_TURN:
-            action_mask = cards_in_hand_vector
-        elif current_phase.type == GamePhaseType.DISCARD_CARD_FROM_HAND:
-            action_mask = cards_in_hand_vector
-        elif current_phase.type == GamePhaseType.DISCARD_KEEPER:
-            action_mask = agent_keeper_vector
-        elif current_phase.type == GamePhaseType.DISCARD_RULE_IN_PLAY:
-            action_mask = rules_in_play_vector
-        elif current_phase.type == GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE:
-            action_mask = self.populate_card_vector([card.name for card in current_phase.latent_space])
-        elif current_phase.type == GamePhaseType.ADD_CARD_IN_PLAY_TO_HAND:
-            action_mask = np.bitwise_or.reduce((*keeper_vectors, rules_in_play_vector, goals_in_play_vector))
-        elif current_phase.type == GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND:
-            action_mask = self.populate_card_vector([card.name for card in current_phase.latent_space])
-        elif current_phase.type == GamePhaseType.PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE:
-            action_mask = self.populate_card_vector(
-                [card.name for card in self.game.discard_pile if card.card_type == CardType.RULE or card.card_type == CardType.ACTION]
-            )
-        elif current_phase.type == GamePhaseType.DISCARD_KEEPER_IN_PLAY:
-            action_mask = np.bitwise_or.reduce(keeper_vectors)
-        elif current_phase.type == GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT:
-            action_mask = self.populate_card_vector([card.name for card in current_phase.latent_space])
-        elif current_phase.type == GamePhaseType.SELECT_KEEPER_TO_STEAL:
-            action_mask = np.bitwise_or.reduce(other_keeper_vectors)
-        elif current_phase.type == GamePhaseType.SELECT_OPPONENT_KEEPER_FOR_EXCHANGE:
-            action_mask = np.bitwise_or.reduce(other_keeper_vectors)
-        elif current_phase.type == GamePhaseType.SELECT_PLAYER_KEEPER_FOR_EXCHANGE:
-            action_mask = agent_keeper_vector
-            action_mask[self.card_to_index[current_phase.labelled_card.name]] = 0 # mask out the keeper that was stolen from the opponent in this exchange
-        elif current_phase.type == GamePhaseType.ACTIVATE_FREE_ACTION:
-            action_mask = self.populate_card_vector([free_action_name for free_action_name in self.game.get_available_free_actions()])
-            no_free_action_legal = True
-        elif current_phase.type == GamePhaseType.DISCARD_OWN_KEEPER_IN_PLAY:
-            action_mask = agent_keeper_vector
-        elif current_phase.type == GamePhaseType.DISCARD_VARIABLE_CARDS_FROM_HAND:
-            valid_cards_in_hand = []
-            for card in self.game.get_cards_in_hand(self.get_player_number(agent)):
-                if card.card_type in current_phase.card_types:
-                    valid_cards_in_hand.append(card.name)
-            action_mask = self.populate_card_vector(valid_cards_in_hand)
-            no_free_action_legal = True
-        elif current_phase.type == GamePhaseType.DISCARD_GOAL_IN_PLAY:
-            action_mask = goals_in_play_vector
-        else:
-            raise Exception(f"Invalid game phase type: {current_phase.type}")
-
-        action_mask = np.append(action_mask, 0)
-        if no_free_action_legal:
-            action_mask[-1] = 1
-
-        if sum(action_mask) == 0:
-            print(" ... PRINTING GAME ... ")
-            for state in self.game.game_history:
-                for i in range(len(self.game.players)):
-                    debug_utils.printout_state(i, state.game_state)
-                print(state.phase)
-
-            print(self.game.stack)
-            debug_utils.printout_state(self.get_player_number(agent), self.game.get_game_state())
-            print(f"discard pile size: {len(self.game.discard_pile)}")
-            print(f"draw pile size: {len(self.game.draw_pile)}")
-            print(self.game.draw_pile)
-            for i, player in enumerate(self.game.players):
-                print(f"p{i} cards drawn: {player.cards_drawn}")
-            print(f"current player turn: {self.game.player_turn}")
-            print(self.game.players[self.game.player_turn].hand)
-            print(f"current agent: {agent}, {self.get_player_number(agent)}")
-            print(f"printing current phase (acting plasyer: {current_phase.acting_player}): {current_phase.type}")
-            print(current_phase)
-
-            raise Exception("No legal actions available")
-
-        return {
-            "observation": observation,
-            "action_mask": action_mask
-        }
+        return self.game.get_game_state()
 
     def decode_action(self, action_index: int) -> str:
         if action_index == self.card_vector_length:

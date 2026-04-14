@@ -1,21 +1,13 @@
 import torch
 
 from agents.FeedForwardNN import FeedForwardNN
+from agents.PPOAgent import PPOAgent
 from agents.RandomAgent import RandomAgent
 from fluxx.env.FluxxEnv import FluxxEnv
 from fluxx.game.Cards import card_lists
 from fluxx.game.Game import Game
 from fluxx.game_states import two_player_p0_one_turn_win, two_player_p0_two_turn_win
 from fluxx.scripts.debug_utils import printout_state
-
-actor = FeedForwardNN(615, 100)  # same architecture
-actor.load_state_dict(torch.load("actor.pt"))
-actor.eval()
-
-agents = {
-    "player_0": actor,
-    "player_1": RandomAgent()
-}
 
 def main(one_turn_win_simple_fluxx=None):
     two_player_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True)
@@ -25,7 +17,17 @@ def main(one_turn_win_simple_fluxx=None):
 
     action_testing = Game(2, card_lists.for_action_testing, disable_game_messages=True)
 
+
     env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
+
+    actor = PPOAgent(env.game.game_config, 0)  # same architecture
+    actor.load_state_dict(torch.load("actor.pt"))
+    actor.eval()
+
+    agents = {
+        "player_0": actor,
+        "player_1": RandomAgent(env.game.game_config, 1)
+    }
 
     victories = {
         "player_0": 0,
@@ -51,7 +53,7 @@ def main(one_turn_win_simple_fluxx=None):
                     action = None
                 else:
                     # this is where you would insert your policy
-                    action, _= agents[agent].act(observation)
+                    action, _, _ = agents[agent].act(observation)
                     action = env.decode_action(action)
                     #input("Press enter to continue...")
 
