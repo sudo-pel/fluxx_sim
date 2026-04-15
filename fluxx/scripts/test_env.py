@@ -2,6 +2,7 @@ import torch
 
 from agents.FeedForwardNN import FeedForwardNN
 from agents.HeuristicAgentMKI import HeuristicAgentMKI
+from agents.HeuristicAgentMKII import HeuristicAgentMKII
 from agents.PPOAgent import PPOAgent
 from agents.RandomAgent import RandomAgent
 from fluxx.env.FluxxEnv import FluxxEnv
@@ -26,8 +27,8 @@ def main(one_turn_win_simple_fluxx=None):
     actor.eval()
 
     agents = {
-        "player_0": actor,
-        "player_1": HeuristicAgentMKI(env.game.game_config, 1)
+        "player_0": RandomAgent(env.game.game_config, 0),
+        "player_1": HeuristicAgentMKII(env.game.game_config, 1)
     }
 
     victories = {
@@ -35,13 +36,14 @@ def main(one_turn_win_simple_fluxx=None):
         "player_1": 0
     }
 
-    GAME_COUNT = 200
+    GAME_COUNT = 100
 
     for i in range(5):
 
         round_victories = {
             "player_0": 0,
-            "player_1": 0
+            "player_1": 0,
+            "draws": 0
         }
 
         for i in range(GAME_COUNT):
@@ -63,8 +65,14 @@ def main(one_turn_win_simple_fluxx=None):
                 #printout_state(env.get_player_number(agent), env.game.get_game_state())
                 #print(env.game.stack)
 
+                if env.game.turn_count > 10000:
+                    break
+
             #print(env.game.winner)
-            round_victories[f"player_{env.game.winner}"] += 1
+            if env.game.winner is None:
+                round_victories["draws"] += 1
+            else:
+                round_victories[f"player_{env.game.winner}"] += 1
             env.close()
 
 
