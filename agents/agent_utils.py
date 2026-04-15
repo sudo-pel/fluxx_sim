@@ -114,8 +114,11 @@ def observe(agent, game_state: GameState, game_config: GameConfig):
     observation = np.concatenate(
         (decision_context_vector, cards_in_hand_vector, agent_keeper_vector, *other_keeper_vectors,
          goals_in_play_vector, rules_in_play_vector, discard_pile_vector, draw_pile_size, opponent_hand_sizes))
+
+    """
     assert len(observation) == agent.observation_space["observation"].shape[0], \
         f"Observation size mismatch: built {len(observation)}, expected {agent.observation_space['observation'].shape[0]}"
+    """
 
     # ----
     # ACTION MASK

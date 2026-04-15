@@ -4,7 +4,7 @@ from torch import nn
 import torch.nn.functional as F
 import numpy as np
 
-from agents import nn_utils
+from agents import agent_utils
 from agents.FeedForwardNN import FeedForwardNN
 from fluxx.game.FluxxEnums import GameState
 
@@ -72,5 +72,5 @@ class PPOAgent(nn.Module):
                 "action_mask": dummy_mask,
             }
         else:
-            return nn_utils.observe(self, state, self.game_config)
+            return agent_utils.observe(self, state, self.game_config)
 

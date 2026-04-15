@@ -119,7 +119,7 @@ class FluxxEnv(AECEnv):
 
     metadata = {"render_modes": ["human"], "name": "card_game_v0"}
 
-    def __init__(self, game: Game, num_players: int = 2, observation_spaces = None, action_spaces = None, render_mode=None):
+    def __init__(self, game: Game, num_players: int = 2, render_mode=None):
         super().__init__()
 
         self.game = game

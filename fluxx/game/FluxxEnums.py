@@ -85,9 +85,14 @@ class GameState:
     draw_pile: list[str]
     rules: list[str]
     stack: list[GamePhase]
-    available_free_actions: list[str]
-    game_over: bool
+
+    # GameState is used for describing specific game states to "load" as well as for analysis by agents. In the former case, the following fields are unused
+    available_free_actions: Optional[list[str]] = None
+    game_over: Optional[bool] = None
     starting_player: Optional[int] = None
+    cards_played: Optional[list[int]] = None
+    plays_remaining: Optional[list[int]] = None
+    cards_drawn: Optional[list[int]] = None
 
 @dataclass
 class GameConfig:

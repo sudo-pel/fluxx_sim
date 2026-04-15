@@ -36,7 +36,10 @@ class Game(GameSchema):
             self.stack,
             self.get_available_free_actions(),
             self.winner is not None,
-            starting_player = None
+            starting_player = None,
+            cards_played = [player.cards_played for player in self.players],
+            plays_remaining = [max(self.get_play_rules(i) - player.cards_played, 0) for i, player in enumerate(self.players)],
+            cards_drawn = [player.cards_drawn for player in self.players],
         )
 
     def game_message(self, message: str, message_type: GameMessageType):

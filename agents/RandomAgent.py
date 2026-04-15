@@ -1,6 +1,6 @@
 from gymnasium import spaces
 
-from agents import nn_utils
+from agents import agent_utils
 from agents.Agent import Agent
 import numpy as np
 
@@ -43,4 +43,4 @@ class RandomAgent(Agent):
                 "action_mask": dummy_mask,
             }
         else:
-            return nn_utils.observe(self, state, self.game_config)
+            return agent_utils.observe(self, state, self.game_config)

@@ -1,6 +1,7 @@
 import torch
 
 from agents.FeedForwardNN import FeedForwardNN
+from agents.HeuristicAgentMKI import HeuristicAgentMKI
 from agents.PPOAgent import PPOAgent
 from agents.RandomAgent import RandomAgent
 from fluxx.env.FluxxEnv import FluxxEnv
@@ -26,7 +27,7 @@ def main(one_turn_win_simple_fluxx=None):
 
     agents = {
         "player_0": actor,
-        "player_1": RandomAgent(env.game.game_config, 1)
+        "player_1": HeuristicAgentMKI(env.game.game_config, 1)
     }
 
     victories = {
@@ -34,7 +35,7 @@ def main(one_turn_win_simple_fluxx=None):
         "player_1": 0
     }
 
-    GAME_COUNT = 100
+    GAME_COUNT = 200
 
     for i in range(5):
 
