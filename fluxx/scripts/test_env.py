@@ -27,7 +27,7 @@ def main(one_turn_win_simple_fluxx=None):
     actor.eval()
 
     agents = {
-        "player_0": RandomAgent(env.game.game_config, 0),
+        "player_0": HeuristicAgentMKI(env.game.game_config, 0),
         "player_1": HeuristicAgentMKII(env.game.game_config, 1)
     }
 
@@ -36,7 +36,7 @@ def main(one_turn_win_simple_fluxx=None):
         "player_1": 0
     }
 
-    GAME_COUNT = 100
+    GAME_COUNT = 2000
 
     for i in range(5):
 

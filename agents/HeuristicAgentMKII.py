@@ -57,7 +57,6 @@ ASYMMETRIC_TURN_EXTENDERS = {
     "draw_3_play_2_of_them",
     "take_another_turn",
     "todays_special",
-    "lets_do_that_again" # TODO: note that this is not actually an asymmetric turn extender but may recur one
 }
 
 
@@ -99,15 +98,9 @@ class HeuristicAgentMKII(Agent):
             for keeper in CARD_DATA[card]["required_keepers"]:
                 keeper_to_goal[keeper].append(card)
 
-    # if there is an insta-win sequence in hand, do NOT use any free actions
-    # goal mill: use if there are goal cards with cards in discard or with many missing cards
-    # swap plays for draws: use if not enough good gameplans
-    # recycling: use on keepers with all gameplans in discard/keepers with weak gameplans
-    # get on with it: use if 1 play left and if cards in hand are weak
-    # mystery play: always use
     def eval_free_action(self, state: GameState, cards_to_eval: list[str]) -> dict[int, set[str]]:
-        gameplans, card_to_gameplan = HeuristicAgentMKII.get_gameplans_from_cards(cards_to_eval, state, self.player_number, sort_by=GameplanSortingOptions.MISSING_COUNT, reverse=False)
-        opponent_gameplans, card_to_opponent_gameplan = HeuristicAgentMKII.get_Gameplan_from_cards(cards_to_eval, state, 1 - self.player_number, hand_visible=False, sort_by=GameplanSortingOptions.MISSING_COUNT, reverse=False)
+        relevant_cards = state.hands[self.player_number] + state.goals + state.keepers[self.player_number]
+        gameplans, card_to_gameplan = HeuristicAgentMKII.get_gameplans_from_cards(relevant_cards, state, self.player_number, sort_by=GameplanSortingOptions.MISSING_COUNT, reverse=False)
         priorities: dict[int, set[str]] = defaultdict(set[str])
 
         # Check whether there is an immediate route to victory
@@ -116,8 +109,50 @@ class HeuristicAgentMKII(Agent):
                 return priorities # return empty priorities
 
         for card in cards_to_eval:
+            if card == "mystery_play":
+                priorities[3].add(card)
             if card == "goal_mill":
-                pass
+                goals_in_hand = [card for card in state.hands[self.player_number] if card_type(card) == "GOAL"]
+                for goal in goals_in_hand:
+                    gameplan = card_to_gameplan[goal][0]
+                    if gameplan.in_discard_count > 0 or gameplan.missing_count > 2:
+                        priorities[2].add(card)
+                        break
+            elif card == "swap_plays_for_draws":
+                # If hand is empty then exchange plays for draws = free cards
+                if len(state.hands[self.player_number]) == 0:
+                    priorities[2].add(card)
+                # Otherwise, only consider doing if there are keepers/goals to evaluate
+                # TODO: implicit here is the assumption that actions/rules are always worth playing which isnt true, forcing an early turn end can result in not losing the game
+                elif gameplans:
+                    best_gameplan = gameplans[0]
+                    if best_gameplan.in_discard_count > 0 or best_gameplan.missing_count > 2:
+                        priorities[2].add(card)
+            elif card == "recycling":
+                for keeper in state.keepers[self.player_number]:
+                    weak_gameplans_only = True
+                    card_gameplans = card_to_gameplan[keeper]
+                    for gameplan in card_gameplans:
+                        if gameplan.in_discard_count == 0 and gameplan.missing_count < 3:
+                            weak_gameplans_only = False
+                            break
+                    if weak_gameplans_only:
+                        priorities[1].add(card)
+            elif card == "get_on_with_it":
+                if state.plays_remaining[self.player_number] == 1:
+                    weak_cards_only = True
+                    for card_in_hand in state.hands[self.player_number]:
+                        if card_type(card_in_hand) == "ACTION":
+                            weak_cards_only = False
+                            break
+                        elif (card_type(card_in_hand) == "KEEPER" or card_type(card_in_hand) == "GOAL") and card_in_hand in card_to_gameplan:
+                            for gameplans in card_to_gameplan[card_in_hand]:
+                                if gameplans.in_discard_count == 0 and gameplans.missing_count < 3:
+                                    weak_cards_only = False
+                                    break
+                    if weak_cards_only:
+                        priorities[1].add(card)
+        return priorities
 
     # TODO: augment this function to take an argument of "additional cards", so that, for example, it can take into account that the card may be being ..
     # TODO: .. played from latent space (currently, card would not be in hand and so gameplan would appear incomplete even if every other card is in hand)
@@ -152,12 +187,12 @@ class HeuristicAgentMKII(Agent):
                 if is_hand_limit_rule(card):
                     player_discard = max(0, len(state.hands[self.player_number]) - rule_options(card)["hand_limit"])
                     opponent_discard = max(0, len(state.hands[1 - self.player_number]) - rule_options(card)["hand_limit"])
-                    priorities[opponent_discard - player_discard].add(card)
+                    priorities[-player_discard - opponent_discard - player_discard].add(card)
                     card_ranked = True
                 else:
                     player_discard = max(0, len(state.keepers[self.player_number]) - rule_options(card)["keeper_limit"])
                     opponent_discard = max(0, len(state.keepers[1 - self.player_number]) - rule_options(card)["keeper_limit"])
-                    priorities[opponent_discard - player_discard].add(card)
+                    priorities[-player_discard - opponent_discard - player_discard].add(card)
                     card_ranked = True
             # if the opponent is building towards the goal in play, replace it with another goal
             # TODO: make this work alongside "double agenda"
@@ -173,11 +208,11 @@ class HeuristicAgentMKII(Agent):
                 card_ranked = True
             # play a "play" rule if it allows for extension of the current turn
             elif is_play_rule(card):
-                if rule_options(card)["play"] > plays_remaining + 1:
+                if rule_options(card)["play"] > plays_remaining + state.cards_played[self.player_number] + 1:
                     priorities[4].add(card)
                     card_ranked = True
                 # if on final play, play the "play" rule if it will reduce the opponents turn
-                elif state.plays_remaining[self.player_number] == 0 and rule_options(card)["play"] < state.cards_played[self.player_number]:
+                elif state.plays_remaining[self.player_number] == 1 and rule_options(card)["play"] < state.cards_played[self.player_number] + 1:
                     priorities[4].add(card)
                     card_ranked = True
                 else:
@@ -185,7 +220,7 @@ class HeuristicAgentMKII(Agent):
                     priorities[-1].add(card)
                     card_ranked = True
             # play a "draw" card if it allows for drawing extra cards
-            elif is_draw_rule(card) and rule_options(card)["draw"] > cards_drawn + 1:
+            elif is_draw_rule(card) and rule_options(card)["draw"] > cards_drawn:
                 priorities[3].add(card)
                 card_ranked = True
             elif card_type(card) == "GOAL":
@@ -195,10 +230,10 @@ class HeuristicAgentMKII(Agent):
                     card_ranked = True
                 # avoid playing goals for which your opponent has a keeper(s) (and where the other required cards aren't in discard)
                 elif card in card_to_opponent_gameplan and opponent_gameplan.in_play_count > goal_mod and opponent_gameplan.in_discard_count == 0:
-                    priorities[-5].add(card)
+                    priorities[-4 + opponent_gameplan.missing_count].add(card)
                     card_ranked = True
                 # avoid playing goal cards that are being worked towards while they are "incomplete" (since they will be overwritten)
-                elif card_to_gameplan[card][0].in_play_count > 1 and card_to_gameplan[card][0].in_discard_count == 0:
+                elif card in card_to_gameplan and card_to_gameplan[card][0].in_play_count > 1 and card_to_gameplan[card][0].in_discard_count == 0:
                     priorities[-2].add(card)
                     card_ranked = True
             # play "keeper" cards that are relevant to one another, prioritizing those that are relevant to the current goal
@@ -209,7 +244,7 @@ class HeuristicAgentMKII(Agent):
                         goal_mod = 1
                     else:
                         goal_mod = 0
-                    priorities[8 - gameplan.missing_count + goal_mod].add(card)
+                    priorities[6 - gameplan.missing_count + goal_mod].add(card)
                     card_ranked = True
                     break
 
@@ -229,14 +264,15 @@ class HeuristicAgentMKII(Agent):
             if card in state.keepers[1 - self.player_number]:
                 priorities[2].add(card)
             # If the card pertains to any gameplans with missing pieces not in the discard pile, keep the card around
+            # TODO: prioritize cards with stronger gameplans
             elif card in card_to_gameplan:
                 card_gameplans = card_to_gameplan[card]
-                missing_pieces_in_discard_pile = True
+                weak_gameplan = True
                 for gameplan in card_gameplans:
                     if gameplan.in_discard_count == 0:
-                        missing_pieces_in_discard_pile = False
+                        weak_gameplan = False
                         break
-                if missing_pieces_in_discard_pile:
+                if weak_gameplan:
                     priorities[1].add(card)
                 else:
                     priorities[-2].add(card)
@@ -290,17 +326,17 @@ class HeuristicAgentMKII(Agent):
             if card in state.keepers[1 - self.player_number]:
                 priorities[3].add(card)
             # If a limit card is going to force discard, remove it from play
-            elif is_hand_limit_rule(card) and len(state.keepers[self.player_number]) > rule_options(card)["hand_limit"]:
+            elif is_hand_limit_rule(card) and len(state.hands[self.player_number]) - state.plays_remaining[self.player_number] > rule_options(card)["hand_limit"]:
                 priorities[2].add(card)
             elif is_keeper_limit_rule(card) and len(state.keepers[self.player_number]) > rule_options(card)["keeper_limit"]:
                 priorities[2].add(card)
             # If a card is in play that forms an "incomplete gameplan", protect it by returning it to hand
-            elif card in card_to_gameplan:
-                card_gameplans = card_to_gameplan[card]
-                for gameplan in card_gameplans:
-                    if gameplan.in_discard_count == 0:
-                        priorities[1].add(card)
-                        break
+            elif card_type(card) == "GOAL":
+                gameplan = card_to_gameplan[card][0]
+                if gameplan.in_play_count > 1 and gameplan.in_discard_count == 0:
+                    priorities[1].add(card)
+                else:
+                    priorities[0].add(card)
             else:
                 priorities[0].add(card)
 
@@ -323,7 +359,7 @@ class HeuristicAgentMKII(Agent):
             elif card in card_to_opponent_gameplan:
                 for gameplan in card_to_opponent_gameplan[card]:
                     if gameplan.in_discard_count == 0:
-                        priorities[10-gameplan.missing_count].add(card)
+                        priorities[9-gameplan.missing_count].add(card)
                         break
             # duplicates here are fine because all card priorities if added otherwise, are positive
             priorities[0].add(card)
@@ -348,10 +384,9 @@ class HeuristicAgentMKII(Agent):
             elif card in card_to_opponent_gameplan:
                 for gameplan in card_to_opponent_gameplan[card]:
                     if gameplan.in_discard_count == 0:
-                        priorities[gameplan.missing_count-10].add(card)
+                        priorities[gameplan.missing_count-9].add(card)
                         card_ranked = True
                         break
-            # duplicates here are fine because all card priorities if added otherwise, are positive
             if not card_ranked:
                 priorities[0].add(card)
 
@@ -378,7 +413,6 @@ class HeuristicAgentMKII(Agent):
 
         GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND: eval_share_cards_from_latent_space,
         GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT: eval_share_cards_from_latent_space,
-
         GamePhaseType.SELECT_KEEPER_TO_STEAL: eval_share_cards_from_latent_space,
         GamePhaseType.SELECT_OPPONENT_KEEPER_FOR_EXCHANGE: eval_share_cards_from_latent_space,
 
@@ -459,6 +493,7 @@ class HeuristicAgentMKII(Agent):
                 card_to_gameplan[card].append(gameplan)
 
         gameplan_list = [g for g in gameplans.values()]
+        gameplan_list.sort(key=lambda gameplan: gameplan.goal)
         if sort_by is not None:
             if sort_by == GameplanSortingOptions.MISSING_COUNT:
                 gameplan_list = sorted(gameplan_list, key=lambda gameplan: gameplan.missing_count, reverse=reverse)
