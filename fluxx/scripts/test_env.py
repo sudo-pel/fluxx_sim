@@ -14,13 +14,13 @@ from fluxx.scripts.debug_utils import printout_state
 def main(one_turn_win_simple_fluxx=None):
     two_player_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True)
     two_player_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True)
-    one_turn_win_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True, force_game_state=two_player_p0_one_turn_win)
-    two_turn_win_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True, force_game_state=two_player_p0_two_turn_win)
+    one_turn_win_simple_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True, force_game_state=two_player_p0_one_turn_win)
+    two_turn_win_simple_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True, force_game_state=two_player_p0_two_turn_win)
 
     action_testing = Game(2, card_lists.for_action_testing, disable_game_messages=True)
 
 
-    env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
+    env = FluxxEnv(two_turn_win_simple_fluxx, 2, render_mode="human")
 
     actor = PPOAgent(env.game.game_config, 0)  # same architecture
     actor.load_state_dict(torch.load("actor.pt"))
@@ -28,7 +28,7 @@ def main(one_turn_win_simple_fluxx=None):
 
     agents = {
         "player_0": HeuristicAgentMKI(env.game.game_config, 0),
-        "player_1": HeuristicAgentMKII(env.game.game_config, 1)
+        "player_1": RandomAgent(env.game.game_config, 1)
     }
 
     victories = {
@@ -66,6 +66,7 @@ def main(one_turn_win_simple_fluxx=None):
                 #print(env.game.stack)
 
                 if env.game.turn_count > 10000:
+                    print("Game over - turn limit reached")
                     break
 
             #print(env.game.winner)

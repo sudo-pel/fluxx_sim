@@ -34,11 +34,11 @@ class PPO:
 
     def _init_hyperparameters(self):
         self.max_timesteps_per_episode = 1600
-        self.games_per_batch = 16
+        self.games_per_batch = 128
         self.gamma = 0.999
         self.updates_per_iteration = 5
         self.clip = 0.2
-        self.lr = 0.005
+        self.lr = 3e-4
 
     def learn(self, total_timesteps):
         current_timestep = 0

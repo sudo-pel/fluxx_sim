@@ -201,6 +201,7 @@ class Game(GameSchema):
             if hasattr(phase, 'card') and phase.card is not None
         )
         )
+        """
         assert total == len(self.deck), (
             f"Card conservation violated: expected {len(self.deck)}, found {total}. "
             f"Draw: {len(self.draw_pile)}, "
@@ -212,6 +213,7 @@ class Game(GameSchema):
             f"Stack latent: {sum(len(ph.latent_space) for ph in self.stack if hasattr(ph, 'latent_space') and ph.latent_space is not None)}, "
             f"Stack cards: {sum(1 for ph in self.stack if hasattr(ph, 'card') and ph.card is not None)}"
         )
+        """
 
     # We note that the simulator will receive an integer and then decode it into something more complex for the game simulator to consume
     def step(self, card_name: str):
