@@ -20,15 +20,15 @@ def main(one_turn_win_simple_fluxx=None):
     action_testing = Game(2, card_lists.for_action_testing, disable_game_messages=True)
 
 
-    env = FluxxEnv(two_turn_win_simple_fluxx, 2, render_mode="human")
+    env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
 
-    actor = PPOAgent(env.game.game_config, 0)  # same architecture
-    actor.load_state_dict(torch.load("actor.pt"))
-    actor.eval()
+    actor = PPOAgent(env.game.game_config, 1)  # same architecture
+    actor.policy_network.load_state_dict(torch.load("actor.pt"))
+    actor.policy_network.eval()
 
     agents = {
-        "player_0": HeuristicAgentMKI(env.game.game_config, 0),
-        "player_1": RandomAgent(env.game.game_config, 1)
+        "player_0": HeuristicAgentMKII(env.game.game_config, 0),
+        "player_1": actor
     }
 
     victories = {
@@ -64,10 +64,6 @@ def main(one_turn_win_simple_fluxx=None):
                 env.step(action)
                 #printout_state(env.get_player_number(agent), env.game.get_game_state())
                 #print(env.game.stack)
-
-                if env.game.turn_count > 10000:
-                    print("Game over - turn limit reached")
-                    break
 
             #print(env.game.winner)
             if env.game.winner is None:

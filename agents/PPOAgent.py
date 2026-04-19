@@ -5,11 +5,12 @@ import torch.nn.functional as F
 import numpy as np
 
 from agents import agent_utils
+from agents.Agent import Agent
 from agents.FeedForwardNN import FeedForwardNN
 from fluxx.game.FluxxEnums import GameState
 
 
-class PPOAgent(nn.Module):
+class PPOAgent(Agent):
     def __init__(self, game_config, player_number):
         super(PPOAgent, self).__init__()
 
@@ -32,20 +33,11 @@ class PPOAgent(nn.Module):
         in_dim = observation_space_size
         out_dim = action_space_size
 
-        self.layer1 = nn.Linear(in_dim, 64)
-        self.layer2 = nn.Linear(64, 64)
-        self.layer3 = nn.Linear(64, out_dim)
+        self.policy_network = FeedForwardNN(in_dim, out_dim)
 
     def forward(self, obs):
         # Convert observation to tensor if given as a numpy array
-        if isinstance(obs, np.ndarray):
-            obs = torch.tensor(obs, dtype=torch.float)
-
-        activation1 = F.relu(self.layer1(obs))
-        activation2 = F.relu(self.layer2(activation1))
-        output = self.layer3(activation2)
-
-        return output
+        return self.policy_network.forward(obs)
 
     def act(self, state):
         obs = self.encode(state)
@@ -53,7 +45,7 @@ class PPOAgent(nn.Module):
         observation = obs["observation"]
         action_mask = obs["action_mask"]
 
-        logits = self.forward(observation)
+        logits = self.policy_network.forward(observation)
         logits[action_mask == 0] = -float("inf")
 
         distribution = torch.distributions.Categorical(logits=logits)

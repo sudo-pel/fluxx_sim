@@ -1,11 +1,39 @@
+from collections import deque
+from typing import Deque
+
 import torch
-from torch import distributions
+from torch import distributions, Tensor
 from torch.optim import Adam
 import numpy as np
 
 from agents.Agent import Agent
 from agents.FeedForwardNN import FeedForwardNN
 from agents.PPOAgent import PPOAgent
+from fluxx.game.FluxxEnums import GameConfig
+
+
+class OpponentPool:
+    def __init__(self, game_config: GameConfig, player_number: int, pool_size: int = 20):
+        self.pool: Deque[Agent] = deque()
+        self.game_config: GameConfig = game_config
+        self.player_number: int = player_number
+        self.pool_size: int = pool_size
+
+    def add_agent(self, agent: Agent):
+        self.pool.append(agent)
+        if len(self.pool) > self.pool_size:
+            self.pool.popleft()
+
+    def add_ppo(self, policy_network: FeedForwardNN):
+        new_agent = PPOAgent(self.game_config, self.player_number)
+        new_agent.policy_network = policy_network
+
+        self.pool.append(new_agent)
+        if len(self.pool) > self.pool_size:
+            self.pool.popleft()
+
+    def sample(self):
+        return np.random.choice(self.pool)
 
 
 class PPO:
@@ -17,28 +45,34 @@ class PPO:
         self.env = env
 
         self.actor = PPOAgent(env.game.game_config, 0)
-        self.actor_optim = Adam(self.actor.parameters(), lr=self.lr)
+        self.actor_optim = Adam(self.actor.policy_network.parameters(), lr=self.lr)
 
         self.critic = FeedForwardNN(self.actor.observation_space["observation"].shape[0], 1)
         self.critic_optim = Adam(self.critic.parameters(), lr=self.lr)
 
         # TODO: dynamic opponent selection
-        self.opponent = PPOAgent(env.game.game_config, 1)
         self.agents = {
             "player_0": self.actor,
-            "player_1": self.opponent
+            "player_1": None
         }
+        self.opponent_pool = OpponentPool(env.game.game_config, 1)
+        base_opponent = PPOAgent(env.game.game_config, 1)
+        self.opponent_pool.add_agent(base_opponent)
 
         # I think that these are unneeded
         #self.timesteps_per_batch = 4800
 
     def _init_hyperparameters(self):
+        # base hyperparameters
         self.max_timesteps_per_episode = 1600
         self.games_per_batch = 128
         self.gamma = 0.999
         self.updates_per_iteration = 5
         self.clip = 0.2
         self.lr = 3e-4
+
+        # extra hyperparameters
+
 
     def learn(self, total_timesteps):
         current_timestep = 0
@@ -47,6 +81,10 @@ class PPO:
         while current_timestep < total_timesteps:
             print(current_timestep)
             print(self.env.game.player_turn)
+
+            current_opponent = self.opponent_pool.sample()
+            self.agents["player_1"] = current_opponent
+
             batch_obs, batch_acts, batch_action_masks, batch_log_probs, batch_rewards_to_go, batch_lens = self.rollout()
             print("rollout complete")
 
@@ -77,13 +115,17 @@ class PPO:
 
             current_timestep += np.sum(batch_lens)
 
-        torch.save(self.actor.state_dict(), "actor.pt")
+            # Add a new enemy to the pool every batch
+            self.opponent_pool.add_ppo(self.actor.policy_network)
+
+
+        torch.save(self.actor.policy_network.state_dict(), "actor.pt")
 
 
     def evaluate(self, batch_obs, batch_acts, batch_action_masks):
         V = self.critic(batch_obs).squeeze()
 
-        logits = self.actor(batch_obs)
+        logits = self.actor.policy_network(batch_obs)
         logits[~batch_action_masks] = -float("inf")
 
         distribution = torch.distributions.Categorical(logits=logits)
