@@ -8,9 +8,20 @@ import numpy as np
 
 from agents.Agent import Agent
 from agents.FeedForwardNN import FeedForwardNN
+from agents.HeuristicAgentMKI import HeuristicAgentMKI
+from agents.HeuristicAgentMKII import HeuristicAgentMKII
 from agents.PPOAgent import PPOAgent
+from agents.RandomAgent import RandomAgent
+from fluxx.AgentBattler import AgentBattler
+from fluxx.MetricsTracker import MetricsTracker
 from fluxx.game.FluxxEnums import GameConfig
 
+"""
+Metrics recorded:
+- average game turn count (per 16,000 timesteps)
+- trainee WR against HeuristicAgentMKII and RandomAgent (100 games each per 16,000 timesteps)
+
+"""
 
 class OpponentPool:
     def __init__(self, game_config: GameConfig, player_number: int, pool_size: int = 20):
@@ -50,7 +61,6 @@ class PPO:
         self.critic = FeedForwardNN(self.actor.observation_space["observation"].shape[0], 1)
         self.critic_optim = Adam(self.critic.parameters(), lr=self.lr)
 
-        # TODO: dynamic opponent selection
         self.agents = {
             "player_0": self.actor,
             "player_1": None
@@ -59,8 +69,15 @@ class PPO:
         base_opponent = PPOAgent(env.game.game_config, 1)
         self.opponent_pool.add_agent(base_opponent)
 
-        # I think that these are unneeded
-        #self.timesteps_per_batch = 4800
+        # TODO: tensorboard integration
+        self.tracker = MetricsTracker(None, False)
+        self.tracker.register_flat_statistic("games_vs_heuristicagentmkii/wins_out_of_100")
+        self.tracker.register_flat_statistic("games_vs_heuristicagentmkii/average_game_length")
+        self.tracker.register_flat_statistic("games_vs_randomagent/wins_out_of_100")
+        self.tracker.register_flat_statistic("games_vs_randomagent/average_game_length")
+
+        self.agent_battler = AgentBattler(env)
+
 
     def _init_hyperparameters(self):
         # base hyperparameters
@@ -83,7 +100,9 @@ class PPO:
             print(self.env.game.player_turn)
 
             current_opponent = self.opponent_pool.sample()
-            self.agents["player_1"] = current_opponent
+            #self.agents["player_1"] = current_opponent
+            #testing something
+            self.agents["player_1"] = HeuristicAgentMKII(self.env.game.game_config, 1)
 
             batch_obs, batch_acts, batch_action_masks, batch_log_probs, batch_rewards_to_go, batch_lens = self.rollout()
             print("rollout complete")
@@ -93,7 +112,6 @@ class PPO:
 
             # advantage normalization
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)
-
 
             for _ in range(self.updates_per_iteration):
                 V, current_log_probs = self.evaluate(batch_obs, batch_acts, batch_action_masks)
@@ -114,6 +132,15 @@ class PPO:
                 print(f"Actor Loss: {actor_loss.item()}, Critic Loss: {critic_loss.item()}")
 
             current_timestep += np.sum(batch_lens)
+
+            # check wr every batch
+            vs_heuristicagent = self.agent_battler.run_games([self.actor, HeuristicAgentMKII(self.env.game.game_config, 1)], 100, 10000)
+            vs_randomagent = self.agent_battler.run_games([self.actor, RandomAgent(self.env.game.game_config, 1)], 100, 10000)
+            self.tracker.record("games_vs_heuristicagentmkii/wins_out_of_100", vs_heuristicagent["player_wins"]["player_0"])
+            self.tracker.record("games_vs_heuristicagentmkii/average_game_length", vs_heuristicagent["average_game_length"])
+            self.tracker.record("games_vs_randomagent/wins_out_of_100", vs_randomagent["player_wins"]["player_0"])
+            self.tracker.record("games_vs_randomagent/average_game_length", vs_randomagent["average_game_length"])
+            self.tracker.flush(current_timestep)
 
             # Add a new enemy to the pool every batch
             self.opponent_pool.add_ppo(self.actor.policy_network)
@@ -185,8 +212,8 @@ class PPO:
             batch_rewards.append(episode_rewards)
 
         # Reshape data as tensors in the shape specified before returning
-        batch_obs = torch.tensor(batch_obs, dtype=torch.float)
-        batch_acts = torch.tensor(batch_acts, dtype=torch.float)
+        batch_obs = torch.from_numpy(np.stack(batch_obs)).float()
+        batch_acts = torch.from_numpy(np.stack(batch_acts)).long()
         batch_log_probs = torch.tensor(batch_log_probs, dtype=torch.float)
         batch_action_masks = torch.tensor(batch_action_masks, dtype=torch.bool)
         # ALG STEP #4
