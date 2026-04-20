@@ -14,4 +14,4 @@ env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
 
 model = PPO(env, ["player_0", "player_1"])
 
-model.learn(1000000)
+model.learn(10000000)
