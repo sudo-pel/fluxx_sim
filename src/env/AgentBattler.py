@@ -17,6 +17,7 @@ class AgentBattler:
 
     def run_games(self, agents: list[Agent], game_count: int, turn_limit: int):
         wins = {f"player_{i}": 0 for i in range(self.env.game.player_count)}
+        wins["draws"] = 0
         agents = {f"player_{i}": agent for i, agent in enumerate(agents)}
 
         game_lengths = []

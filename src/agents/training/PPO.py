@@ -35,8 +35,12 @@ class OpponentPool:
             self.pool.popleft()
 
     def add_ppo(self, policy_network: FeedForwardNN):
+        import copy
         new_agent = PPOAgent(self.game_config, self.player_number)
-        new_agent.policy_network = policy_network
+        new_agent.policy_network = copy.deepcopy(policy_network)
+        new_agent.policy_network.eval()
+        for p in new_agent.policy_network.parameters():
+            p.requires_grad_(False)
 
         self.pool.append(new_agent)
         if len(self.pool) > self.pool_size:
@@ -72,12 +76,14 @@ class PPO:
         self.opponent_pool.add_agent(base_opponent)
 
         # TODO: tensorboard integration
-        self.run_name = f"ppo_{datetime.now().strftime('%d-%m-%Y_%H:%M:%S')}"
+        self.run_name = f"ppo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
         self.tracker = MetricsTracker(f"{self.run_name}", True)
         self.tracker.register_flat_statistic("games_vs_heuristicagentmkii/wins_out_of_100")
         self.tracker.register_flat_statistic("games_vs_heuristicagentmkii/average_game_length")
         self.tracker.register_flat_statistic("games_vs_randomagent/wins_out_of_100")
         self.tracker.register_flat_statistic("games_vs_randomagent/average_game_length")
+        self.tracker.register_flat_statistic("games_vs_past_version/wins_out_of_100")
+        self.tracker.register_flat_statistic("games_vs_past_version/average_game_length")
 
         self.agent_battler = AgentBattler(env)
 
@@ -88,15 +94,15 @@ class PPO:
         # base hyperparameters
         self.max_timesteps_per_episode = 1600
         self.games_per_batch = 128
-        self.gamma = 0.999
+        self.gamma = 0.99
         self.epoch_count = 4
         self.minibatch_size = 64
-        # TODO: consider setting a KL divergence limit
+        self.kl_limit = 0.02
         self.clip = 0.2
-        self.lr = 3e-4
+        self.lr = 1e-4
 
         # extra hyperparameters
-
+        self.gae_lambda = 0.95
 
     def learn(self, total_timesteps):
         self.global_timestep = 0
@@ -108,7 +114,7 @@ class PPO:
             current_opponent = self.opponent_pool.sample()
             self.agents["player_1"] = current_opponent
 
-            batch_obs, batch_acts, batch_action_masks, batch_log_probs, batch_rewards_to_go, batch_lens = self.rollout()
+            batch_obs, batch_acts, batch_action_masks, batch_log_probs, batch_advantages, batch_returns = self.rollout()
             print("rollout complete")
 
             V, _, entropy = self.evaluate(batch_obs, batch_acts, batch_action_masks)
@@ -116,45 +122,77 @@ class PPO:
 
             # explained variance
             with torch.no_grad():
-                explained_var = 1 - torch.var(batch_rewards_to_go - V) / torch.var(batch_rewards_to_go)
+                explained_var = 1 - (batch_returns - V).var() / (batch_returns.var() + 1e-8)
             self.tracker.record("actor/explained_variance", explained_var.item())
             self.tracker.flush(self.global_timestep)
 
-            advantages = batch_rewards_to_go - V.detach()
-
             # advantage normalization
-            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)
+            advantages = (batch_advantages - batch_advantages.mean()) / (batch_advantages.std() + 1e-5)
 
             # Per-update metrics
             kl_divergences = []
             clip_fractions = []
+            actor_losses, critic_losses = [], []
 
-            for _ in range(self.updates_per_iteration):
-                V, current_log_probs, entropy = self.evaluate(batch_obs, batch_acts, batch_action_masks)
-                ratios = torch.exp(current_log_probs - batch_log_probs)
-                surr1 = ratios * advantages
-                surr2 = torch.clamp(ratios, 1-self.clip, 1+self.clip) * advantages
+            # setup minibatching
+            batch_size = batch_obs.shape[0]
+            indices = np.arange(batch_size)
 
-                actor_loss = (-torch.min(surr1, surr2)).mean()
-                self.actor_optim.zero_grad()
-                actor_loss.backward(retain_graph=True)
-                self.actor_optim.step()
+            early_stopped = False
+            for epoch in range(self.epoch_count):
+                if early_stopped:
+                    break
 
-                critic_loss = torch.nn.MSELoss()(V, batch_rewards_to_go)
-                self.critic_optim.zero_grad()
-                critic_loss.backward()
-                self.critic_optim.step()
+                np.random.shuffle(indices)
 
-                # per-update statistics
-                with torch.no_grad():
-                    log_ratio = current_log_probs - batch_log_probs
-                    approx_kl = ((ratios - 1) - log_ratio).mean()
-                    clip_fraction = ((ratios - 1).abs() > self.clip).float().mean()
+                for start in range(0, batch_size, self.minibatch_size):
+                    end = start + self.minibatch_size
+                    minibatch_indices = indices[start:end]
 
-                kl_divergences.append(approx_kl.item())
-                clip_fractions.append(clip_fraction.item())
+                    mb_obs = batch_obs[minibatch_indices]
+                    mb_acts = batch_acts[minibatch_indices]
+                    mb_masks = batch_action_masks[minibatch_indices]
+                    mb_old_log_probs = batch_log_probs[minibatch_indices]
+                    mb_advantages = advantages[minibatch_indices]
+                    mb_returns = batch_returns[minibatch_indices]
 
-                print(f"Actor Loss: {actor_loss.item()}, Critic Loss: {critic_loss.item()}")
+                    # Forward pass on the minibatch
+                    V_mb, current_log_probs, _ = self.evaluate(mb_obs, mb_acts, mb_masks)
+
+                    # PPO actor loss
+                    ratios = torch.exp(current_log_probs - mb_old_log_probs)
+                    surr1 = ratios * mb_advantages
+                    surr2 = torch.clamp(ratios, 1 - self.clip, 1 + self.clip) * mb_advantages
+                    actor_loss = (-torch.min(surr1, surr2)).mean()
+
+                    self.actor_optim.zero_grad()
+                    actor_loss.backward(retain_graph=True)
+                    self.actor_optim.step()
+
+                    # Critic loss
+                    critic_loss = torch.nn.MSELoss()(V_mb, mb_returns)
+                    self.critic_optim.zero_grad()
+                    critic_loss.backward()
+                    self.critic_optim.step()
+
+                    # Diagnostics
+                    with torch.no_grad():
+                        log_ratio = current_log_probs - mb_old_log_probs
+                        approx_kl = ((ratios - 1) - log_ratio).mean()
+                        clip_frac = ((ratios - 1).abs() > self.clip).float().mean()
+
+                    kl_divergences.append(approx_kl.item())
+                    clip_fractions.append(clip_frac.item())
+                    actor_losses.append(actor_loss.item())
+                    critic_losses.append(critic_loss.item())
+
+                # if the kl of this branch exceeds the limt, stop training off the minibatches
+                if self.kl_limit is not None:
+                    # KLs from this epoch only
+                    epoch_kls = kl_divergences[-(batch_size // self.minibatch_size):]
+                    if np.mean(epoch_kls) > self.kl_limit:
+                        print(f"Early stopping at epoch {epoch + 1}: KL {np.mean(epoch_kls):.4f} > {self.kl_limit}")
+                        early_stopped = True
 
             self.tracker.record("kl_divergence", np.mean(kl_divergences))
             self.tracker.record("clip_fraction", np.mean(clip_fractions))
@@ -199,30 +237,38 @@ class PPO:
         batch_action_masks = []
         batch_log_probs = []
         batch_rewards = []
-        batch_rewards_to_go = []
-        batch_lens = []
+        batch_values = []
+        batch_dones = []
 
         games_played = 0
+        game_lengths = []
         while games_played < self.games_per_batch:
             obs = self.env.reset()
             episode_rewards = []
+            episode_values = []
+            episode_dones = []
 
             current_timestep = 0
             for agent in self.env.agent_iter():
-                current_timestep += 1
-                self.global_timestep += 1
                 # Ideally only complete games, but terminate games early in case some pathological loop occurs
                 if current_timestep > self.max_timesteps_per_episode:
                     break
 
                 observation, reward, termination, truncation, info = self.env.last()
 
-                # .last() gets rewards from the previous action, whose entry in ep_rewards will have been appended in the previous iteration of the loop (see below)
-                if agent == "player_0" and len(episode_rewards) > 0:
-                    episode_rewards[-1] += reward
+                if agent == "player_0":
+                    # only the timesteps of the agent being trained matter
+                    current_timestep += 1
+                    self.global_timestep += 1
+
+                    # .last() gets rewards from the previous action, whose entry in ep_rewards will have been appended in the previous iteration of the loop (see below)
+                    if len(episode_rewards) > 0:
+                        episode_rewards[-1] += reward
 
                 if termination or truncation:
                     action = None
+                    if len(episode_dones) > 0:
+                        episode_dones[-1] = True
                 else:
                     action, log_probs, observation = self.agents[agent].act(observation)
 
@@ -235,48 +281,70 @@ class PPO:
                         episode_rewards.append(reward)
                         batch_log_probs.append(log_probs)
 
+                        # Compute value for this state
+                        with torch.no_grad():
+                            obs_tensor = torch.from_numpy(observation["observation"]).float().unsqueeze(0)
+                            value = self.critic(obs_tensor).squeeze().item()
+                        episode_values.append(value)
+                        episode_dones.append(False)  # will be flipped to True on terminal turn
+
                     action = self.env.decode_action(action)
 
                 self.env.step(action)
 
             games_played += 1
+            game_lengths.append(self.env.game.turn_count)
 
-            batch_lens.append(current_timestep + 1)
             batch_rewards.append(episode_rewards)
+            batch_values.append(episode_values)
+            batch_dones.append(episode_dones)
 
         # Reshape data as tensors in the shape specified before returning
         batch_obs = torch.from_numpy(np.stack(batch_obs)).float()
         batch_acts = torch.from_numpy(np.stack(batch_acts)).long()
         batch_log_probs = torch.tensor(batch_log_probs, dtype=torch.float)
         batch_action_masks = torch.tensor(batch_action_masks, dtype=torch.bool)
-        # ALG STEP #4
-        batch_rewards_to_go = self.compute_rewards_to_go(batch_rewards)
+
+        # compute advantages and returns
+        batch_advantages, batch_returns = self.compute_gae(batch_rewards, batch_values, batch_dones)
 
         # end of rollout metric tracking
-        self.tracker.record("rollout/average_game_length", np.mean(batch_lens))
-        self.tracker.record("rollout/win_rate_vs_pool", sum(sum(ep_rew) for ep_rew in batch_rewards) / games_played)
+        self.tracker.record("rollout/average_game_length", np.mean(game_lengths))
+        wins = sum(1 for ep in batch_rewards if sum(ep) > 0)
+        self.tracker.record("rollout/win_rate_vs_pool", wins / games_played)
         self.tracker.flush(self.global_timestep)
 
         # Return the batch data
-        return batch_obs, batch_acts, batch_action_masks, batch_log_probs, batch_rewards_to_go, batch_lens
+        return batch_obs, batch_acts, batch_action_masks, batch_log_probs, batch_advantages, batch_returns
 
-    def compute_rewards_to_go(self, batch_rewards):
+    def compute_gae(self, rewards, values, dones):
         """
-        Compute rewards-to-go for each episode in the batch.
-        For each episode, computes the rtg at each timestep
+        Compute GAE for a batch of experiences.
         """
-        batch_rewards_to_go = []
-        # Iterate through each episode backwards to maintain same order
-        # in batch_rtgs
-        for ep_rewards in batch_rewards:
-            discounted_reward = 0  # The discounted reward so far
-            rewards_to_go = []
-            for rew in reversed(ep_rewards):
-                discounted_reward = rew + discounted_reward * self.gamma
-                rewards_to_go.append(discounted_reward)
-            rewards_to_go.reverse()
-            batch_rewards_to_go.extend(rewards_to_go)
+        all_advantages = []
+        all_returns = []
 
-        # Convert the rewards-to-go into a tensor
-        batch_rtgs = torch.tensor(batch_rewards_to_go, dtype=torch.float)
-        return batch_rtgs
+        for ep_rewards, ep_values, ep_dones in zip(rewards, values, dones):
+            T = len(ep_rewards)
+            advantages = np.zeros(T)
+            last_advantage = 0
+
+            for t in reversed(range(T)):
+                if t == T - 1:
+                    next_value = 0.0
+                    next_non_terminal = 0.0
+                else:
+                    next_value = ep_values[t + 1]
+                    next_non_terminal = 1.0 - float(ep_dones[t + 1])
+
+                delta = ep_rewards[t] + self.gamma * next_value * next_non_terminal - ep_values[t]
+                advantages[t] = last_advantage = delta + self.gamma * self.gae_lambda * next_non_terminal * last_advantage
+
+            returns = advantages + np.array(ep_values, dtype=np.float32)
+            all_advantages.extend(advantages.tolist())
+            all_returns.extend(returns.tolist())
+
+        advantages_tensor = torch.tensor(all_advantages, dtype=torch.float)
+        returns_tensor = torch.tensor(all_returns, dtype=torch.float)
+
+        return advantages_tensor, returns_tensor
