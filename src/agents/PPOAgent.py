@@ -33,8 +33,30 @@ class PPOAgent(Agent):
 
         self.policy_network = FeedForwardNN(in_dim, out_dim)
 
+    @property
+    def device(self) -> torch.device:
+        """
+        Device of the underlying policy network. Inferred from parameters so
+        callers don't have to plumb a device through the constructor.
+        """
+        try:
+            return next(self.policy_network.parameters()).device
+        except StopIteration:
+            return torch.device("cpu")
+
+    def _to_device_tensor(self, arr) -> torch.Tensor:
+        """
+        Convert a numpy array (or tensor) observation to a float tensor on the
+        policy network's device.
+        """
+        if isinstance(arr, torch.Tensor):
+            return arr.to(self.device, dtype=torch.float)
+        return torch.from_numpy(np.asarray(arr)).float().to(self.device)
+
     def forward(self, obs):
         # Convert observation to tensor if given as a numpy array
+        if isinstance(obs, np.ndarray):
+            obs = self._to_device_tensor(obs)
         return self.policy_network.forward(obs)
 
     def act(self, state):
@@ -43,15 +65,24 @@ class PPOAgent(Agent):
         observation = obs["observation"]
         action_mask = obs["action_mask"]
 
-        logits = self.policy_network.forward(observation)
-        logits[action_mask == 0] = -float("inf")
+        # Move observation + mask onto the network's device for the forward pass.
+        obs_tensor = self._to_device_tensor(observation)
+        mask_tensor = torch.as_tensor(np.asarray(action_mask), dtype=torch.bool, device=self.device)
 
-        distribution = torch.distributions.Categorical(logits=logits)
+        with torch.no_grad():
+            logits = self.policy_network.forward(obs_tensor)
+            # Out-of-place mask fill is safer than in-place assignment on device tensors.
+            logits = logits.masked_fill(~mask_tensor, float("-inf"))
 
-        action = distribution.sample()
-        log_probs = distribution.log_prob(action)
+            distribution = torch.distributions.Categorical(logits=logits)
+            action = distribution.sample()
+            log_probs = distribution.log_prob(action)
 
-        return action.item(), log_probs, obs
+        # Return a python int for the action (env.step expects a plain int) and a
+        # detached CPU scalar tensor for log_probs so the training loop can stack
+        # them without device-mismatch issues. `obs` is kept as numpy (unchanged
+        # contract) — the training loop is responsible for batching it.
+        return action.item(), log_probs.detach().cpu(), obs
 
     def encode(self, state: GameState):
         if state.game_over:
@@ -63,4 +94,3 @@ class PPOAgent(Agent):
             }
         else:
             return agent_utils.observe(self, state, self.game_config)
-

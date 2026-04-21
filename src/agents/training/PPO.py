@@ -27,14 +27,33 @@ Metrics recorded:
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
+
+def get_default_device() -> torch.device:
+    """
+    Pick the best available device.
+    """
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    return torch.device("cpu")
+
+
 class OpponentPool:
-    def __init__(self, game_config: GameConfig, player_number: int, pool_size: int = 20):
+    def __init__(self, game_config: GameConfig, player_number: int, pool_size: int = 20,
+                 device: torch.device = torch.device("cpu")):
         self.pool: Deque[Agent] = deque()
         self.game_config: GameConfig = game_config
         self.player_number: int = player_number
         self.pool_size: int = pool_size
+        self.device: torch.device = device
 
     def add_agent(self, agent: Agent):
+        # Best-effort move any nn.Module attributes on the agent to the pool's device.
+        policy = getattr(agent, "policy_network", None)
+        if isinstance(policy, torch.nn.Module):
+            policy.to(self.device)
+            policy.eval()
+            for p in policy.parameters():
+                p.requires_grad_(False)
         self.pool.append(agent)
         if len(self.pool) > self.pool_size:
             self.pool.popleft()
@@ -42,7 +61,9 @@ class OpponentPool:
     def add_ppo(self, policy_network: FeedForwardNN):
         import copy
         new_agent = PPOAgent(self.game_config, self.player_number)
-        new_agent.policy_network = copy.deepcopy(policy_network)
+        # Deep copy on CPU is cheap and safe; then move to device.
+        cpu_copy = copy.deepcopy(policy_network).to("cpu")
+        new_agent.policy_network = cpu_copy.to(self.device)
         new_agent.policy_network.eval()
         for p in new_agent.policy_network.parameters():
             p.requires_grad_(False)
@@ -59,24 +80,28 @@ class OpponentPool:
 
 
 class PPO:
-    def __init__(self, env, agent_names: list[str]):
+    def __init__(self, env, agent_names: list[str], device: torch.device = None):
         super().__init__()
         self._init_hyperparameters()
+
+        self.device: torch.device = device if device is not None else get_default_device()
+        print(f"PPO using device: {self.device}")
 
         self.agent_names = agent_names
         self.env = env
 
         self.actor = PPOAgent(env.game.game_config, 0)
+        self.actor.policy_network.to(self.device)
         self.actor_optim = Adam(self.actor.policy_network.parameters(), lr=self.lr)
 
-        self.critic = FeedForwardNN(self.actor.observation_space["observation"].shape[0], 1)
+        self.critic = FeedForwardNN(self.actor.observation_space["observation"].shape[0], 1).to(self.device)
         self.critic_optim = Adam(self.critic.parameters(), lr=self.lr)
 
         self.agents = {
             "player_0": self.actor,
             "player_1": None
         }
-        self.opponent_pool = OpponentPool(env.game.game_config, 1)
+        self.opponent_pool = OpponentPool(env.game.game_config, 1, device=self.device)
         base_opponent = PPOAgent(env.game.game_config, 1)
         self.opponent_pool.add_agent(base_opponent)
 
@@ -92,6 +117,7 @@ class PPO:
             "clip": self.clip,
             "lr": self.lr,
             "gae_lambda": self.gae_lambda,
+            "device": str(self.device),
         })
         self.tracker.register_flat_statistic("games_vs_heuristicagentmkii/wins_out_of_100")
         self.tracker.register_flat_statistic("games_vs_heuristicagentmkii/average_game_length")
@@ -167,13 +193,15 @@ class PPO:
                 for start in range(0, batch_size, self.minibatch_size):
                     end = start + self.minibatch_size
                     minibatch_indices = indices[start:end]
+                    # Use a torch long tensor on device for indexing to avoid host<->device syncs
+                    idx_tensor = torch.as_tensor(minibatch_indices, dtype=torch.long, device=self.device)
 
-                    mb_obs = batch_obs[minibatch_indices]
-                    mb_acts = batch_acts[minibatch_indices]
-                    mb_masks = batch_action_masks[minibatch_indices]
-                    mb_old_log_probs = batch_log_probs[minibatch_indices]
-                    mb_advantages = advantages[minibatch_indices]
-                    mb_returns = batch_returns[minibatch_indices]
+                    mb_obs = batch_obs.index_select(0, idx_tensor)
+                    mb_acts = batch_acts.index_select(0, idx_tensor)
+                    mb_masks = batch_action_masks.index_select(0, idx_tensor)
+                    mb_old_log_probs = batch_log_probs.index_select(0, idx_tensor)
+                    mb_advantages = advantages.index_select(0, idx_tensor)
+                    mb_returns = batch_returns.index_select(0, idx_tensor)
 
                     # Forward pass on the minibatch
                     V_mb, current_log_probs, _ = self.evaluate(mb_obs, mb_acts, mb_masks)
@@ -248,14 +276,17 @@ class PPO:
 
     def save_current_model(self, filename):
         path = f"{PROJECT_ROOT}/experiments/{self.run_name}/models/{filename}.pt"
-        torch.save(self.actor.policy_network.state_dict(), path)
+        # Save a CPU copy of the state_dict so checkpoints are portable across devices.
+        state_dict = {k: v.detach().cpu() for k, v in self.actor.policy_network.state_dict().items()}
+        torch.save(state_dict, path)
         print(f"Model saved to {path}")
 
     def evaluate(self, batch_obs, batch_acts, batch_action_masks):
+        # Inputs are expected to be on self.device already (set up in rollout / minibatching).
         V = self.critic(batch_obs).squeeze()
 
         logits = self.actor.policy_network(batch_obs)
-        logits[~batch_action_masks] = -float("inf")
+        logits = logits.masked_fill(~batch_action_masks, float("-inf"))
 
         distribution = torch.distributions.Categorical(logits=logits)
 
@@ -308,18 +339,38 @@ class PPO:
                     # (For now) only collect training data from the actor agent
                     # TODO: also collect training data from the opponent agent
                     if agent == "player_0":
-                        batch_acts.append(action) # consider whether to decode before this
-                        batch_action_masks.append(observation["action_mask"])
-                        batch_obs.append(observation["observation"])
-                        episode_rewards.append(reward)
-                        batch_log_probs.append(log_probs)
+                        # Normalize `action` to a plain python int for env.step and storage.
+                        if isinstance(action, torch.Tensor):
+                            action_for_env = action.detach().cpu().item()
+                        else:
+                            action_for_env = int(action)
 
-                        # Compute value for this state
+                        # Normalize log_probs to a python float for later stacking.
+                        if isinstance(log_probs, torch.Tensor):
+                            log_prob_val = log_probs.detach().cpu().item()
+                        else:
+                            log_prob_val = float(log_probs)
+
+                        batch_acts.append(action_for_env)  # consider whether to decode before this
+                        batch_action_masks.append(np.asarray(observation["action_mask"], dtype=bool))
+                        batch_obs.append(np.asarray(observation["observation"]))
+                        episode_rewards.append(reward)
+                        batch_log_probs.append(log_prob_val)
+
+                        # Compute value for this state (on device)
                         with torch.no_grad():
-                            obs_tensor = torch.from_numpy(observation["observation"]).float().unsqueeze(0)
+                            obs_tensor = torch.from_numpy(
+                                np.asarray(observation["observation"])
+                            ).float().unsqueeze(0).to(self.device)
                             value = self.critic(obs_tensor).squeeze().item()
                         episode_values.append(value)
                         episode_dones.append(False)  # will be flipped to True on terminal turn
+
+                        action = action_for_env
+                    else:
+                        # Opponent action: still needs to be a plain int for env.step.
+                        if isinstance(action, torch.Tensor):
+                            action = action.detach().cpu().item()
 
                     action = self.env.decode_action(action)
 
@@ -332,13 +383,13 @@ class PPO:
             batch_values.append(episode_values)
             batch_dones.append(episode_dones)
 
-        # Reshape data as tensors in the shape specified before returning
-        batch_obs = torch.from_numpy(np.stack(batch_obs)).float()
-        batch_acts = torch.from_numpy(np.stack(batch_acts)).long()
-        batch_log_probs = torch.tensor(batch_log_probs, dtype=torch.float)
-        batch_action_masks = torch.tensor(np.array(batch_action_masks), dtype=torch.bool)
+        # Reshape data as tensors on self.device before returning.
+        batch_obs = torch.from_numpy(np.stack(batch_obs)).float().to(self.device)
+        batch_acts = torch.from_numpy(np.stack(batch_acts)).long().to(self.device)
+        batch_log_probs = torch.tensor(batch_log_probs, dtype=torch.float, device=self.device)
+        batch_action_masks = torch.from_numpy(np.stack(batch_action_masks)).bool().to(self.device)
 
-        # compute advantages and returns
+        # compute advantages and returns (done in numpy, then moved to device)
         batch_advantages, batch_returns = self.compute_gae(batch_rewards, batch_values, batch_dones)
 
         # end of rollout metric tracking
@@ -352,7 +403,8 @@ class PPO:
 
     def compute_gae(self, rewards, values, dones):
         """
-        Compute GAE for a batch of experiences.
+        Compute GAE for a batch of experiences. Kept on CPU/numpy (small, sequential work)
+        and moved to self.device at the end.
         """
         all_advantages = []
         all_returns = []
@@ -377,7 +429,7 @@ class PPO:
             all_advantages.extend(advantages.tolist())
             all_returns.extend(returns.tolist())
 
-        advantages_tensor = torch.tensor(all_advantages, dtype=torch.float)
-        returns_tensor = torch.tensor(all_returns, dtype=torch.float)
+        advantages_tensor = torch.tensor(all_advantages, dtype=torch.float, device=self.device)
+        returns_tensor = torch.tensor(all_returns, dtype=torch.float, device=self.device)
 
         return advantages_tensor, returns_tensor
