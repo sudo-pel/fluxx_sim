@@ -1,5 +1,3 @@
-import os
-
 from src.agents.training.PPO import PPO
 from src.env.FluxxEnv import FluxxEnv
 from src.game.cards import card_lists
@@ -12,8 +10,6 @@ one_turn_win_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_m
 two_turn_win_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True, force_game_state=two_player_p0_two_turn_win)
 
 env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
-
-os.environ['CUDA_VISIBLE_DEVICES'] = [1,2]
 
 model = PPO(env, ["player_0", "player_1"])
 
