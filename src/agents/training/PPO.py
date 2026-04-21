@@ -1,5 +1,7 @@
+import os
 from collections import deque
 from datetime import datetime
+from pathlib import Path
 from typing import Deque
 
 import torch
@@ -15,12 +17,15 @@ from src.env.AgentBattler import AgentBattler
 from src.env.MetricsTracker import MetricsTracker
 from src.game.FluxxEnums import GameConfig
 
+# TODO: update this
 """
 Metrics recorded:
 - average game turn count (per 16,000 timesteps)
 - trainee WR against HeuristicAgentMKII and RandomAgent (100 games each per 16,000 timesteps)
 
 """
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 class OpponentPool:
     def __init__(self, game_config: GameConfig, player_number: int, pool_size: int = 20):
@@ -77,7 +82,17 @@ class PPO:
 
         # TODO: tensorboard integration
         self.run_name = f"ppo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-        self.tracker = MetricsTracker(f"{self.run_name}", True)
+        self.tracker = MetricsTracker(f"{self.run_name}", True, 100, {
+            "max_timesteps_per_episode": self.max_timesteps_per_episode,
+            "games_per_batch": self.games_per_batch,
+            "gamma": self.gamma,
+            "epoch_count": self.epoch_count,
+            "minibatch_size": self.minibatch_size,
+            "kl_limit": self.kl_limit,
+            "clip": self.clip,
+            "lr": self.lr,
+            "gae_lambda": self.gae_lambda,
+        })
         self.tracker.register_flat_statistic("games_vs_heuristicagentmkii/wins_out_of_100")
         self.tracker.register_flat_statistic("games_vs_heuristicagentmkii/average_game_length")
         self.tracker.register_flat_statistic("games_vs_randomagent/wins_out_of_100")
@@ -88,6 +103,10 @@ class PPO:
         self.agent_battler = AgentBattler(env)
 
         self.global_timestep = 0
+        self.model_checkpoints_taken = 0
+
+        # save_current_model needs the file to already exist
+        os.makedirs(f"{PROJECT_ROOT}/experiments/{self.run_name}/models")
 
 
     def _init_hyperparameters(self):
@@ -212,11 +231,25 @@ class PPO:
             # Add a new enemy to the pool every batch
             self.opponent_pool.add_ppo(self.actor.policy_network)
 
+            # save the policy every time a threshold is crossed
+            if self.global_timestep // 500000 >= self.model_checkpoints_taken + 1:
+                self.model_checkpoints_taken += 1
+                self.save_current_model(f"model_{self.global_timestep}")
 
-        torch.save(self.actor.policy_network.state_dict(), "actor.pt")
+        torch.save(self.actor.policy_network.state_dict(), "model_final")
 
-        self.tracker.close()
+        # final evaluation
+        vs_heuristicagent = self.agent_battler.run_games([self.actor, HeuristicAgentMKII(self.env.game.game_config, 1)],100, 10000)
+        vs_randomagent = self.agent_battler.run_games([self.actor, RandomAgent(self.env.game.game_config, 1)], 100,10000)
+        self.tracker.close({
+            "wr_vs_heuristicagent": vs_heuristicagent["player_wins"]["player_0"],
+            "wr_vs_randomagent": vs_randomagent["player_wins"]["player_0"],
+        })
 
+    def save_current_model(self, filename):
+        path = f"{PROJECT_ROOT}/experiments/{self.run_name}/models/{filename}.pt"
+        torch.save(self.actor.policy_network.state_dict(), path)
+        print(f"Model saved to {path}")
 
     def evaluate(self, batch_obs, batch_acts, batch_action_masks):
         V = self.critic(batch_obs).squeeze()

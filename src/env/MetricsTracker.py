@@ -1,7 +1,7 @@
 import time
 from collections import defaultdict, deque
 from pathlib import Path
-from typing import Deque
+from typing import Deque, Any
 
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
@@ -18,7 +18,7 @@ class MetricsTracker:
     - additional metrics that are calculated (like elapsed time)
 
     """
-    def __init__(self, log_dir: str | None = None, use_tensorboard: bool = False, return_window_size: int = 128):
+    def __init__(self, log_dir: str | None = None, use_tensorboard: bool = False, return_window_size: int = 128, hyperparameters: dict[str, Any] = {}):
         self.buffers: dict[str, list[float]] = defaultdict(list)
         self.episode_returns: Deque[float] = deque(maxlen=return_window_size)
         self.start_time = time.time()
@@ -27,6 +27,8 @@ class MetricsTracker:
         self.writer = None
         if use_tensorboard:
             self.writer = SummaryWriter(f"{PROJECT_ROOT}/experiments/{log_dir}/logs")
+
+        self.hyperparameters = hyperparameters
 
     def register_flat_statistic(self, name: str):
         """
@@ -77,9 +79,16 @@ class MetricsTracker:
             parts.append(f"{key}={value:.2f}")
         print(" | ".join(parts))
 
-    def close(self):
+    def close(self, metrics: dict[str, Any]):
         if self.writer is not None:
             self.writer.close()
+            hyperparam_writer = SummaryWriter(f"{PROJECT_ROOT}/experiments/{self.writer.log_dir}/logs")
+            hyperparam_writer.add_hparams(
+                hparam_dict=self.hyperparameters,
+                metric_dict=metrics,
+                run_name="."
+            )
+            hyperparam_writer.close()
 
 
 
