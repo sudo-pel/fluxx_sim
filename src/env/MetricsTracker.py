@@ -82,7 +82,7 @@ class MetricsTracker:
     def close(self, metrics: dict[str, Any]):
         if self.writer is not None:
             self.writer.close()
-            hyperparam_writer = SummaryWriter(f"{PROJECT_ROOT}/experiments/{self.writer.log_dir}/logs")
+            hyperparam_writer = SummaryWriter(self.writer.log_dir)
             hyperparam_writer.add_hparams(
                 hparam_dict=self.hyperparameters,
                 metric_dict=metrics,

@@ -236,14 +236,14 @@ class PPO:
                 self.model_checkpoints_taken += 1
                 self.save_current_model(f"model_{self.global_timestep}")
 
-        torch.save(self.actor.policy_network.state_dict(), "model_final")
+        self.save_current_model("final_model")
 
         # final evaluation
         vs_heuristicagent = self.agent_battler.run_games([self.actor, HeuristicAgentMKII(self.env.game.game_config, 1)],100, 10000)
         vs_randomagent = self.agent_battler.run_games([self.actor, RandomAgent(self.env.game.game_config, 1)], 100,10000)
         self.tracker.close({
-            "wr_vs_heuristicagent": vs_heuristicagent["player_wins"]["player_0"],
-            "wr_vs_randomagent": vs_randomagent["player_wins"]["player_0"],
+            "final_wr_vs_heuristicagent": vs_heuristicagent["player_wins"]["player_0"]/100,
+            "final_wr_vs_randomagent": vs_randomagent["player_wins"]["player_0"]/100,
         })
 
     def save_current_model(self, filename):
@@ -336,7 +336,7 @@ class PPO:
         batch_obs = torch.from_numpy(np.stack(batch_obs)).float()
         batch_acts = torch.from_numpy(np.stack(batch_acts)).long()
         batch_log_probs = torch.tensor(batch_log_probs, dtype=torch.float)
-        batch_action_masks = torch.tensor(batch_action_masks, dtype=torch.bool)
+        batch_action_masks = torch.tensor(np.array(batch_action_masks), dtype=torch.bool)
 
         # compute advantages and returns
         batch_advantages, batch_returns = self.compute_gae(batch_rewards, batch_values, batch_dones)
