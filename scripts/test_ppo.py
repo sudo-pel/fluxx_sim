@@ -1,3 +1,6 @@
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 from src.agents.training.PPO import PPO
 from src.env.FluxxEnv import FluxxEnv
 from src.game.cards import card_lists
