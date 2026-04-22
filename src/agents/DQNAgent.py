@@ -54,11 +54,6 @@ class DQNAgent(Agent):
         return self.q_network.forward(obs)
 
     def act(self, state, epsilon: float = 0.0):
-        """
-        ε-greedy over legal actions. Returns (action:int, q_value_of_action:tensor, obs:dict).
-        Keeping the return shape parallel to PPOAgent.act so the training loop can
-        treat them symmetrically — log_probs there, selected Q-value here.
-        """
         obs = self.encode(state)
         observation = obs["observation"]
         action_mask = obs["action_mask"]

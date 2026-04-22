@@ -22,9 +22,6 @@ from src.neural_networks.FeedForwardNN import FeedForwardNN
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
-# Limit PyTorch CPU threading. For small batches and networks, more threads
-# cause sync overhead that outweighs parallelism. 2–4 is usually optimal on
-# a laptop; tune if you have a lot of cores free.
 torch.set_num_threads(4)
 torch.set_num_interop_threads(1)
 
@@ -36,7 +33,6 @@ def get_default_device() -> torch.device:
 
 
 def _freeze_eval(module: torch.nn.Module) -> None:
-    """Put a module in eval mode and disable gradients."""
     module.eval()
     for p in module.parameters():
         p.requires_grad_(False)
@@ -194,7 +190,7 @@ class DQN:
 
     def _init_hyperparameters(self):
         # replay / learning
-        self.buffer_capacity = 50000
+        self.buffer_capacity = 350000
         self.batch_size = 128          # was 256; halves per-update gradient cost on CPU
         self.gamma = 0.99
         self.n_step = 3                # was 5; reduces pending-queue bookkeeping + bias
