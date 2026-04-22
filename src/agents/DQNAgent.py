@@ -4,7 +4,7 @@ import numpy as np
 
 from src.agents import agent_utils
 from src.agents.Agent import Agent
-from src.neural_networks.FeedForwardNN import FeedForwardNN
+from src.neural_networks.NormalizedFeedForwardNN import NormalizedFeedForwardNN
 from src.game.FluxxEnums import GameState
 
 
@@ -34,7 +34,7 @@ class DQNAgent(Agent):
         self.action_space_size = action_space_size
 
         # Q-network. Output dim = number of actions (Q(s, a) for each a).
-        self.q_network = FeedForwardNN(observation_space_size, action_space_size, 256)
+        self.q_network = NormalizedFeedForwardNN(observation_space_size, action_space_size, 256)
 
     @property
     def device(self) -> torch.device:
