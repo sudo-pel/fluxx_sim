@@ -148,9 +148,12 @@ class PPO:
 
         # extra hyperparameters
         self.gae_lambda = 0.95
+        self.model_eval_count = 200
 
     def learn(self, total_timesteps):
         self.global_timestep = 0
+        eval_every = total_timesteps // self.model_eval_count
+        evals_performed = 0
 
         # timestep..?
         while self.global_timestep < total_timesteps:
@@ -245,16 +248,18 @@ class PPO:
             self.tracker.record("clip_fraction", np.mean(clip_fractions))
 
             # check wr every batch
-            vs_heuristicagent = self.agent_battler.run_games([self.actor, HeuristicAgentMKII(self.env.game.game_config, 1)], 100, 10000)
-            vs_randomagent = self.agent_battler.run_games([self.actor, RandomAgent(self.env.game.game_config, 1)], 100, 10000)
-            vs_past_version = self.agent_battler.run_games([self.actor, self.opponent_pool.get_oldest()], 100, 10000)
-            self.tracker.record("games_vs_heuristicagentmkii/wins_out_of_100", vs_heuristicagent["player_wins"]["player_0"])
-            self.tracker.record("games_vs_heuristicagentmkii/average_game_length", vs_heuristicagent["average_game_length"])
-            self.tracker.record("games_vs_randomagent/wins_out_of_100", vs_randomagent["player_wins"]["player_0"])
-            self.tracker.record("games_vs_randomagent/average_game_length", vs_randomagent["average_game_length"])
-            self.tracker.record("games_vs_past_version/wins_out_of_100", vs_past_version["player_wins"]["player_0"])
-            self.tracker.record("games_vs_past_version/average_game_length", vs_past_version["average_game_length"])
-            self.tracker.flush(self.global_timestep)
+            if self.global_timestep // eval_every >= evals_performed + 1:
+                evals_performed += 1
+                vs_heuristicagent = self.agent_battler.run_games([self.actor, HeuristicAgentMKII(self.env.game.game_config, 1)], 15, 10000)
+                vs_randomagent = self.agent_battler.run_games([self.actor, RandomAgent(self.env.game.game_config, 1)], 15, 10000)
+                vs_past_version = self.agent_battler.run_games([self.actor, self.opponent_pool.get_oldest()], 15, 10000)
+                self.tracker.record("games_vs_heuristicagentmkii/winrate", vs_heuristicagent["player_wins"]["player_0"]/15)
+                self.tracker.record("games_vs_heuristicagentmkii/average_game_length", vs_heuristicagent["average_game_length"])
+                self.tracker.record("games_vs_randomagent/winrate", vs_randomagent["player_wins"]["player_0"]/15)
+                self.tracker.record("games_vs_randomagent/average_game_length", vs_randomagent["average_game_length"])
+                self.tracker.record("games_vs_past_version/winrate", vs_past_version["player_wins"]["player_0"]/15)
+                self.tracker.record("games_vs_past_version/average_game_length", vs_past_version["average_game_length"])
+                self.tracker.flush(self.global_timestep)
 
             # Add a new enemy to the pool every batch
             self.opponent_pool.add_ppo(self.actor.policy_network)
