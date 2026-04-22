@@ -161,7 +161,7 @@ class DQN:
 
         self.buffer = NStepReplayBuffer(self.buffer_capacity, self.n_step, self.gamma)
 
-        self.run_name = f"dqn_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        self.run_name = f"dqn-normalized_nn_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
         self.tracker = MetricsTracker(f"{self.run_name}", True, 100, {
             "buffer_capacity": self.buffer_capacity,
             "batch_size": self.batch_size,
