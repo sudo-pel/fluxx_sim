@@ -169,11 +169,11 @@ class DQN:
             "games_per_eval": self.games_per_eval,
             "device": str(self.device),
         })
-        self.tracker.register_flat_statistic("games_vs_heuristicagentmkii/wins_out_of_100")
+        self.tracker.register_flat_statistic("games_vs_heuristicagentmkii/winrate")
         self.tracker.register_flat_statistic("games_vs_heuristicagentmkii/average_game_length")
-        self.tracker.register_flat_statistic("games_vs_randomagent/wins_out_of_100")
+        self.tracker.register_flat_statistic("games_vs_randomagent/winrate")
         self.tracker.register_flat_statistic("games_vs_randomagent/average_game_length")
-        self.tracker.register_flat_statistic("games_vs_past_version/wins_out_of_100")
+        self.tracker.register_flat_statistic("games_vs_past_version/winrate")
         self.tracker.register_flat_statistic("games_vs_past_version/average_game_length")
 
         self.agent_battler = AgentBattler(env)
