@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from src.agents.training.PPO import PPO
 from src.env.FluxxEnv import FluxxEnv
