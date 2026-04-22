@@ -25,7 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 # Limit PyTorch CPU threading. For small batches and networks, more threads
 # cause sync overhead that outweighs parallelism. 2–4 is usually optimal on
 # a laptop; tune if you have a lot of cores free.
-torch.set_num_threads(1)
+torch.set_num_threads(4)
 torch.set_num_interop_threads(1)
 
 
