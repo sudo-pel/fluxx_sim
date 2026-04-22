@@ -250,14 +250,14 @@ class PPO:
             # check wr every batch
             if self.global_timestep // eval_every >= evals_performed + 1:
                 evals_performed += 1
-                vs_heuristicagent = self.agent_battler.run_games([self.actor, HeuristicAgentMKII(self.env.game.game_config, 1)], 15, 10000)
-                vs_randomagent = self.agent_battler.run_games([self.actor, RandomAgent(self.env.game.game_config, 1)], 15, 10000)
-                vs_past_version = self.agent_battler.run_games([self.actor, self.opponent_pool.get_oldest()], 15, 10000)
-                self.tracker.record("games_vs_heuristicagentmkii/winrate", vs_heuristicagent["player_wins"]["player_0"]/15)
+                vs_heuristicagent = self.agent_battler.run_games([self.actor, HeuristicAgentMKII(self.env.game.game_config, 1)], 50, 10000)
+                vs_randomagent = self.agent_battler.run_games([self.actor, RandomAgent(self.env.game.game_config, 1)], 50, 10000)
+                vs_past_version = self.agent_battler.run_games([self.actor, self.opponent_pool.get_oldest()], 50, 10000)
+                self.tracker.record("games_vs_heuristicagentmkii/winrate", vs_heuristicagent["player_wins"]["player_0"]/50)
                 self.tracker.record("games_vs_heuristicagentmkii/average_game_length", vs_heuristicagent["average_game_length"])
-                self.tracker.record("games_vs_randomagent/winrate", vs_randomagent["player_wins"]["player_0"]/15)
+                self.tracker.record("games_vs_randomagent/winrate", vs_randomagent["player_wins"]["player_0"]/50)
                 self.tracker.record("games_vs_randomagent/average_game_length", vs_randomagent["average_game_length"])
-                self.tracker.record("games_vs_past_version/winrate", vs_past_version["player_wins"]["player_0"]/15)
+                self.tracker.record("games_vs_past_version/winrate", vs_past_version["player_wins"]["player_0"]/50)
                 self.tracker.record("games_vs_past_version/average_game_length", vs_past_version["average_game_length"])
                 self.tracker.flush(self.global_timestep)
 

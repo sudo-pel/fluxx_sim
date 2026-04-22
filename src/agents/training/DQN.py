@@ -22,11 +22,24 @@ from src.neural_networks.FeedForwardNN import FeedForwardNN
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
+# Limit PyTorch CPU threading. For small batches and networks, more threads
+# cause sync overhead that outweighs parallelism. 2–4 is usually optimal on
+# a laptop; tune if you have a lot of cores free.
+torch.set_num_threads(4)
+torch.set_num_interop_threads(1)
+
 
 def get_default_device() -> torch.device:
     if torch.cuda.is_available():
         return torch.device("cuda")
     return torch.device("cpu")
+
+
+def _freeze_eval(module: torch.nn.Module) -> None:
+    """Put a module in eval mode and disable gradients."""
+    module.eval()
+    for p in module.parameters():
+        p.requires_grad_(False)
 
 
 class DQNOpponentPool:
@@ -45,20 +58,16 @@ class DQNOpponentPool:
         q_net = getattr(agent, "q_network", None)
         if isinstance(q_net, torch.nn.Module):
             q_net.to(self.device)
-            q_net.eval()
-            for p in q_net.parameters():
-                p.requires_grad_(False)
+            _freeze_eval(q_net)
         self.pool.append(agent)
         if len(self.pool) > self.pool_size:
             self.pool.popleft()
 
     def add_dqn(self, q_network: FeedForwardNN):
         new_agent = DQNAgent(self.game_config, self.player_number)
-        cpu_copy = copy.deepcopy(q_network).to("cpu")
-        new_agent.q_network = cpu_copy.to(self.device)
-        new_agent.q_network.eval()
-        for p in new_agent.q_network.parameters():
-            p.requires_grad_(False)
+        # Deepcopy directly on the source device — no wasteful CPU round-trip.
+        new_agent.q_network = copy.deepcopy(q_network).to(self.device)
+        _freeze_eval(new_agent.q_network)
         self.pool.append(new_agent)
         if len(self.pool) > self.pool_size:
             self.pool.popleft()
@@ -128,7 +137,8 @@ class DQN:
         self._init_hyperparameters()
 
         self.device: torch.device = device if device is not None else get_default_device()
-        print(f"DQN using device: {self.device}")
+        print(f"DQN using device: {self.device}", flush=True)
+        print(f"torch threads: {torch.get_num_threads()} / interop: {torch.get_num_interop_threads()}", flush=True)
 
         self.agent_names = agent_names
         self.env = env
@@ -140,9 +150,7 @@ class DQN:
 
         # Target network is a training-time artifact, not part of the agent.
         self.target_network = copy.deepcopy(self.actor.q_network).to(self.device)
-        self.target_network.eval()
-        for p in self.target_network.parameters():
-            p.requires_grad_(False)
+        _freeze_eval(self.target_network)
 
         self.agents = {
             "player_0": self.actor,
@@ -187,14 +195,14 @@ class DQN:
     def _init_hyperparameters(self):
         # replay / learning
         self.buffer_capacity = 200000
-        self.batch_size = 256
+        self.batch_size = 128          # was 256; halves per-update gradient cost on CPU
         self.gamma = 0.99
-        self.n_step = 5
+        self.n_step = 3                # was 5; reduces pending-queue bookkeeping + bias
         self.lr = 1e-4
 
         # target network + update cadence
         self.target_sync_every = 2_000
-        self.learn_every = 4
+        self.learn_every = 8           # was 4; halves number of gradient updates per env step
         self.warmup_steps = 10_000
 
         # exploration
@@ -202,11 +210,12 @@ class DQN:
         self.eps_end = 0.05
         self.eps_decay_steps = 200000
 
-        # evaluation / pool
-        self.games_per_eval = 15
-        self.eval_every_steps = 16000
-        self.pool_push_every_steps = 16000
-        self.run_games_every_steps = 50000
+        # evaluation / pool / logging
+        self.games_per_eval = 50
+        self.log_every_steps = 2_000           # lightweight metric flush (cheap)
+        self.eval_every_steps = 16_000         # retained for compatibility
+        self.pool_push_every_steps = 16_000
+        self.run_games_every_steps = 50_000    # expensive: plays full games vs fixed opponents
 
     def current_epsilon(self) -> float:
         frac = min(1.0, self.global_timestep / self.eps_decay_steps)
@@ -214,12 +223,15 @@ class DQN:
 
     def learn(self, total_timesteps: int):
         self.global_timestep = 0
-        last_eval_step = 0
+        last_log_step = 0
         last_pool_push_step = 0
         last_run_games_step = 0
         episode_game_lengths = []
         recent_losses = []
         recent_q_values = []
+
+        print(f"[start] total_timesteps={total_timesteps} warmup_steps={self.warmup_steps} "
+              f"learn_every={self.learn_every} batch_size={self.batch_size}", flush=True)
 
         while self.global_timestep < total_timesteps:
             current_opponent = self.opponent_pool.sample()
@@ -231,9 +243,12 @@ class DQN:
             recent_losses.extend(ep_loss)
             recent_q_values.extend(ep_q)
 
-            if self.global_timestep - last_eval_step >= self.eval_every_steps:
-                last_eval_step = self.global_timestep
-                self.tracker.record("rollout/average_game_length", float(np.mean(episode_game_lengths)))
+            # Cheap, frequent logging — runs every log_every_steps so we see progress
+            # without waiting for the expensive run_games evaluation.
+            if self.global_timestep - last_log_step >= self.log_every_steps:
+                last_log_step = self.global_timestep
+                if episode_game_lengths:
+                    self.tracker.record("rollout/average_game_length", float(np.mean(episode_game_lengths)))
                 self.tracker.record("rollout/epsilon", self.current_epsilon())
                 if recent_losses:
                     self.tracker.record("q/loss", float(np.mean(recent_losses)))
@@ -246,9 +261,12 @@ class DQN:
                 recent_losses.clear()
                 recent_q_values.clear()
 
+            # Expensive: actually plays full games against fixed opponents.
             if self.global_timestep - last_run_games_step >= self.run_games_every_steps:
                 last_run_games_step = self.global_timestep
+                print(f"[step {self.global_timestep}] running evaluations...", flush=True)
                 self.run_evaluations()
+                print(f"[step {self.global_timestep}] evaluations done", flush=True)
 
             if self.global_timestep - last_pool_push_step >= self.pool_push_every_steps:
                 last_pool_push_step = self.global_timestep
@@ -257,6 +275,11 @@ class DQN:
             if self.global_timestep // 500_000 >= self.model_checkpoints_taken + 1:
                 self.model_checkpoints_taken += 1
                 self.save_current_model(f"model_{self.global_timestep}")
+
+            # Heartbeat so we always know training is alive.
+            if self.games_played % 10 == 0:
+                print(f"[step {self.global_timestep}] games={self.games_played} "
+                      f"buffer={len(self.buffer)} eps={self.current_epsilon():.3f}", flush=True)
 
         self.run_evaluations(final=True)
         self.save_current_model("final_model")
@@ -314,8 +337,10 @@ class DQN:
                     self.env.step(None)
                     continue
 
-                # Select next action.
-                action, q_val, obs_dict = self.actor.act(observation, epsilon=self.current_epsilon())
+                # Select next action. inference_mode skips autograd bookkeeping;
+                # stricter (and faster) than no_grad for pure-inference calls.
+                with torch.inference_mode():
+                    action, q_val, obs_dict = self.actor.act(observation, epsilon=self.current_epsilon())
                 ep_q_values.append(float(q_val.item()) if hasattr(q_val, "item") else float(q_val))
 
                 pending = (
@@ -338,11 +363,13 @@ class DQN:
                 self.env.step(self.env.decode_action(action))
 
             else:
-                # Opponent turn — play, don't learn.
+                # Opponent turn — play, don't learn. Wrap in inference_mode to skip
+                # autograd overhead on every opponent action.
                 if done:
                     self.env.step(None)
                     continue
-                action, _unused, _obs = current_opponent_act(self.agents[agent_id], observation)
+                with torch.inference_mode():
+                    action, _unused, _obs = current_opponent_act(self.agents[agent_id], observation)
                 self.env.step(self.env.decode_action(action))
 
         return episode_return, self.env.game.turn_count, ep_losses, ep_q_values
@@ -378,7 +405,7 @@ class DQN:
         path = f"{PROJECT_ROOT}/experiments/{self.run_name}/models/{filename}.pt"
         state_dict = {k: v.detach().cpu() for k, v in self.actor.q_network.state_dict().items()}
         torch.save(state_dict, path)
-        print(f"Model saved to {path}")
+        print(f"Model saved to {path}", flush=True)
 
 
 def current_opponent_act(agent, observation):
