@@ -107,11 +107,6 @@ class Game(GameSchema):
         The same as check_current_phase, but pops from the phase stack
         """
 
-        self.game_history.append(GamePhaseHistory(
-            copy.deepcopy(self.stack),
-            copy.deepcopy(self.get_game_state())
-        ))
-
         self.assert_nonempty_stack()
         return self.stack.pop()
 
