@@ -203,9 +203,10 @@ class DQN:
         self.eps_decay_steps = 200000
 
         # evaluation / pool
-        self.games_per_eval = 20
-        self.eval_every_steps = 100000
+        self.games_per_eval = 15
+        self.eval_every_steps = 16000
         self.pool_push_every_steps = 16000
+        self.run_games_every_steps = 50000
 
     def current_epsilon(self) -> float:
         frac = min(1.0, self.global_timestep / self.eps_decay_steps)
@@ -215,6 +216,7 @@ class DQN:
         self.global_timestep = 0
         last_eval_step = 0
         last_pool_push_step = 0
+        last_run_games_step = 0
         episode_game_lengths = []
         recent_losses = []
         recent_q_values = []
@@ -229,7 +231,6 @@ class DQN:
             recent_losses.extend(ep_loss)
             recent_q_values.extend(ep_q)
 
-            # Periodic logging — mirrors PPO's per-batch tracker.flush cadence.
             if self.global_timestep - last_eval_step >= self.eval_every_steps:
                 last_eval_step = self.global_timestep
                 self.tracker.record("rollout/average_game_length", float(np.mean(episode_game_lengths)))
@@ -241,10 +242,13 @@ class DQN:
                 self.tracker.record("buffer/size", len(self.buffer))
                 self.tracker.flush(self.global_timestep)
 
-                self.run_evaluations()
                 episode_game_lengths.clear()
                 recent_losses.clear()
                 recent_q_values.clear()
+
+            if self.global_timestep - last_run_games_step >= self.run_games_every_steps:
+                last_run_games_step = self.global_timestep
+                self.run_evaluations()
 
             if self.global_timestep - last_pool_push_step >= self.pool_push_every_steps:
                 last_pool_push_step = self.global_timestep
@@ -254,8 +258,8 @@ class DQN:
                 self.model_checkpoints_taken += 1
                 self.save_current_model(f"model_{self.global_timestep}")
 
-        self.save_current_model("final_model")
         self.run_evaluations(final=True)
+        self.save_current_model("final_model")
 
     def run_evaluations(self, final: bool = False):
         vs_heuristicagent = self.agent_battler.run_games(
