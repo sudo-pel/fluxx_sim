@@ -194,7 +194,7 @@ class DQN:
 
     def _init_hyperparameters(self):
         # replay / learning
-        self.buffer_capacity = 200000
+        self.buffer_capacity = 50000
         self.batch_size = 128          # was 256; halves per-update gradient cost on CPU
         self.gamma = 0.99
         self.n_step = 3                # was 5; reduces pending-queue bookkeeping + bias

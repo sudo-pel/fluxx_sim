@@ -17,5 +17,4 @@ two_turn_win_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_m
 env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
 
 model = DQN(env, ["player_0", "player_1"])
-model.learn(500_000)
-#model.learn(10_000_000)
+model.learn(10000000)
