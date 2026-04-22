@@ -34,7 +34,7 @@ class DQNAgent(Agent):
         self.action_space_size = action_space_size
 
         # Q-network. Output dim = number of actions (Q(s, a) for each a).
-        self.q_network = FeedForwardNN(observation_space_size, action_space_size)
+        self.q_network = FeedForwardNN(observation_space_size, action_space_size, 256)
 
     @property
     def device(self) -> torch.device:

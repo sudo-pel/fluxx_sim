@@ -1,4 +1,5 @@
 import os
+import copy
 from collections import deque
 from datetime import datetime
 from pathlib import Path
@@ -59,9 +60,7 @@ class OpponentPool:
             self.pool.popleft()
 
     def add_ppo(self, policy_network: FeedForwardNN):
-        import copy
         new_agent = PPOAgent(self.game_config, self.player_number)
-        # Deep copy on CPU is cheap and safe; then move to device.
         cpu_copy = copy.deepcopy(policy_network).to("cpu")
         new_agent.policy_network = cpu_copy.to(self.device)
         new_agent.policy_network.eval()

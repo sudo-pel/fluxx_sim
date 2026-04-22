@@ -25,7 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 # Limit PyTorch CPU threading. For small batches and networks, more threads
 # cause sync overhead that outweighs parallelism. 2–4 is usually optimal on
 # a laptop; tune if you have a lot of cores free.
-torch.set_num_threads(4)
+torch.set_num_threads(1)
 torch.set_num_interop_threads(1)
 
 
@@ -65,8 +65,8 @@ class DQNOpponentPool:
 
     def add_dqn(self, q_network: FeedForwardNN):
         new_agent = DQNAgent(self.game_config, self.player_number)
-        # Deepcopy directly on the source device — no wasteful CPU round-trip.
-        new_agent.q_network = copy.deepcopy(q_network).to(self.device)
+        new_agent.q_network = copy.deepcopy(q_network).to("cpu")
+        new_agent.q_network.to(self.device)
         _freeze_eval(new_agent.q_network)
         self.pool.append(new_agent)
         if len(self.pool) > self.pool_size:
@@ -216,6 +216,7 @@ class DQN:
         self.eval_every_steps = 16_000         # retained for compatibility
         self.pool_push_every_steps = 16_000
         self.run_games_every_steps = 50_000    # expensive: plays full games vs fixed opponents
+        self.max_timesteps_per_episode = 1600
 
     def current_epsilon(self) -> float:
         frac = min(1.0, self.global_timestep / self.eps_decay_steps)
@@ -316,11 +317,16 @@ class DQN:
         ep_steps = 0
 
         for agent_id in self.env.agent_iter():
+            if ep_steps > self.max_timesteps_per_episode:
+                break
+
             observation, reward, termination, truncation, info = self.env.last()
             done = termination or truncation
 
             if agent_id == "player_0":
                 accumulated_reward += reward
+                self.global_timestep += 1
+                ep_steps += 1
 
                 # Close out the previous trainee transition if one is pending.
                 if pending is not None:
@@ -348,8 +354,6 @@ class DQN:
                     int(action),
                     np.asarray(obs_dict["action_mask"], dtype=bool),
                 )
-                self.global_timestep += 1
-                ep_steps += 1
 
                 # Gradient step.
                 if len(self.buffer) >= self.warmup_steps and self.global_timestep % self.learn_every == 0:
@@ -410,7 +414,7 @@ class DQN:
 
 def current_opponent_act(agent, observation):
     try:
-        return agent.act(observation, epsilon=0.0)
+        return agent.act(observation, epsilon=0.05)
     except TypeError:
         out = agent.act(observation)
         # Normalize to (action, None, obs) shape.
