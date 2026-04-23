@@ -23,7 +23,7 @@ from src.neural_networks.FeedForwardNN import FeedForwardNN
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
-torch.set_num_threads(4)
+torch.set_num_threads(1)
 torch.set_num_interop_threads(1)
 
 
