@@ -253,6 +253,8 @@ class PPO:
 
             self.tracker.record("kl_divergence", np.mean(kl_divergences))
             self.tracker.record("clip_fraction", np.mean(clip_fractions))
+            self.tracker.record("actor/loss", np.mean(actor_losses))
+            self.tracker.record("critic/loss", np.mean(critic_losses))
 
             # check wr every batch
             if self.global_timestep // eval_every >= evals_performed + 1:
