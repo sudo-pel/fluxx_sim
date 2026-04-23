@@ -10,6 +10,7 @@ from torch.optim import Adam
 import numpy as np
 
 from src.agents.Agent import Agent
+from src.agents.training.TrainingEnums import LearningCheckpoint
 from src.neural_networks.FeedForwardNN import FeedForwardNN
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgent import PPOAgent
