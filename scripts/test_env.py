@@ -1,5 +1,6 @@
 import torch
 
+from src.agents.DQNAgent import DQNAgent
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgent import PPOAgent
 from src.agents.RandomAgent import RandomAgent
@@ -20,9 +21,9 @@ def main(one_turn_win_simple_fluxx=None):
 
     env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
 
-    actor = PPOAgent(env.game.game_config, 1)  # same architecture
-    actor.policy_network.load_state_dict(torch.load("../experiments/ppo_20-04-2026_10:40:57/models/final/actor.pt"))
-    actor.policy_network.eval()
+    actor = DQNAgent(env.game.game_config, 1)  # same architecture
+    actor.q_network.load_state_dict(torch.load("../from_remote/dqn-normalized_nn_2026-04-23_02-45-56_final.pt"))
+    actor.q_network.eval()
 
     agents = {
         "player_0": RandomAgent(env.game.game_config, 0),

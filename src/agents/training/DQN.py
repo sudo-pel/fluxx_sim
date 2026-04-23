@@ -1,5 +1,6 @@
 import copy
 import os
+import random
 from collections import deque
 from datetime import datetime
 from pathlib import Path
@@ -157,7 +158,7 @@ class DQN:
 
         self.buffer = NStepReplayBuffer(self.buffer_capacity, self.n_step, self.gamma)
 
-        self.run_name = f"dqn-normalized_nn_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        self.run_name = f"dqn-heuristic_mkii_in_pool_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
         self.tracker = MetricsTracker(f"{self.run_name}", True, 100, {
             "buffer_capacity": self.buffer_capacity,
             "batch_size": self.batch_size,
@@ -232,6 +233,10 @@ class DQN:
 
         while self.global_timestep < total_timesteps:
             current_opponent = self.opponent_pool.sample()
+            if self.global_timestep < 2_000_000:
+                roll = random.randint(0,3)
+                if roll == 3:
+                    current_opponent = HeuristicAgentMKII(self.env.game.game_config, 1)
             self.agents["player_1"] = current_opponent
 
             episode_return, ep_len, ep_loss, ep_q = self.play_one_episode()
