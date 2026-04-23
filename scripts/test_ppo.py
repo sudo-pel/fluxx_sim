@@ -1,4 +1,7 @@
 import faulthandler, signal
+
+from src.agents.training.TrainingEnums import LearningCheckpoint
+
 faulthandler.enable()
 faulthandler.register(signal.SIGUSR1)
 faulthandler.dump_traceback_later(600, repeat=True, exit=False)
@@ -19,6 +22,12 @@ two_turn_win_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_m
 
 env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
 
-model = PPO(env, ["player_0", "player_1"])
+job_checkpoint = LearningCheckpoint(
+    6001181,
+    "ppo_2026-04-22_20-16-08",
+    13
+)
+
+model = PPO(env, ["player_0", "player_1"], from_checkpoint=job_checkpoint)
 
 model.learn(10000000)
