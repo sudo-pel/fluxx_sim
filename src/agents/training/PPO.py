@@ -138,7 +138,7 @@ class PPO:
             self.model_checkpoints_taken = from_checkpoint.model_checkpoints_taken
             state_dict = torch.load(f"{PROJECT_ROOT}/experiments/{self.run_name}/models/model_{self.global_timestep}.pt", map_location="cpu", weights_only=True)
             self.actor.policy_network.load_state_dict(state_dict)
-            print(f"Loaded model from checkpoint {from_checkpoint.checkpoint_path}")
+            print(f"Loaded model from checkpoint {self.run_name}")
         else:
             os.makedirs(f"{PROJECT_ROOT}/experiments/{self.run_name}/models")
 
