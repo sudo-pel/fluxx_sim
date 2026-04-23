@@ -288,9 +288,12 @@ class PPO:
 
     def save_current_model(self, filename):
         path = f"{PROJECT_ROOT}/experiments/{self.run_name}/models/{filename}.pt"
+        critic_path = f"{PROJECT_ROOT}/experiments/{self.run_name}/models/{filename}_critic.pt"
         # Save a CPU copy of the state_dict so checkpoints are portable across devices.
         state_dict = {k: v.detach().cpu() for k, v in self.actor.policy_network.state_dict().items()}
+        critic_state_dict = {k: v.detach().cpu() for k, v in self.critic.policy_network.state_dict().items()}
         torch.save(state_dict, path)
+        torch.save(critic_state_dict, critic_path)
         print(f"Model saved to {path}")
 
     def evaluate(self, batch_obs, batch_acts, batch_action_masks):
