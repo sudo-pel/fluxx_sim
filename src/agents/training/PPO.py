@@ -145,7 +145,7 @@ class PPO:
 
     def _init_hyperparameters(self):
         # base hyperparameters
-        self.max_timesteps_per_episode = 1600
+        self.max_timesteps_per_episode = 3200
         self.games_per_batch = 128
         self.gamma = 0.99
         self.epoch_count = 4
@@ -331,13 +331,14 @@ class PPO:
             for agent in self.env.agent_iter():
                 # Ideally only complete games, but terminate games early in case some pathological loop occurs
                 if current_timestep > self.max_timesteps_per_episode:
+                    print(f"[rollout] truncating game: timestep {current_timestep}, "f"game_turn={self.env.game.turn_count}, last_agent={agent}")
                     break
 
                 observation, reward, termination, truncation, info = self.env.last()
+                current_timestep += 1
 
                 if agent == "player_0":
                     # only the timesteps of the agent being trained matter
-                    current_timestep += 1
                     self.global_timestep += 1
 
                     # .last() gets rewards from the previous action, whose entry in ep_rewards will have been appended in the previous iteration of the loop (see below)

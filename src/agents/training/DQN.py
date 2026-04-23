@@ -212,7 +212,7 @@ class DQN:
         self.eval_every_steps = 16_000         # retained for compatibility
         self.pool_push_every_steps = 16_000
         self.run_games_every_steps = 50_000    # expensive: plays full games vs fixed opponents
-        self.max_timesteps_per_episode = 1600
+        self.max_steps_per_episode = 3200
 
     def current_epsilon(self) -> float:
         frac = min(1.0, self.global_timestep / self.eps_decay_steps)
@@ -313,8 +313,10 @@ class DQN:
         ep_steps = 0
 
         for agent_id in self.env.agent_iter():
-            if ep_steps > self.max_timesteps_per_episode:
+            if ep_steps > self.max_steps_per_episode:
+                print(f"[rollout] truncating game: timestep {ep_steps}, "f"game_turn={self.env.game.turn_count}, last_agent={agent_id}")
                 break
+            ep_steps += 1
 
             observation, reward, termination, truncation, info = self.env.last()
             done = termination or truncation
@@ -322,7 +324,6 @@ class DQN:
             if agent_id == "player_0":
                 accumulated_reward += reward
                 self.global_timestep += 1
-                ep_steps += 1
 
                 # Close out the previous trainee transition if one is pending.
                 if pending is not None:
