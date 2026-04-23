@@ -79,7 +79,7 @@ class OpponentPool:
 
 
 class PPO:
-    def __init__(self, env, agent_names: list[str], device: torch.device = None):
+    def __init__(self, env, agent_names: list[str], device: torch.device = None, from_checkpoint: LearningCheckpoint = None):
         super().__init__()
         self._init_hyperparameters()
 
@@ -131,7 +131,15 @@ class PPO:
         self.model_checkpoints_taken = 0
 
         # save_current_model needs the file to already exist
-        os.makedirs(f"{PROJECT_ROOT}/experiments/{self.run_name}/models")
+        if from_checkpoint is not None:
+            self.run_name = from_checkpoint.run_name
+            self.global_timestep = from_checkpoint.global_timestep
+            self.model_checkpoints_taken = from_checkpoint.model_checkpoints_taken
+            state_dict = torch.load(f"{PROJECT_ROOT}/experiments{self.run_name}/models/model_{self.global_timestep}", map_location="cpu", weights_only=True)
+            self.actor.policy_network.load_state_dict(state_dict)
+            print(f"Loaded model from checkpoint {from_checkpoint.checkpoint_path}")
+        else:
+            os.makedirs(f"{PROJECT_ROOT}/experiments/{self.run_name}/models")
 
 
     def _init_hyperparameters(self):
