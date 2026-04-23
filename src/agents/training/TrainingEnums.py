@@ -4,4 +4,4 @@ from dataclasses import dataclass
 class LearningCheckpoint:
     global_timestep: int
     run_name: str
-    checkpoints_taken: int
+    model_checkpoints_taken: int
