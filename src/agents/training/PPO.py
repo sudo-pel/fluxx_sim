@@ -158,7 +158,6 @@ class PPO:
         self.model_eval_count = 200
 
     def learn(self, total_timesteps):
-        self.global_timestep = 0
         eval_every = total_timesteps // self.model_eval_count
         evals_performed = 0
 
