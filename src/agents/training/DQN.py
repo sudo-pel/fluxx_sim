@@ -386,9 +386,15 @@ class DQN:
 
         with torch.no_grad():
             next_q_online = self.actor.q_network(s2).masked_fill(~m2, float("-inf"))
-            next_actions  = next_q_online.argmax(dim=-1, keepdim=True)
+            next_actions = next_q_online.argmax(dim=-1, keepdim=True)
             next_q_target = self.target_network(s2).masked_fill(~m2, float("-inf"))
             next_q = next_q_target.gather(1, next_actions).squeeze(-1)
+
+            next_q = torch.where(
+                done.bool() | torch.isinf(next_q),
+                torch.zeros_like(next_q),
+                next_q,
+            )
             td_target = R + (1.0 - done) * g * next_q
 
         q_sa = self.actor.q_network(s).gather(1, a.unsqueeze(-1)).squeeze(-1)
