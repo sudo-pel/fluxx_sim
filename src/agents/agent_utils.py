@@ -31,7 +31,7 @@ def convert_decision_encoding(decision_encoding: list[DecisionEncodingType], dec
 
     return decision_context_vector
 
-def observe(agent, game_state: GameState, game_config: GameConfig):
+def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):
     current_phase = game_state.stack[-1]
 
     # ----

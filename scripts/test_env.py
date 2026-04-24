@@ -36,7 +36,7 @@ def main(one_turn_win_simple_fluxx=None):
 
     agents = {
         "player_0": actor,
-        "player_1": HeuristicAgentMKI(env.game.game_config, 1)
+        "player_1": HeuristicAgentMKII(env.game.game_config, 1)
     }
 
     victories = {

@@ -5,7 +5,7 @@ faulthandler.dump_traceback_later(600, repeat=True, exit=False)
 
 import os
 
-from src.agents.training.DQN import DQN
+from src.training.dqn.dqn import DQN
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 

@@ -1,7 +1,5 @@
 import faulthandler, signal
 
-from src.agents.training.TrainingEnums import LearningCheckpoint
-
 faulthandler.enable()
 faulthandler.register(signal.SIGUSR1)
 faulthandler.dump_traceback_later(600, repeat=True, exit=False)
@@ -9,7 +7,7 @@ faulthandler.dump_traceback_later(600, repeat=True, exit=False)
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
-from src.agents.training.PPO import PPO
+from src.training.ppo.ppo import PPO
 from src.env.FluxxEnv import FluxxEnv
 from src.game.cards import card_lists
 from src.game.Game import Game

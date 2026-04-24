@@ -2,7 +2,7 @@ import torch
 
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgent import PPOAgent
-from src.agents.training.TrainingEnums import GameLogConfig
+from src.training.TrainingEnums import GameLogConfig
 from src.env.AgentBattler import AgentBattler
 from src.env.FluxxEnv import FluxxEnv
 from src.game.Game import Game

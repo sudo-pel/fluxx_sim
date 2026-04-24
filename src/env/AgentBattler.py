@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 from src.agents.Agent import Agent
-from src.agents.training.TrainingEnums import GameLogConfig
+from src.training.TrainingEnums import GameLogConfig
 from src.env.FluxxEnv import FluxxEnv
 from src.env.Logger import GameLogLogger
 

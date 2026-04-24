@@ -82,4 +82,4 @@ class DQNAgent(Agent):
             dummy_mask = np.zeros(self.action_space.n, dtype=np.int8)
             return {"observation": dummy_obs, "action_mask": dummy_mask}
         else:
-            return agent_utils.observe(self, state, self.game_config)
+            return agent_utils.observe_hot_encoded(self, state, self.game_config)
