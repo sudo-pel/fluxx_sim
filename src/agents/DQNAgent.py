@@ -4,7 +4,7 @@ import numpy as np
 
 from src.agents import agent_utils
 from src.agents.Agent import Agent
-from src.neural_networks.NormalizedFeedForwardNN import NormalizedFeedForwardNN
+from src.neural_networks.DuelingFeedForwardNN import DuelingFeedForwardNN
 from src.neural_networks.FeedForwardNN import FeedForwardNN
 from src.game.FluxxEnums import GameState
 

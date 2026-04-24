@@ -4,23 +4,17 @@ col_size = 30
 
 def printout_state(player_number, game_state):
     """Print out the game state"""
-
-    goals = [g.name for g in game_state["goals"]]
-
-    rules = [r.name for r in game_state["rules"]]
-    player_keepers = [[k.name for k in player.keepers] for player in game_state["players"]]
-    hand = [f"({i}) - {c.name}" for i, c in enumerate(game_state["players"][player_number].hand)]
+    hand = [f"({i}) - {c}" for i, c in enumerate(game_state.hands[player_number])]
 
     enemy_keepers = []
-    for i, player in enumerate(game_state["players"]):
+    for i, keepers in enumerate(game_state.keepers):
         if i == player_number:
             continue
         enemy_keepers.append(f" ***PLAYER {i} KEEPERS***")
-        for keeper in player.keepers:
-            enemy_keepers.append(keeper.name)
+        for keeper in keepers:
+            enemy_keepers.append(keeper)
 
     output_string: list[str] = []
-
     output_string.append("-" * ui_size)
     output_string.append("|" + " " * (ui_size - 2) + "|")
 
@@ -46,11 +40,9 @@ def printout_state(player_number, game_state):
             row_to_append_to = output_string[i]
             output_string[i] = row_to_append_to + (" " * max_row_size + "|")
 
-    add_to_row(0, [" ***HAND***"] + hand + ["", " ***KEEPERS***"] + player_keepers[player_number])
+    add_to_row(0, [" ***HAND***"] + hand + ["", " ***KEEPERS***"] + game_state.keepers[player_number])
     add_to_row(1, enemy_keepers)
-    add_to_row(2, [" ***GOAL***"] + goals + ["", " ***RULES***"] + rules)
+    add_to_row(2, [" ***GOAL***"] + game_state.goals + ["", " ***rules***"] + game_state.rules)
 
     output_string.append("-" * ui_size)
-
-    for row in output_string:
-        print(row)
+    return output_string

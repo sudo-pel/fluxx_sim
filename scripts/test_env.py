@@ -1,6 +1,7 @@
 import torch
 
 from src.agents.DQNAgent import DQNAgent
+from src.agents.HeuristicAgentMKI import HeuristicAgentMKI
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgent import PPOAgent
 from src.agents.RandomAgent import RandomAgent
@@ -8,6 +9,10 @@ from src.env.FluxxEnv import FluxxEnv
 from src.game.cards import card_lists
 from src.game.Game import Game
 from src.game.game_states import two_player_p0_one_turn_win, two_player_p0_two_turn_win
+
+
+class PPOAgenr:
+    pass
 
 
 def main(one_turn_win_simple_fluxx=None):
@@ -21,13 +26,17 @@ def main(one_turn_win_simple_fluxx=None):
 
     env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
 
-    actor = DQNAgent(env.game.game_config, 1)  # same architecture
-    actor.q_network.load_state_dict(torch.load("../from_remote/dqn-normalized_nn_2026-04-23_02-45-56_final.pt"))
-    actor.q_network.eval()
+    actor = PPOAgent(env.game.game_config, 0)  # same architecture
+    actor.policy_network.load_state_dict(torch.load("../from_remote/ppo_2026-04-23_12-33-19_final.pt"))
+    actor.policy_network.eval()
+
+    actor2 = DQNAgent(env.game.game_config, 1)
+    actor2.q_network.load_state_dict(torch.load("../from_remote/dqn-normalized_nn_2026-04-23_02-45-56_final.pt"))
+    actor2.q_network.eval()
 
     agents = {
-        "player_0": RandomAgent(env.game.game_config, 0),
-        "player_1": actor
+        "player_0": actor,
+        "player_1": HeuristicAgentMKI(env.game.game_config, 1)
     }
 
     victories = {
@@ -45,11 +54,14 @@ def main(one_turn_win_simple_fluxx=None):
             "draws": 0
         }
 
-        for i in range(GAME_COUNT):
+        for j in range(GAME_COUNT):
             env.reset()
-
             for agent in env.agent_iter():
                 observation, reward, termination, truncation, info = env.last()
+
+                if env.game.turn_count > 10000:
+                    print(f"turn limit reached for game {i*2000+j}")
+                    break
 
                 if termination or truncation:
                     action = None

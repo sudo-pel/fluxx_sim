@@ -18,7 +18,7 @@ from src.agents.RandomAgent import RandomAgent
 from src.env.AgentBattler import AgentBattler
 from src.env.MetricsTracker import MetricsTracker
 from src.game.FluxxEnums import GameConfig
-from src.neural_networks.FeedForwardNN import FeedForwardNN
+from src.neural_networks.DuelingFeedForwardNN import DuelingFeedForwardNN
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -60,7 +60,7 @@ class DQNOpponentPool:
         if len(self.pool) > self.pool_size:
             self.pool.popleft()
 
-    def add_dqn(self, q_network: FeedForwardNN):
+    def add_dqn(self, q_network: DuelingFeedForwardNN):
         new_agent = DQNAgent(self.game_config, self.player_number)
         new_agent.q_network = copy.deepcopy(q_network).to("cpu")
         new_agent.q_network.to(self.device)
@@ -87,11 +87,11 @@ class NStepReplayBuffer:
 
     def _flush(self, trans_queue, final_s, final_mask, done):
         R, g = 0.0, 1.0
-        for (_, _, r, _, _) in trans_queue:
+        for (_, _, _, r, _, _) in trans_queue:
             R += g * r
             g *= self.gamma
-        s0, a0, _, _, _ = trans_queue[0]
-        self._add((s0, a0, R, final_s, final_mask, done, g))
+        s0, m0, a0, _, _, _ = trans_queue[0]
+        self._add((s0, m0, a0, R, final_s, final_mask, done, g))
 
     def _add(self, item):
         if len(self.buf) < self.capacity:
@@ -100,8 +100,8 @@ class NStepReplayBuffer:
             self.buf[self.pos] = item
             self.pos = (self.pos + 1) % self.capacity
 
-    def push(self, s, a, r, s_next, mask_next, done):
-        self.pending.append((s, a, r, s_next, done))
+    def push(self, s, mask, a, r, s_next, mask_next, done):
+        self.pending.append((s, mask, a, r, s_next, done))
         if len(self.pending) >= self.n_step:
             self._flush(list(self.pending), s_next, mask_next, done)
             self.pending.popleft()
@@ -113,9 +113,10 @@ class NStepReplayBuffer:
     def sample(self, batch_size):
         idx = np.random.randint(0, len(self.buf), size=batch_size)
         batch = [self.buf[i] for i in idx]
-        s, a, R, s2, m2, done, g = zip(*batch)
+        s, m, a, R, s2, m2, done, g = zip(*batch)
         return (
             np.stack(s).astype(np.float32),
+            np.stack(m).astype(bool),
             np.array(a, dtype=np.int64),
             np.array(R, dtype=np.float32),
             np.stack(s2).astype(np.float32),
@@ -158,7 +159,7 @@ class DQN:
 
         self.buffer = NStepReplayBuffer(self.buffer_capacity, self.n_step, self.gamma)
 
-        self.run_name = f"dqn-heuristic_mkii_in_pool_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        self.run_name = f"dqn-dueling_nn_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
         self.tracker = MetricsTracker(f"{self.run_name}", True, 100, {
             "buffer_capacity": self.buffer_capacity,
             "batch_size": self.batch_size,
@@ -205,7 +206,8 @@ class DQN:
         # exploration
         self.eps_start = 1.0
         self.eps_end = 0.05
-        self.eps_decay_steps = 200000
+        self.eps_decay_steps = 1500000
+        self.eps_decay_delay = self.warmup_steps
 
         # evaluation / pool / logging
         self.games_per_eval = 50
@@ -216,7 +218,8 @@ class DQN:
         self.max_steps_per_episode = 3200
 
     def current_epsilon(self) -> float:
-        frac = min(1.0, self.global_timestep / self.eps_decay_steps)
+        steps_into_decay = max(0, self.global_timestep - self.eps_decay_delay)
+        frac = min(1.0, steps_into_decay / self.eps_decay_steps)
         return self.eps_start + frac * (self.eps_end - self.eps_start)
 
     def learn(self, total_timesteps: int):
@@ -335,8 +338,12 @@ class DQN:
                     encoded = self.actor.encode(observation)
                     s_next = np.asarray(encoded["observation"], dtype=np.float32)
                     m_next = np.asarray(encoded["action_mask"], dtype=bool)
-                    s_prev, a_prev, _m_prev = pending
-                    self.buffer.push(s_prev, a_prev, accumulated_reward, s_next, m_next, done)
+                    s_prev, m_prev, a_prev = pending
+                    self.buffer.push(
+                        s_prev, m_prev, a_prev,
+                        accumulated_reward,
+                        s_next, m_next, done,
+                    )
                     episode_return += accumulated_reward
                     accumulated_reward = 0.0
                     pending = None
@@ -345,16 +352,15 @@ class DQN:
                     self.env.step(None)
                     continue
 
-                # Select next action. inference_mode skips autograd bookkeeping;
-                # stricter (and faster) than no_grad for pure-inference calls.
+                # Select next action.
                 with torch.inference_mode():
                     action, q_val, obs_dict = self.actor.act(observation, epsilon=self.current_epsilon())
                 ep_q_values.append(float(q_val.item()) if hasattr(q_val, "item") else float(q_val))
 
                 pending = (
                     np.asarray(obs_dict["observation"], dtype=np.float32),
-                    int(action),
                     np.asarray(obs_dict["action_mask"], dtype=bool),
+                    int(action),
                 )
 
                 # Gradient step.
@@ -381,19 +387,21 @@ class DQN:
         return episode_return, self.env.game.turn_count, ep_losses, ep_q_values
 
     def q_update(self):
-        s, a, R, s2, m2, done, g = self.buffer.sample(self.batch_size)
-        s  = torch.from_numpy(s).to(self.device)
+        s, m, a, R, s2, m2, done, g = self.buffer.sample(self.batch_size)
+        s = torch.from_numpy(s).to(self.device)
+        m = torch.from_numpy(m).to(self.device)
         s2 = torch.from_numpy(s2).to(self.device)
         m2 = torch.from_numpy(m2).to(self.device)
-        a  = torch.from_numpy(a).to(self.device)
-        R  = torch.from_numpy(R).to(self.device)
+        a = torch.from_numpy(a).to(self.device)
+        R = torch.from_numpy(R).to(self.device)
         done = torch.from_numpy(done).to(self.device)
-        g  = torch.from_numpy(g).to(self.device)
+        g = torch.from_numpy(g).to(self.device)
 
         with torch.no_grad():
-            next_q_online = self.actor.q_network(s2).masked_fill(~m2, float("-inf"))
+            next_q_online = self.actor.q_network(s2, action_mask=m2).masked_fill(~m2, float("-inf"))
             next_actions = next_q_online.argmax(dim=-1, keepdim=True)
-            next_q_target = self.target_network(s2).masked_fill(~m2, float("-inf"))
+
+            next_q_target = self.target_network(s2, action_mask=m2).masked_fill(~m2, float("-inf"))
             next_q = next_q_target.gather(1, next_actions).squeeze(-1)
 
             next_q = torch.where(
@@ -403,7 +411,7 @@ class DQN:
             )
             td_target = R + (1.0 - done) * g * next_q
 
-        q_sa = self.actor.q_network(s).gather(1, a.unsqueeze(-1)).squeeze(-1)
+        q_sa = self.actor.q_network(s, action_mask=m).gather(1, a.unsqueeze(-1)).squeeze(-1)
         loss = F.smooth_l1_loss(q_sa, td_target)
 
         self.q_optim.zero_grad()

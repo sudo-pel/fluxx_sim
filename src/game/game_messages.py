@@ -21,7 +21,7 @@ class GameMessageType(Enum):
     NOTIFICATION = 1,
     DRAWN_CARD = 2,
     TURN_START = 3,
-    GAME_OVER = 4
+    GAME_OVER = 4,
 
 def special_effect(message: str):
     print(f"{bcolors.YELLOW_TEXT}{message}{bcolors.ENDC}")

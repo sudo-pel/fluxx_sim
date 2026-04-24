@@ -225,7 +225,7 @@ class HeuristicAgentMKII(Agent):
                 card_ranked = True
             elif card_type(card) == "GOAL":
                 # under no circumstances play a goal card that will instantly win your opponent the game
-                if card in card_to_opponent_gameplan and opponent_gameplan.missing_cards == {card}:
+                if card in card_to_opponent_gameplan and (opponent_gameplan.missing_cards == {card} or len(opponent_gameplan.missing_cards) == 0):
                     priorities[-100].add(card)
                     card_ranked = True
                 # avoid playing goals for which your opponent has a keeper(s) (and where the other required cards aren't in discard)

@@ -7,7 +7,7 @@ import os
 
 from src.agents.training.DQN import DQN
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from src.env.FluxxEnv import FluxxEnv
 from src.game.cards import card_lists

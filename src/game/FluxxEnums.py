@@ -78,6 +78,8 @@ class GameState:
     """
     Note that the order of the lists is important.
     """
+    turn_count: int
+    player_count: int
     hands: list[list[str]]
     keepers: list[list[str]]
     goals: list[str]

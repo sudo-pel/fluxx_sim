@@ -1,6 +1,7 @@
 import abc, random
 from typing import Optional
 
+from src.env.Logger import Logger
 from src.game.cards.Card import Card, Rule, Goal, make_card
 from src.game.FluxxEnums import GamePhase, GameState, GamePhaseHistory, GameConfig
 
@@ -8,7 +9,7 @@ from src.game.Player import Player
 
 
 class GameSchema(metaclass=abc.ABCMeta):
-    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool, force_game_state: Optional[GameState]):
+    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool, force_game_state: Optional[GameState], logger: Optional[Logger] = None):
         self.card_list = card_list # static, not shuffled
         self.player_count: int = player_count
         self.players: list[Player] = [Player(i) for i in range(player_count)]
@@ -31,6 +32,7 @@ class GameSchema(metaclass=abc.ABCMeta):
             player_count,
             card_list
         )
+        self.logger = logger
 
         # TODO: strongly consider removing (exists for debugging purposes)
         self.game_history: list[GamePhaseHistory] = []

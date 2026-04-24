@@ -1,9 +1,9 @@
-# begin with implementing a two-player game.
 import copy
 import random
 from typing import Optional
 from collections import Counter
 
+from src.env.Logger import Logger
 from src.game.cards.Card import Card, Rule, Goal, Keeper, Action
 from src.game.FluxxEnums import CardType, GamePhase, GamePhaseType, GameState, CardZone, GamePhaseHistory
 
@@ -19,12 +19,14 @@ from src.game.utils.general_utils import index_of_card
 
 
 class Game(GameSchema):
-    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool = False, force_game_state: Optional[GameState] = None):
-        GameSchema.__init__(self, player_count, card_list, disable_game_messages, force_game_state)
+    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool = False, force_game_state: Optional[GameState] = None, logger: Optional[Logger] = None):
+        GameSchema.__init__(self, player_count, card_list, disable_game_messages, force_game_state, logger)
 
     # there is a class for game state although it is not currently used.
     def get_game_state(self) -> GameState:
         return GameState(
+            self.turn_count,
+            self.player_count,
             [self.get_cards_in_hand_by_name(i) for i in range(self.player_count)],
             [self.get_keepers_by_name(i) for i in range(self.player_count)],
             self.get_goals_in_play_by_name(),
@@ -41,8 +43,12 @@ class Game(GameSchema):
         )
 
     def game_message(self, message: str, message_type: GameMessageType):
+        if self.logger:
+            self.logger.game_message(message, message_type)
+
         if self.disable_game_messages:
             return
+
         if message_type == GameMessageType.SPECIAL_EFFECT:
             game_messages.special_effect(message)
         elif message_type == GameMessageType.NOTIFICATION:
@@ -210,6 +216,12 @@ class Game(GameSchema):
 
     # We note that the simulator will receive an integer and then decode it into something more complex for the game simulator to consume
     def step(self, card_name: str):
+        if self.winner is not None:
+            if card_name is not None:
+                # this should never happen
+                raise Exception("Game already won")
+            return
+
         current_phase = self.get_current_phase()
         acting_player = current_phase.acting_player
 
@@ -341,6 +353,9 @@ class Game(GameSchema):
             del self.goals[card_index]
             self.discard_pile.append(card)
 
+        # early stop if the game is over
+        if self.winner is not None:
+            return
 
         # ---
         # ACTIONLESS PHASES (some actions need to be deferred after prompts)
@@ -397,6 +412,9 @@ class Game(GameSchema):
         """
         Checks whether the turn player's turn is over, advancing the turn if so and adding another PLAY+POST_CARD_FOR_TURN to the stack otherwise
         """
+        # apply draw effects in case
+        self.draw_for_turn()
+
         if self.is_turn_over():
             self.handle_end_of_turn()
         else:
@@ -440,6 +458,10 @@ class Game(GameSchema):
 
         self.turn_count += 1
 
+        # game logging: cleanest to put at the end of each turn
+        if self.logger is not None:
+            self.logger.game_stepped(self.get_game_state())
+
     def discard_card(self, player_number: int, card_name: str):
         """
         Discard a card from a player's hand. Does not check whether the card is actually in the player's hand.
@@ -447,6 +469,9 @@ class Game(GameSchema):
         player = self.players[player_number]
 
         card_index = index_of_card(player.hand, card_name)
+
+        self.game_message(f"<< Player {player_number} discarded {player.hand[card_index].name} >>", GameMessageType.NOTIFICATION)
+
         self.discard_pile.append(player.hand[card_index])
         del player.hand[card_index]
 
@@ -485,6 +510,9 @@ class Game(GameSchema):
 
     def activate_card(self, player_number: int, card_to_play):
         """Activate a card. Is the result of 'playing a card', but is not the same thing as it"""
+
+        self.game_message(f"<< Player {player_number} plays {card_to_play.name} >>", GameMessageType.SPECIAL_EFFECT)
+
         if card_to_play.card_type == CardType.ACTION:
             self.play_action(player_number, card_to_play)
         elif card_to_play.card_type == CardType.RULE:
@@ -731,6 +759,11 @@ class Game(GameSchema):
         if not self.goals:
             return
 
+        if self.winner is not None:
+            return
+
+        winners = []
+
         for current_goal in self.goals:
             # TODO: special goal cards (cards in hand, etc)
             if current_goal.name == "5_keepers":
@@ -739,8 +772,7 @@ class Game(GameSchema):
                     keeper_count = len(player.keepers)
                     if keeper_count >= 5 + self.inflation():
                         if keeper_count == max(keeper_counts) and Counter(keeper_counts)[keeper_count] == 1:
-                            self.winner = i
-                            return
+                            winners.append(player)
                 continue
             elif current_goal.name == "10_cards_in_hand":
                 hand_counts = [len(p.hand) for p in self.players]
@@ -748,8 +780,7 @@ class Game(GameSchema):
                     hand_count = len(player.hand)
                     if hand_count >= 10 + self.inflation():
                         if hand_count == max(hand_counts) and Counter(hand_counts)[hand_count] == 1:
-                            self.winner = i
-                            return
+                            winners.append(player)
                 continue
 
             goal_keepers = set(current_goal.required_keepers)
@@ -774,8 +805,12 @@ class Game(GameSchema):
                         win_cancelled = True
 
                     if not win_cancelled:
-                        self.winner = i
-                        return
+                        winners.append(player)
+
+        if len(winners) == 1:
+            self.winner = winners[0].id
+            if self.logger is not None:
+                self.logger.game_over(self.winner, self.get_game_state())
 
     def shuffle_discard_pile_into_draw(self):
         random.shuffle(self.discard_pile)
@@ -804,6 +839,7 @@ class Game(GameSchema):
 
     def draw(self, player: Player):
         """Draw a card from the deck and add it to the hand of player 'player'. Does NOT increment player.cards_drawn"""
+        self.game_message(f"player_{player.id} drawing", GameMessageType.DRAWN_CARD)
         card_drawn = self.get_card_from_draw_pile()
 
         if card_drawn is None and len(self.draw_pile) > 0:
@@ -833,14 +869,6 @@ class Game(GameSchema):
                 self.draw(turn_player)
                 turn_player.cards_drawn += 1
 
-        if len(self.draw_pile) > 0:
-            assert len(turn_player.hand) > previous_cards_in_hand, (
-                f"Hand shrank/didnt increase during draw_for_turn: was {previous_cards_in_hand}, now {len(turn_player.hand)}. "
-                f"Player: {self.player_turn}, draw_amount: {draw_amount}, "
-                f"cards_drawn: {turn_player.cards_drawn}, "
-                f"draw_pile: {len(self.draw_pile)}, discard: {len(self.discard_pile)}"
-            )
-
     def get_available_free_actions(self) -> list[str]:
         available_free_actions = []
 
@@ -852,6 +880,7 @@ class Game(GameSchema):
 
     def play_free_action(self, free_action_name):
         self.played_free_actions.add(free_action_name)
+        self.game_message(f"<< Player {self.player_turn} plays free action '{free_action_name}' >>", GameMessageType.SPECIAL_EFFECT)
         activate_free_action(self, self.player_turn, free_action_name)
 
         self.check_for_winners()
