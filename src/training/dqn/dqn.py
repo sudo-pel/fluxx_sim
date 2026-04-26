@@ -33,7 +33,7 @@ def get_default_device() -> torch.device:
     return torch.device("cpu")
 
 
-def _freeze_eval(module: torch.nn.Module) -> None:
+def freeze_eval(module: torch.nn.Module) -> None:
     module.eval()
     for p in module.parameters():
         p.requires_grad_(False)
@@ -55,22 +55,27 @@ class DQNOpponentPool:
         q_net = getattr(agent, "q_network", None)
         if isinstance(q_net, torch.nn.Module):
             q_net.to(self.device)
-            _freeze_eval(q_net)
+            freeze_eval(q_net)
         self.pool.append(agent)
         if len(self.pool) > self.pool_size:
             self.pool.popleft()
 
     def add_dqn(self, q_network: DuelingFeedForwardNN):
+        # Synchronize so any in-flight CUDA work on q_network is finished - attempt at curbing segfault issues
+        if self.device.type == "cuda":
+            torch.cuda.synchronize(self.device)
+
         new_agent = DQNAgent(self.game_config, self.player_number)
-        new_agent.q_network = copy.deepcopy(q_network).to("cpu")
+        snapshot_sd = {k: v.detach().to("cpu", copy=True) for k, v in q_network.state_dict().items()}
+        new_agent.q_network.load_state_dict(snapshot_sd)
         new_agent.q_network.to(self.device)
-        _freeze_eval(new_agent.q_network)
+        freeze_eval(new_agent.q_network)
         self.pool.append(new_agent)
         if len(self.pool) > self.pool_size:
             self.pool.popleft()
 
     def sample(self):
-        return np.random.choice(self.pool)
+        return self.pool[np.random.randint(len(self.pool))]
 
     def get_oldest(self):
         return self.pool[0]
@@ -85,15 +90,15 @@ class NStepReplayBuffer:
         self.pos = 0
         self.pending = deque()
 
-    def _flush(self, trans_queue, final_s, final_mask, done):
+    def flush(self, trans_queue, final_s, final_mask, done):
         R, g = 0.0, 1.0
         for (_, _, _, r, _, _) in trans_queue:
             R += g * r
             g *= self.gamma
         s0, m0, a0, _, _, _ = trans_queue[0]
-        self._add((s0, m0, a0, R, final_s, final_mask, done, g))
+        self.add((s0, m0, a0, R, final_s, final_mask, done, g))
 
-    def _add(self, item):
+    def add(self, item):
         if len(self.buf) < self.capacity:
             self.buf.append(item)
         else:
@@ -103,11 +108,11 @@ class NStepReplayBuffer:
     def push(self, s, mask, a, r, s_next, mask_next, done):
         self.pending.append((s, mask, a, r, s_next, done))
         if len(self.pending) >= self.n_step:
-            self._flush(list(self.pending), s_next, mask_next, done)
+            self.flush(list(self.pending), s_next, mask_next, done)
             self.pending.popleft()
         if done:
             while self.pending:
-                self._flush(list(self.pending), s_next, mask_next, True)
+                self.flush(list(self.pending), s_next, mask_next, True)
                 self.pending.popleft()
 
     def sample(self, batch_size):
@@ -132,7 +137,7 @@ class NStepReplayBuffer:
 class DQN:
     def __init__(self, env, agent_names: list[str], device: torch.device = None):
         super().__init__()
-        self._init_hyperparameters()
+        self.init_hyperparameters()
 
         self.device: torch.device = device if device is not None else get_default_device()
         print(f"DQN using device: {self.device}", flush=True)
@@ -141,14 +146,13 @@ class DQN:
         self.agent_names = agent_names
         self.env = env
 
-        # Trainee: online Q-network lives on the DQNAgent.
         self.actor = DQNAgent(env.game.game_config, 0)
         self.actor.q_network.to(self.device)
         self.q_optim = Adam(self.actor.q_network.parameters(), lr=self.lr)
 
-        # Target network is a training-time artifact, not part of the agent.
         self.target_network = copy.deepcopy(self.actor.q_network).to(self.device)
-        _freeze_eval(self.target_network)
+        # Eval on target not needed
+        freeze_eval(self.target_network)
 
         self.agents = {
             "player_0": self.actor,
@@ -190,7 +194,7 @@ class DQN:
 
         os.makedirs(f"{PROJECT_ROOT}/experiments/{self.run_name}/models")
 
-    def _init_hyperparameters(self):
+    def init_hyperparameters(self):
         # replay / learning
         self.buffer_capacity = 350000
         self.batch_size = 128          # was 256; halves per-update gradient cost on CPU
@@ -348,7 +352,7 @@ class DQN:
                     continue
 
                 # Select next action
-                with torch.inference_mode():
+                with torch.no_grad():
                     action, q_val, obs_dict = self.actor.act(observation, epsilon=self.current_epsilon())
                 ep_q_values.append(float(q_val.item()) if hasattr(q_val, "item") else float(q_val))
 
@@ -373,7 +377,7 @@ class DQN:
                 if done:
                     self.env.step(None)
                     continue
-                with torch.inference_mode():
+                with torch.no_grad():
                     action, _unused, _obs = current_opponent_act(self.agents[agent_id], observation)
                 self.env.step(self.env.decode_action(action))
 

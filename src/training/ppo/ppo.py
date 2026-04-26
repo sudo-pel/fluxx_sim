@@ -73,7 +73,7 @@ class OpponentPool:
             self.pool.popleft()
 
     def sample(self):
-        return np.random.choice(self.pool)
+        return self.pool[np.random.randint(len(self.pool))]
 
     def get_oldest(self):
         return self.pool[0]
