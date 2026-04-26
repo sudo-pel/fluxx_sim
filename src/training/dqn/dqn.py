@@ -215,10 +215,10 @@ class DQN:
 
         # evaluation / pool / logging
         self.games_per_eval = 50
-        self.log_every_steps = 2_000           # lightweight metric flush (cheap)
-        self.eval_every_steps = 16_000         # retained for compatibility
-        self.pool_push_every_steps = 16_000
-        self.run_games_every_steps = 50_000    # expensive: plays full games vs fixed opponents
+        self.log_every_steps = 30000
+        self.eval_every_steps = 30000
+        self.pool_push_every_steps = 16000
+        self.run_games_every_steps = 50000    # expensive: plays full games vs fixed opponents
         self.max_steps_per_episode = 3200
 
     def current_epsilon(self) -> float:
