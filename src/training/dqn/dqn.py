@@ -236,7 +236,7 @@ class DQN:
 
         while self.global_timestep < total_timesteps:
             current_opponent = self.opponent_pool.sample()
-            if self.global_timestep < 2_000_000:
+            if self.global_timestep > 2_000_000:
                 roll = random.randint(0,3)
                 if roll == 3:
                     current_opponent = HeuristicAgentMKII(self.env.game.game_config, 1)
@@ -248,8 +248,6 @@ class DQN:
             recent_losses.extend(ep_loss)
             recent_q_values.extend(ep_q)
 
-            # Cheap, frequent logging — runs every log_every_steps so we see progress
-            # without waiting for the expensive run_games evaluation.
             if self.global_timestep - last_log_step >= self.log_every_steps:
                 last_log_step = self.global_timestep
                 if episode_game_lengths:
@@ -266,25 +264,22 @@ class DQN:
                 recent_losses.clear()
                 recent_q_values.clear()
 
-            # Expensive: actually plays full games against fixed opponents.
+            # Run evaluations against fixed opponents
             if self.global_timestep - last_run_games_step >= self.run_games_every_steps:
                 last_run_games_step = self.global_timestep
                 print(f"[step {self.global_timestep}] running evaluations...", flush=True)
                 self.run_evaluations()
                 print(f"[step {self.global_timestep}] evaluations done", flush=True)
 
+            # Add current agent to self-play pool
             if self.global_timestep - last_pool_push_step >= self.pool_push_every_steps:
                 last_pool_push_step = self.global_timestep
                 self.opponent_pool.add_dqn(self.actor.q_network)
 
+            # Take a checkpoint of the current model
             if self.global_timestep // 500_000 >= self.model_checkpoints_taken + 1:
                 self.model_checkpoints_taken += 1
                 self.save_current_model(f"model_{self.global_timestep}")
-
-            # Heartbeat so we always know training is alive.
-            if self.games_played % 10 == 0:
-                print(f"[step {self.global_timestep}] games={self.games_played} "
-                      f"buffer={len(self.buffer)} eps={self.current_epsilon():.3f}", flush=True)
 
         self.run_evaluations(final=True)
         self.save_current_model("final_model")
@@ -352,7 +347,7 @@ class DQN:
                     self.env.step(None)
                     continue
 
-                # Select next action.
+                # Select next action
                 with torch.inference_mode():
                     action, q_val, obs_dict = self.actor.act(observation, epsilon=self.current_epsilon())
                 ep_q_values.append(float(q_val.item()) if hasattr(q_val, "item") else float(q_val))
@@ -375,8 +370,6 @@ class DQN:
                 self.env.step(self.env.decode_action(action))
 
             else:
-                # Opponent turn — play, don't learn. Wrap in inference_mode to skip
-                # autograd overhead on every opponent action.
                 if done:
                     self.env.step(None)
                     continue

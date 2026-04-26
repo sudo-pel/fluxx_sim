@@ -11,10 +11,6 @@ from src.game.Game import Game
 from src.game.game_states import two_player_p0_one_turn_win, two_player_p0_two_turn_win
 
 
-class PPOAgenr:
-    pass
-
-
 def main(one_turn_win_simple_fluxx=None):
     two_player_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True)
     two_player_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True)
