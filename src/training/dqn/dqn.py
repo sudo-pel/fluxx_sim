@@ -9,6 +9,7 @@ from typing import Deque
 import numpy as np
 import torch
 import torch.nn.functional as F
+from numpy.random import SeedSequence
 from torch.optim import Adam
 
 from src.agents.Agent import Agent
@@ -44,12 +45,18 @@ class DQNOpponentPool:
     Agents store q-values networks and not policy networks, making this distinct from PPOs OpponentPool
     """
     def __init__(self, game_config: GameConfig, player_number: int, pool_size: int = 20,
-                 device: torch.device = torch.device("cpu")):
+                 device: torch.device = torch.device("cpu"), seed: np.random.SeedSequence = None):
         self.pool: Deque[Agent] = deque()
         self.game_config = game_config
         self.player_number = player_number
         self.pool_size = pool_size
         self.device = device
+        if seed is None:
+            self.ss_models = SeedSequence()
+            self.rng = np.random.default_rng()
+        else:
+            self.ss_models, self.ss_rng = seed.spawn(2)
+            self.rng = np.random.default_rng(ss_rng)
 
     def add_agent(self, agent: Agent):
         q_net = getattr(agent, "q_network", None)
@@ -65,7 +72,8 @@ class DQNOpponentPool:
         if self.device.type == "cuda":
             torch.cuda.synchronize(self.device)
 
-        new_agent = DQNAgent(self.game_config, self.player_number)
+        new_agent_seed = self.ss_models.spawn(1)[0]
+        new_agent = DQNAgent(self.game_config, self.player_number, seed=new_agent_seed)
         snapshot_sd = {k: v.detach().to("cpu", copy=True) for k, v in q_network.state_dict().items()}
         new_agent.q_network.load_state_dict(snapshot_sd)
         new_agent.q_network.to(self.device)
@@ -75,20 +83,24 @@ class DQNOpponentPool:
             self.pool.popleft()
 
     def sample(self):
-        return self.pool[np.random.randint(len(self.pool))]
+        return self.pool[self.rng.integers(len(self.pool))]
 
     def get_oldest(self):
         return self.pool[0]
 
 
 class NStepReplayBuffer:
-    def __init__(self, capacity: int, n_step: int, gamma: float):
+    def __init__(self, capacity: int, n_step: int, gamma: float, seed: np.random.SeedSequence = None):
         self.capacity = capacity
         self.n_step = n_step
         self.gamma = gamma
         self.buf: list = []
         self.pos = 0
         self.pending = deque()
+        if seed is None:
+            self.rng = np.random.default_rng()
+        else:
+            self.rng = np.random.default_rng(seed)
 
     def flush(self, trans_queue, final_s, final_mask, done):
         R, g = 0.0, 1.0
@@ -116,7 +128,7 @@ class NStepReplayBuffer:
                 self.pending.popleft()
 
     def sample(self, batch_size):
-        idx = np.random.randint(0, len(self.buf), size=batch_size)
+        idx = self.rng.integers(0, len(self.buf), size=batch_size)
         batch = [self.buf[i] for i in idx]
         s, m, a, R, s2, m2, done, g = zip(*batch)
         return (
@@ -135,7 +147,7 @@ class NStepReplayBuffer:
 
 
 class DQN:
-    def __init__(self, env, agent_names: list[str], device: torch.device = None):
+    def __init__(self, env, agent_names: list[str], device: torch.device = None, seed: np.random.SeedSequence = None):
         super().__init__()
         self.init_hyperparameters()
 
@@ -146,7 +158,10 @@ class DQN:
         self.agent_names = agent_names
         self.env = env
 
-        self.actor = DQNAgent(env.game.game_config, 0)
+        # seed handling
+        ss_buffer, ss_opponent_pool, ss_actor, ss_opponents = seed.spawn(4)
+
+        self.actor = DQNAgent(env.game.game_config, 0, ss_actor)
         self.actor.q_network.to(self.device)
         self.q_optim = Adam(self.actor.q_network.parameters(), lr=self.lr)
 
@@ -158,12 +173,12 @@ class DQN:
             "player_0": self.actor,
             "player_1": None,
         }
-        self.opponent_pool = DQNOpponentPool(env.game.game_config, 1, device=self.device)
+        self.opponent_pool = DQNOpponentPool(env.game.game_config, 1, device=self.device, seed=ss_opponent_pool)
         self.opponent_pool.add_agent(DQNAgent(env.game.game_config, 1))
 
-        self.buffer = NStepReplayBuffer(self.buffer_capacity, self.n_step, self.gamma)
+        self.buffer = NStepReplayBuffer(self.buffer_capacity, self.n_step, self.gamma, seed=ss_buffer)
 
-        self.run_name = f"dqn-dueling_nn_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        self.run_name = f"dqn_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
         self.tracker = MetricsTracker(f"{self.run_name}", True, 100, {
             "buffer_capacity": self.buffer_capacity,
             "batch_size": self.batch_size,
@@ -240,10 +255,6 @@ class DQN:
 
         while self.global_timestep < total_timesteps:
             current_opponent = self.opponent_pool.sample()
-            if self.global_timestep > 2_000_000:
-                roll = random.randint(0,3)
-                if roll == 3:
-                    current_opponent = HeuristicAgentMKII(self.env.game.game_config, 1)
             self.agents["player_1"] = current_opponent
 
             episode_return, ep_len, ep_loss, ep_q = self.play_one_episode()

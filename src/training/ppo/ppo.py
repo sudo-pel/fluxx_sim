@@ -19,14 +19,6 @@ from src.env.AgentBattler import AgentBattler
 from src.env.MetricsTracker import MetricsTracker
 from src.game.FluxxEnums import GameConfig
 
-# TODO: update this
-"""
-Metrics recorded:
-- average game turn count (per 16,000 timesteps)
-- trainee WR against HeuristicAgentMKII and RandomAgent (100 games each per 16,000 timesteps)
-
-"""
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
@@ -41,12 +33,16 @@ def get_default_device() -> torch.device:
 
 class OpponentPool:
     def __init__(self, game_config: GameConfig, player_number: int, pool_size: int = 20,
-                 device: torch.device = torch.device("cpu")):
+                 device: torch.device = torch.device("cpu"), seed: np.random.SeedSequence = None):
         self.pool: Deque[Agent] = deque()
         self.game_config: GameConfig = game_config
         self.player_number: int = player_number
         self.pool_size: int = pool_size
         self.device: torch.device = device
+        if seed is None:
+            self.rng = np.random.default_rng()
+        else:
+            self.rng = np.random.default_rng(seed)
 
     def add_agent(self, agent: Agent):
         # Best-effort move any nn.Module attributes on the agent to the pool's device.
@@ -73,14 +69,14 @@ class OpponentPool:
             self.pool.popleft()
 
     def sample(self):
-        return self.pool[np.random.randint(len(self.pool))]
+        return self.pool[self.rng.integers(len(self.pool))]
 
     def get_oldest(self):
         return self.pool[0]
 
 
 class PPO:
-    def __init__(self, env, agent_names: list[str], device: torch.device = None, from_checkpoint: LearningCheckpoint = None):
+    def __init__(self, env, agent_names: list[str], device: torch.device = None, from_checkpoint: LearningCheckpoint = None, seed: np.random.SeedSequence = None):
         super().__init__()
         self._init_hyperparameters()
 
@@ -89,6 +85,10 @@ class PPO:
 
         self.agent_names = agent_names
         self.env = env
+
+        # seed handling
+        ss_opponent_pool, ss_ppo = seed.spawn(2)
+        self.rng = np.random.default_rng(ss_ppo)
 
         self.actor = PPOAgent(env.game.game_config, 0)
         self.actor.policy_network.to(self.device)
@@ -101,7 +101,7 @@ class PPO:
             "player_0": self.actor,
             "player_1": None
         }
-        self.opponent_pool = OpponentPool(env.game.game_config, 1, device=self.device)
+        self.opponent_pool = OpponentPool(env.game.game_config, 1, device=self.device, seed=ss_opponent_pool)
         base_opponent = PPOAgent(env.game.game_config, 1)
         self.opponent_pool.add_agent(base_opponent)
 
@@ -198,7 +198,7 @@ class PPO:
                 if early_stopped:
                     break
 
-                np.random.shuffle(indices)
+                self.rng.shuffle(indices)
 
                 for start in range(0, batch_size, self.minibatch_size):
                     end = start + self.minibatch_size

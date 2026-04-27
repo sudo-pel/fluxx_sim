@@ -111,7 +111,7 @@ class FluxxEnv(AECEnv):
 
     metadata = {"render_modes": ["human"], "name": "card_game_v0"}
 
-    def __init__(self, game: Game, num_players: int = 2, render_mode=None):
+    def __init__(self, game: Game, num_players: int = 2, render_mode=None, seed: np.random.SeedSequence = None):
         super().__init__()
 
         self.game = game
@@ -126,6 +126,8 @@ class FluxxEnv(AECEnv):
         self.num_players = num_players
         self.render_mode = render_mode
         self.possible_agents = [f"player_{i}" for i in range(num_players)]
+
+        # seed unused as of yet but added for completeness
 
     def reset(self, seed=None, options=None):
         self.agents = self.possible_agents[:]

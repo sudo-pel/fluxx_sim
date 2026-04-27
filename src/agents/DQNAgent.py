@@ -9,7 +9,7 @@ from src.game.FluxxEnums import GameState
 
 
 class DQNAgent(Agent):
-    def __init__(self, game_config, player_number):
+    def __init__(self, game_config, player_number, seed: np.random.SeedSequence = None):
         super(DQNAgent, self).__init__()
 
         self.game_config = game_config
@@ -35,6 +35,12 @@ class DQNAgent(Agent):
 
         # Q-network. Output dim = number of actions (Q(s, a) for each a).
         self.q_network = DuelingFeedForwardNN(observation_space_size, action_space_size, 256)
+
+        # seed (for epsilon-greedy strategy)
+        if seed is None:
+            self.rng = np.random.default_rng()
+        else:
+            self.rng = np.random.default_rng(seed)
 
     @property
     def device(self) -> torch.device:
@@ -65,7 +71,7 @@ class DQNAgent(Agent):
             q_values = self.q_network.forward(obs_tensor)
             q_values_masked = q_values.masked_fill(~mask_tensor, float("-inf"))
 
-            if np.random.rand() < epsilon:
+            if self.rng.random() < epsilon:
                 legal_idx = np.flatnonzero(action_mask)
                 action = int(np.random.choice(legal_idx))
             else:

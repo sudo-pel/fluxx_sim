@@ -1,5 +1,9 @@
-import abc, random
+import abc
 from typing import Optional
+
+import numpy as np
+
+from random import Random
 
 from src.env.Logger import Logger
 from src.game.cards.Card import Card, Rule, Goal, make_card
@@ -9,7 +13,7 @@ from src.game.Player import Player
 
 
 class GameSchema(metaclass=abc.ABCMeta):
-    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool, force_game_state: Optional[GameState], logger: Optional[Logger] = None):
+    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool, force_game_state: Optional[GameState], logger: Optional[Logger] = None, seed: Optional[np.random.SeedSequence] = None):
         self.card_list = card_list # static, not shuffled
         self.player_count: int = player_count
         self.players: list[Player] = [Player(i) for i in range(player_count)]
@@ -34,14 +38,18 @@ class GameSchema(metaclass=abc.ABCMeta):
         )
         self.logger = logger
 
-        # TODO: strongly consider removing (exists for debugging purposes)
-        self.game_history: list[GamePhaseHistory] = []
+        # seed setting
+        if seed is None:
+            self.rng = Random()
+        else:
+            # uses a SeedSequence in case more seeds are needed in the future
+            self.rng = Random(int(seed.generate_state(1, dtype=np.uint64)[0]))
 
     def reset(self):
-        random.shuffle(self.deck)
+        self.rng.shuffle(self.deck)
         self.draw_pile = [make_card(card_name) for card_name in self.deck]
 
-        self.player_turn: int = random.randint(0, self.player_count - 1)
+        self.player_turn: int = self.rng.randint(0, self.player_count - 1)
         self.turn_count: int = 0
         self.goals = []
         self.discard_pile = []

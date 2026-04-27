@@ -1,7 +1,7 @@
-import copy
-import random
 from typing import Optional
 from collections import Counter
+
+import numpy as np
 
 from src.env.Logger import Logger
 from src.game.cards.Card import Card, Rule, Goal, Keeper, Action
@@ -19,8 +19,8 @@ from src.game.utils.general_utils import index_of_card
 
 
 class Game(GameSchema):
-    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool = False, force_game_state: Optional[GameState] = None, logger: Optional[Logger] = None):
-        GameSchema.__init__(self, player_count, card_list, disable_game_messages, force_game_state, logger)
+    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool = False, force_game_state: Optional[GameState] = None, logger: Optional[Logger] = None, seed: Optional[np.random.SeedSequence] = None):
+        GameSchema.__init__(self, player_count, card_list, disable_game_messages, force_game_state, logger, seed)
 
     # there is a class for game state although it is not currently used.
     def get_game_state(self) -> GameState:
@@ -72,7 +72,7 @@ class Game(GameSchema):
         else:
             if self.rule_in_play("first_play_random") and len(turn_player.hand) > 0:
                 if turn_player.cards_played == 0 and self.get_play_rules(self.player_turn) > 1:
-                    card_index = random.randint(0, len(turn_player.hand) - 1)
+                    card_index = self.rng.randint(0, len(turn_player.hand) - 1)
                     card_name = turn_player.hand[card_index].name
                     self.game_message(f"<< (First Play Random) played {card_name} >>", GameMessageType.SPECIAL_EFFECT)
                     self.play_card_from_hand(self.player_turn, card_name)
@@ -506,7 +506,7 @@ class Game(GameSchema):
 
     def play_action(self, player_number: int, action: Action):
         self.stack.append(GamePhase(GamePhaseType.DEFERRED_ADD_CARD_TO_DISCARD_PILE, player_number, card=action))
-        action_cards.activate_action(action.name, self, player_number)
+        action_cards.activate_action(action.name, self, player_number, self.rng)
 
     def activate_card(self, player_number: int, card_to_play):
         """Activate a card. Is the result of 'playing a card', but is not the same thing as it"""
@@ -813,7 +813,7 @@ class Game(GameSchema):
                 self.logger.game_over(self.winner, self.get_game_state())
 
     def shuffle_discard_pile_into_draw(self):
-        random.shuffle(self.discard_pile)
+        self.rng.shuffle(self.discard_pile)
         self.draw_pile = self.discard_pile
         self.discard_pile = []
 
@@ -873,7 +873,7 @@ class Game(GameSchema):
         available_free_actions = []
 
         for rule in self.rules:
-            if rule.free_action and can_use_free_action(self, self.player_turn, rule.name):
+            if rule.free_action and can_use_free_action(self, self.player_turn, rule.name, self.rng):
                 available_free_actions.append(rule.name)
 
         return available_free_actions
@@ -881,7 +881,7 @@ class Game(GameSchema):
     def play_free_action(self, free_action_name):
         self.played_free_actions.add(free_action_name)
         self.game_message(f"<< Player {self.player_turn} plays free action '{free_action_name}' >>", GameMessageType.SPECIAL_EFFECT)
-        activate_free_action(self, self.player_turn, free_action_name)
+        activate_free_action(self, self.player_turn, free_action_name, self.rng)
 
         self.check_for_winners()
 

@@ -1,3 +1,4 @@
+from random import Random
 from typing import TYPE_CHECKING
 
 from src.game.game_messages import GameMessageType
@@ -13,24 +14,24 @@ from src.game.FluxxEnums import CardType, GamePhase, GamePhaseType, OnCompleteBe
 # FREE ACTION USABILITY CHECKS
 # ---------------------
 
-def can_use_mystery_play(game_state: 'Game', player_number: int) -> bool:
+def can_use_mystery_play(game_state: 'Game', player_number: int, rng: Random) -> bool:
     return "mystery_play" not in game_state.played_free_actions
 
-def can_use_swap_plays_for_draws(game_state: 'Game', player_number: int) -> bool:
+def can_use_swap_plays_for_draws(game_state: 'Game', player_number: int, rng: Random) -> bool:
     return "swap_plays_for_draws" not in game_state.played_free_actions
 
-def can_use_goal_mill(game_state: 'Game', player_number: int) -> bool:
+def can_use_goal_mill(game_state: 'Game', player_number: int, rng: Random) -> bool:
     player = game_state.players[player_number]
 
     goal_cards_in_hand = [card for card in player.hand if card.card_type == CardType.GOAL]
     return "goal_mill" not in game_state.played_free_actions and len(goal_cards_in_hand) > 0
 
-def can_use_get_on_with_it(game_state: 'Game', player_number: int) -> bool:
+def can_use_get_on_with_it(game_state: 'Game', player_number: int, rng: Random) -> bool:
     player = game_state.players[player_number]
     can_play_more = (player.cards_played < game_state.get_play_rules(player_number) or game_state.rule_in_play("play_all"))
     return "get_on_with_it" not in game_state.played_free_actions and can_play_more and len(player.hand) > 0
 
-def can_use_recycling(game_state: 'Game', player_number: int) -> bool:
+def can_use_recycling(game_state: 'Game', player_number: int, rng: Random) -> bool:
     player = game_state.players[player_number]
     return "recycling" not in game_state.played_free_actions and len(player.keepers) > 0
 
@@ -38,14 +39,14 @@ def can_use_recycling(game_state: 'Game', player_number: int) -> bool:
 # FREE ACTION EFFECTS
 # ---------------------
 
-def activate_mystery_play(game_state: "Game", user_number: int):
+def activate_mystery_play(game_state: 'Game', user_number: int, rng: Random):
     card = game_state.get_card_from_draw_pile()
     if card is None:
         return
     game_state.game_message(f"<< Played {card.name}! >>", GameMessageType.SPECIAL_EFFECT)
     game_state.activate_card(user_number, card)
 
-def activate_swap_plays_for_draws(game_state: "Game", user_number: int):
+def activate_swap_plays_for_draws(game_state: 'Game', user_number: int, rng: Random):
     user = game_state.players[user_number]
 
     plays_allowed = game_state.get_play_rules(user_number)
@@ -61,7 +62,7 @@ def activate_swap_plays_for_draws(game_state: "Game", user_number: int):
 
     game_state.force_turn_over = True
 
-def activate_goal_mill(game_state: "Game", user_number: int):
+def activate_goal_mill(game_state: 'Game', user_number: int, rng: Random):
     user = game_state.players[user_number]
 
     game_state.stack.append(GamePhase(
@@ -73,7 +74,7 @@ def activate_goal_mill(game_state: "Game", user_number: int):
         on_complete=OnCompleteBehaviour.DRAW
     ))
 
-def activate_get_on_with_it(game_state: "Game", user_number: int):
+def activate_get_on_with_it(game_state: 'Game', user_number: int, rng: Random):
     user = game_state.players[user_number]
 
     while len(user.hand) > 0:
@@ -84,7 +85,7 @@ def activate_get_on_with_it(game_state: "Game", user_number: int):
 
     game_state.force_turn_over = True
 
-def activate_recycling(game_state: "Game", user_number: int):
+def activate_recycling(game_state: 'Game', user_number: int, rng: Random):
     game_state.stack.append(GamePhase(
         GamePhaseType.DEFERRED_DRAW_CARD,
         user_number,
@@ -121,19 +122,19 @@ FREE_ACTIONS = {
 }
 
 
-def can_use_free_action(game_state: 'Game', player_number: int, free_action_name: str) -> bool:
+def can_use_free_action(game_state: 'Game', player_number: int, free_action_name: str, rng: Random) -> bool:
     free_action = FREE_ACTIONS.get(free_action_name)
     if free_action is None:
         raise Exception(f"Invalid free action: {free_action_name}")
 
-    return free_action["can_use"](game_state, player_number)
+    return free_action["can_use"](game_state, player_number, rng)
 
-def activate_free_action(game_state: 'Game', player_number: int, free_action_name: str):
+def activate_free_action(game_state: 'Game', player_number: int, free_action_name: str, rng: Random):
     free_action = FREE_ACTIONS.get(free_action_name)
     if free_action is None:
         raise Exception(f"Invalid free action: {free_action_name}")
 
-    free_action["activate"](game_state, player_number)
+    free_action["activate"](game_state, player_number, rng)
 
 
 
