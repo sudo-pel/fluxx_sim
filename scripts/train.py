@@ -33,6 +33,7 @@ Resumability is limited: RNG states are not checkpointed. Could be extended to i
 
 import argparse
 import json
+import torch
 import logging
 import os
 import platform
@@ -80,7 +81,7 @@ def parse_args():
         "-d", "--device",
         type=str,
         default=None,
-        help="CUDA device to use"
+        help="CUDA device to use: 'cuda:0', 'cuda:1', ... , 'cpu'"
     )
     return parser.parse_args()
 
@@ -129,15 +130,13 @@ def write_metadata(run_dir: Path, args: argparse.Namespace, master_seed: int) ->
 def main():
     args = parse_args()
 
-    # (optionally) set os.cuda device. Must be done before importing torch
-    if args.device is not None:
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.device
-    import torch
-
     # seed generation
     master_seed = args.seed if args.seed is not None else int.from_bytes(os.urandom(2), "big")
     master_ss = np.random.SeedSequence(master_seed)
     game_ss, env_ss, training_ss, torch_ss = master_ss.spawn(4)
+
+    # set pytorch device
+    device = torch.device(args.device) if args.device else (torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 
     # torch determinism (global)
     torch.manual_seed(torch_ss.generate_state(1)[0])
@@ -164,9 +163,9 @@ def main():
 
     # create an instance of the correct training script
     if args.script == "dqn":
-        training_script = DQN(env, ["player_0", "player_1"], run_name, seed=training_ss)
+        training_script = DQN(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device)
     elif args.script == "ppo":
-        training_script = PPO(env, ["player_0", "player_1"], run_name, seed=training_ss)
+        training_script = PPO(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device)
     else:
         logging.error("Unknown training script: {}".format(args.script))
         return 1
