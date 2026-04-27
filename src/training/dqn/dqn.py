@@ -56,7 +56,7 @@ class DQNOpponentPool:
             self.rng = np.random.default_rng()
         else:
             self.ss_models, self.ss_rng = seed.spawn(2)
-            self.rng = np.random.default_rng(ss_rng)
+            self.rng = np.random.default_rng(self.ss_rng)
 
     def add_agent(self, agent: Agent):
         q_net = getattr(agent, "q_network", None)
