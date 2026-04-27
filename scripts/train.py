@@ -42,7 +42,6 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-import torch
 
 from src.env.FluxxEnv import FluxxEnv
 from src.game.Game import Game
@@ -130,6 +129,11 @@ def write_metadata(run_dir: Path, args: argparse.Namespace, master_seed: int) ->
 def main():
     args = parse_args()
 
+    # (optionally) set os.cuda device. Must be done before importing torch
+    if args.device is not None:
+        os.environ["CUDA_VISIBLE_DEVICES"] = args.device
+    import torch
+
     # seed generation
     master_seed = args.seed if args.seed is not None else int.from_bytes(os.urandom(2), "big")
     master_ss = np.random.SeedSequence(master_seed)
@@ -166,10 +170,6 @@ def main():
     else:
         logging.error("Unknown training script: {}".format(args.script))
         return 1
-
-    # (optionally) set os.cuda device
-    if args.device is not None:
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.device
 
     # run training script
     training_script.learn(args.timesteps)
