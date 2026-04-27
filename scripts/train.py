@@ -32,9 +32,14 @@ Resumability is limited: RNG states are not checkpointed. Could be extended to i
 """
 
 import argparse
+import json
 import logging
 import os
+import platform
+import subprocess
 import sys
+from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -57,7 +62,7 @@ def parse_args():
     )
     parser.add_argument(
         "timesteps",
-        default="output.txt",
+        type=int,
         help="Number of episode timesteps",
     )
     parser.add_argument(
@@ -80,6 +85,47 @@ def parse_args():
     )
     return parser.parse_args()
 
+def git_info() -> dict:
+    try:
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL
+        ).decode().strip()
+        diff = subprocess.check_output(
+            ["git", "diff", "HEAD"], stderr=subprocess.DEVNULL
+        ).decode()
+        return {"commit": commit, "diff": diff, "dirty": bool(diff.strip())}
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return {"commit": None, "diff": None, "dirty": None}
+
+def write_metadata(run_dir: Path, args: argparse.Namespace, master_seed: int) -> None:
+    """
+    Writes a metadata.json file to the directory run_dir
+    """
+    cuda_version = torch.version.cuda if torch.cuda.is_available() else None
+    cudnn_version = torch.backends.cudnn.version() if torch.backends.cudnn.is_available() else None
+
+    metadata = {
+        "arguments": vars(args),
+        "seed": master_seed,
+        "seed_was_specified": args.seed is not None,
+        "timestamp": datetime.now().isoformat(),
+        "versions": {
+            "python": platform.python_version(),
+            "pytorch": torch.__version__,
+            "numpy": np.__version__,
+            "cuda": cuda_version,
+            "cudnn": cudnn_version,
+        },
+        "platform": {
+            "system": platform.system(),
+            "release": platform.release(),
+            "machine": platform.machine(),
+        },
+        "git": git_info(),
+    }
+
+    with open(run_dir / "run_metadata.json", "w") as f:
+        json.dump(metadata, f, indent=2)
 
 def main():
     args = parse_args()
@@ -99,12 +145,24 @@ def main():
     fluxx_game_2p = Game(2, card_lists.base_deck, disable_game_messages=True, seed=game_ss)
     env = FluxxEnv(fluxx_game_2p, 2, seed=env_ss)
 
+    # create run name
+    run_name = args.run_name + "_" if args.run_name is not None else ""
+    run_name = f"{args.script}_{run_name}{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+
+    # create experiment directory structure
+    run_dir = Path("experiments") / run_name
+    (run_dir / "logs").mkdir(parents=True, exist_ok=True)
+    (run_dir / "models").mkdir(parents=True, exist_ok=True)
+    (run_dir / "final").mkdir(parents=True, exist_ok=True)
+
+    # write metadata before training kicks off
+    write_metadata(run_dir, args, master_seed)
+
     # create an instance of the correct training script
-    training_script = None
     if args.script == "dqn":
-        training_script = DQN(env, ["player_0", "player_1"], seed=training_ss)
+        training_script = DQN(env, ["player_0", "player_1"], run_name, seed=training_ss)
     elif args.script == "ppo":
-        training_script = PPO(env, ["player_0", "player_1"], seed=training_ss)
+        training_script = PPO(env, ["player_0", "player_1"], run_name, seed=training_ss)
     else:
         logging.error("Unknown training script: {}".format(args.script))
         return 1

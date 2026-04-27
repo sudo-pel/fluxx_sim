@@ -135,7 +135,7 @@ def activate_rock_paper_scissors_showdown(game_state: 'GameSchema', user_number:
     selected_player_number = user_number ^ 1
     selected_player = game_state.players[selected_player_number]
 
-    coin = random.randint(0, 1)
+    coin = rng.randint(0, 1)
     if coin == 0:
         winner = user_player
         loser = selected_player
@@ -157,7 +157,7 @@ def activate_random_tax(game_state: 'GameSchema', user_number: int, rng: Random)
             if len(player.hand) == 0 or player_number == user_number:
                 continue
 
-            index_to_take = random.randint(0, len(player.hand) - 1)
+            index_to_take = rng.randint(0, len(player.hand) - 1)
             card_to_take = player.hand[index_to_take]
 
             game_state.game_message(f"<< Player {player_number} took {card_to_take.name} from their hand >>", GameMessageType.SPECIAL_EFFECT)
@@ -210,7 +210,7 @@ def activate_empty_the_trash(game_state: 'GameSchema', user_number: int, rng: Ra
     game_state.draw_pile += game_state.discard_pile
     discard_pile_size = len(game_state.discard_pile)
     game_state.discard_pile = []
-    random.shuffle(game_state.draw_pile)
+    rng.shuffle(game_state.draw_pile)
     game_state.game_message(f"<< Shuffled {discard_pile_size} cards from discard pile into deck! >>", GameMessageType.SPECIAL_EFFECT)
 
 

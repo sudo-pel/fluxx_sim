@@ -4,7 +4,7 @@ import random
 from collections import deque
 from datetime import datetime
 from pathlib import Path
-from typing import Deque
+from typing import Deque, Optional
 
 import numpy as np
 import torch
@@ -147,7 +147,7 @@ class NStepReplayBuffer:
 
 
 class DQN:
-    def __init__(self, env, agent_names: list[str], device: torch.device = None, seed: np.random.SeedSequence = None):
+    def __init__(self, env, agent_names: list[str], run_name, device: torch.device = None, seed: np.random.SeedSequence = None):
         super().__init__()
         self.init_hyperparameters()
 
@@ -178,7 +178,7 @@ class DQN:
 
         self.buffer = NStepReplayBuffer(self.buffer_capacity, self.n_step, self.gamma, seed=ss_buffer)
 
-        self.run_name = f"dqn_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        self.run_name = run_name
         self.tracker = MetricsTracker(f"{self.run_name}", True, 100, {
             "buffer_capacity": self.buffer_capacity,
             "batch_size": self.batch_size,
@@ -206,8 +206,6 @@ class DQN:
         self.global_timestep = 0
         self.model_checkpoints_taken = 0
         self.games_played = 0
-
-        os.makedirs(f"{PROJECT_ROOT}/experiments/{self.run_name}/models")
 
     def init_hyperparameters(self):
         # replay / learning
@@ -297,7 +295,7 @@ class DQN:
                 self.save_current_model(f"model_{self.global_timestep}")
 
         self.run_evaluations(final=True)
-        self.save_current_model("final_model")
+        self.save_current_model(f"final_model_{self.global_timestep}", final=True)
 
     def run_evaluations(self, final: bool = False):
         vs_heuristicagent = self.agent_battler.run_games(
@@ -429,8 +427,11 @@ class DQN:
 
         return loss.item(), q_sa.mean().item()
 
-    def save_current_model(self, filename):
-        path = f"{PROJECT_ROOT}/experiments/{self.run_name}/models/{filename}.pt"
+    def save_current_model(self, filename, final: bool = False):
+        if not final:
+            path = f"{PROJECT_ROOT}/experiments/{self.run_name}/models/{filename}.pt"
+        else:
+            path = f"{PROJECT_ROOT}/experiments/{self.run_name}/final/{filename}.pt"
         state_dict = {k: v.detach().cpu() for k, v in self.actor.q_network.state_dict().items()}
         torch.save(state_dict, path)
         print(f"Model saved to {path}", flush=True)

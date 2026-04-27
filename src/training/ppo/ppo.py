@@ -3,7 +3,7 @@ import copy
 from collections import deque
 from datetime import datetime
 from pathlib import Path
-from typing import Deque
+from typing import Deque, Optional
 
 import torch
 from torch.optim import Adam
@@ -76,7 +76,7 @@ class OpponentPool:
 
 
 class PPO:
-    def __init__(self, env, agent_names: list[str], device: torch.device = None, from_checkpoint: LearningCheckpoint = None, seed: np.random.SeedSequence = None):
+    def __init__(self, env, agent_names: list[str], run_name, device: torch.device = None, from_checkpoint: LearningCheckpoint = None, seed: np.random.SeedSequence = None):
         super().__init__()
         self._init_hyperparameters()
 
@@ -105,8 +105,7 @@ class PPO:
         base_opponent = PPOAgent(env.game.game_config, 1)
         self.opponent_pool.add_agent(base_opponent)
 
-        # TODO: tensorboard integration
-        self.run_name = f"ppo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        self.run_name = run_name
         self.tracker = MetricsTracker(f"{self.run_name}", True, 100, {
             "max_timesteps_per_episode": self.max_timesteps_per_episode,
             "games_per_batch": self.games_per_batch,
@@ -139,8 +138,6 @@ class PPO:
             state_dict = torch.load(f"{PROJECT_ROOT}/experiments/{self.run_name}/models/model_{self.global_timestep}.pt", map_location="cpu", weights_only=True)
             self.actor.policy_network.load_state_dict(state_dict)
             print(f"Loaded model from checkpoint {self.run_name}")
-        else:
-            os.makedirs(f"{PROJECT_ROOT}/experiments/{self.run_name}/models")
 
 
     def _init_hyperparameters(self):
@@ -278,7 +275,7 @@ class PPO:
                 self.model_checkpoints_taken += 1
                 self.save_current_model(f"model_{self.global_timestep}")
 
-        self.save_current_model("final_model")
+        self.save_current_model(f"final_model_{self.global_timestep}", final=True)
 
         # final evaluation
         vs_heuristicagent = self.agent_battler.run_games([self.actor, HeuristicAgentMKII(self.env.game.game_config, 1)],100, 10000)
@@ -288,9 +285,13 @@ class PPO:
             "final_wr_vs_randomagent": vs_randomagent["player_wins"]["player_0"]/100,
         })
 
-    def save_current_model(self, filename):
-        path = f"{PROJECT_ROOT}/experiments/{self.run_name}/models/{filename}.pt"
-        critic_path = f"{PROJECT_ROOT}/experiments/{self.run_name}/models/{filename}_critic.pt"
+    def save_current_model(self, filename, final: bool = False):
+        if not final:
+            path = f"{PROJECT_ROOT}/experiments/{self.run_name}/models/{filename}.pt"
+            critic_path = f"{PROJECT_ROOT}/experiments/{self.run_name}/models/{filename}_critic.pt"
+        else:
+            path = f"{PROJECT_ROOT}/experiments/{self.run_name}/final/{filename}.pt"
+            critic_path = f"{PROJECT_ROOT}/experiments/{self.run_name}/final/{filename}_critic.pt"
         # Save a CPU copy of the state_dict so checkpoints are portable across devices.
         state_dict = {k: v.detach().cpu() for k, v in self.actor.policy_network.state_dict().items()}
         critic_state_dict = {k: v.detach().cpu() for k, v in self.critic.state_dict().items()}
