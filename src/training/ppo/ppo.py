@@ -10,6 +10,7 @@ from torch.optim import Adam
 import numpy as np
 
 from src.agents.Agent import Agent
+from src.neural_networks.NormalizedFeedForwardNN import NormalizedFeedForwardNN
 from src.training.TrainingEnums import LearningCheckpoint
 from src.neural_networks.FeedForwardNN import FeedForwardNN
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
@@ -56,7 +57,7 @@ class OpponentPool:
         if len(self.pool) > self.pool_size:
             self.pool.popleft()
 
-    def add_ppo(self, policy_network: FeedForwardNN):
+    def add_ppo(self, policy_network: NormalizedFeedForwardNN):
         new_agent = PPOAgent(self.game_config, self.player_number)
         cpu_copy = copy.deepcopy(policy_network).to("cpu")
         new_agent.policy_network = cpu_copy.to(self.device)
@@ -94,7 +95,7 @@ class PPO:
         self.actor.policy_network.to(self.device)
         self.actor_optim = Adam(self.actor.policy_network.parameters(), lr=self.lr)
 
-        self.critic = FeedForwardNN(self.actor.observation_space["observation"].shape[0], 1).to(self.device)
+        self.critic = NormalizedFeedForwardNN(self.actor.observation_space["observation"].shape[0], 1).to(self.device)
         self.critic_optim = Adam(self.critic.parameters(), lr=self.lr)
 
         self.agents = {
