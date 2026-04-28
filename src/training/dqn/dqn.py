@@ -19,7 +19,7 @@ from src.agents.RandomAgent import RandomAgent
 from src.env.AgentBattler import AgentBattler
 from src.env.MetricsTracker import MetricsTracker
 from src.game.FluxxEnums import GameConfig
-from src.neural_networks.DuelingFeedForwardNN import DuelingFeedForwardNN
+from src.neural_networks.NormalizedFeedForwardNN import NormalizedFeedForwardNN
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -67,7 +67,7 @@ class DQNOpponentPool:
         if len(self.pool) > self.pool_size:
             self.pool.popleft()
 
-    def add_dqn(self, q_network: DuelingFeedForwardNN):
+    def add_dqn(self, q_network: NormalizedFeedForwardNN):
         # Synchronize so any in-flight CUDA work on q_network is finished - attempt at curbing segfault issues
         if self.device.type == "cuda":
             torch.cuda.synchronize(self.device)
@@ -404,10 +404,10 @@ class DQN:
         g = torch.from_numpy(g).to(self.device)
 
         with torch.no_grad():
-            next_q_online = self.actor.q_network(s2, action_mask=m2).masked_fill(~m2, float("-inf"))
+            next_q_online = self.actor.q_network(s2).masked_fill(~m2, float("-inf"))
             next_actions = next_q_online.argmax(dim=-1, keepdim=True)
 
-            next_q_target = self.target_network(s2, action_mask=m2).masked_fill(~m2, float("-inf"))
+            next_q_target = self.target_network(s2).masked_fill(~m2, float("-inf"))
             next_q = next_q_target.gather(1, next_actions).squeeze(-1)
 
             next_q = torch.where(
@@ -417,7 +417,7 @@ class DQN:
             )
             td_target = R + (1.0 - done) * g * next_q
 
-        q_sa = self.actor.q_network(s, action_mask=m).gather(1, a.unsqueeze(-1)).squeeze(-1)
+        q_sa = self.actor.q_network(s,).gather(1, a.unsqueeze(-1)).squeeze(-1)
         loss = F.smooth_l1_loss(q_sa, td_target)
 
         self.q_optim.zero_grad()
