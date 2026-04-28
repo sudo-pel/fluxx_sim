@@ -150,6 +150,7 @@ class PPO:
         self.kl_limit = 0.02
         self.clip = 0.2
         self.lr = 1e-4
+        self.entropy_coefficient = 0.01
 
         # extra hyperparameters
         self.gae_lambda = 0.95
@@ -211,13 +212,15 @@ class PPO:
                     mb_returns = batch_returns.index_select(0, idx_tensor)
 
                     # Forward pass on the minibatch
-                    V_mb, current_log_probs, _ = self.evaluate(mb_obs, mb_acts, mb_masks)
+                    V_mb, current_log_probs, mb_entropy = self.evaluate(mb_obs, mb_acts, mb_masks)
 
                     # PPO actor loss
                     ratios = torch.exp(current_log_probs - mb_old_log_probs)
                     surr1 = ratios * mb_advantages
                     surr2 = torch.clamp(ratios, 1 - self.clip, 1 + self.clip) * mb_advantages
-                    actor_loss = (-torch.min(surr1, surr2)).mean()
+                    policy_loss = (-torch.min(surr1, surr2)).mean()
+                    entropy_bonus = mb_entropy.mean()
+                    actor_loss = policy_loss - self.entropy_coefficient * entropy_bonus
 
                     self.actor_optim.zero_grad()
                     actor_loss.backward(retain_graph=True)
