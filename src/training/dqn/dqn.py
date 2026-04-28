@@ -213,7 +213,7 @@ class DQN:
         self.batch_size = 128          # was 256; halves per-update gradient cost on CPU
         self.gamma = 0.99
         self.n_step = 3                # was 5; reduces pending-queue bookkeeping + bias
-        self.lr = 1e-4
+        self.lr = 3e-4
 
         # target network + update cadence
         self.target_sync_every = 2_000
