@@ -4,7 +4,7 @@ import numpy as np
 
 from src.agents import agent_utils
 from src.agents.Agent import Agent
-from src.neural_networks.FeedForwardNN import FeedForwardNN
+from src.neural_networks.NormalizedFeedForwardNN import NormalizedFeedForwardNN
 from src.game.FluxxEnums import GameState
 
 
@@ -31,7 +31,7 @@ class PPOAgent(Agent):
         in_dim = observation_space_size
         out_dim = action_space_size
 
-        self.policy_network = FeedForwardNN(in_dim, out_dim)
+        self.policy_network = NormalizedFeedForwardNN(in_dim, out_dim)
 
     @property
     def device(self) -> torch.device:
