@@ -31,16 +31,7 @@ def convert_decision_encoding(decision_encoding: list[DecisionEncodingType], dec
 
     return decision_context_vector
 
-def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):
-    current_phase = game_state.stack[-1]
-
-    # ----
-    # OBSERVATION
-    # ----
-
-    decisions_left = current_phase.decisions_left
-
-    decision_context_vectors: dict[GamePhaseType, list[DecisionEncodingType]] = {
+decision_context_vectors: dict[GamePhaseType, list[DecisionEncodingType]] = {
         GamePhaseType.DISCARD_CARD_FROM_HAND: [DecisionEncodingType.PLACE_DISCARD_PILE,
                                                DecisionEncodingType.REMAIN_PLAYER_HAND],
         GamePhaseType.PLAY_CARD_FOR_TURN: [DecisionEncodingType.PLAY, DecisionEncodingType.REMAIN_PLAYER_HAND],
@@ -72,7 +63,17 @@ def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):
                                                          DecisionEncodingType.REMAIN_PLAYER_HAND],
         GamePhaseType.DISCARD_GOAL_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE,
                                              DecisionEncodingType.REMAIN_IN_PLAY],
-    }
+}
+
+def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):
+    current_phase = game_state.stack[-1]
+
+    # ----
+    # OBSERVATION
+    # ----
+
+    decisions_left = current_phase.decisions_left
+
     decision_context_vector = convert_decision_encoding(decision_context_vectors[current_phase.type],
                                                         decisions_left, current_phase.counter,
                                                         current_phase.on_complete)

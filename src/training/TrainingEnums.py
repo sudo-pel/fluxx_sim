@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 
+import numpy as np
+
+
 @dataclass
 class GameLogConfig:
     log_name: str
@@ -10,3 +13,16 @@ class LearningCheckpoint:
     global_timestep: int
     run_name: str
     model_checkpoints_taken: int
+
+@dataclass
+class BufferEntry:
+    decision_context: np.ndarray
+    hand: list[str]
+    discard: list[str]
+    own_keepers: list[str]
+    opp_keepers: list[str]
+    goals: list[str]
+    rules: list[str]
+    draw_pile_size: int
+    opponent_hand_size: int
+    action_mask: np.ndarray
