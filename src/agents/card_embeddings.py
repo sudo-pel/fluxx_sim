@@ -18,7 +18,7 @@ from sentence_transformers import SentenceTransformer
 from src.game.cards.card_data import CARD_DATA
 
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+model = SentenceTransformer('all-mpnet-base-v2')
 
 # EXAMPLE USAGE FOR REFERENCE WHILE DEVELOPING
 embedding = model.encode("Draw 3 cards.")
@@ -50,7 +50,7 @@ def build_card_embedding(
     offset = 0
 
     # Type one-hot (4)
-    card_type = CARD_DATA["card_type"]
+    card_type = CARD_DATA[card_name]["card_type"]
     embedding[offset + CARD_TYPE_TO_IDX[card_type]] = 1.0
     offset += TYPE_DIM
 
@@ -58,7 +58,7 @@ def build_card_embedding(
     embedding[offset : offset + NAME_EMBED_DIM] = model.encode(card_name)
     offset += NAME_EMBED_DIM
 
-    # Goal-only keeper pools (32 + 32 + 32 = 96)
+    # Keeper pools (goal only)
     if card_type == "GOAL":
         for keeper_field in ("required_keepers", "disallowed_keepers", "optional_keepers"):
             keeper_names = CARD_DATA.get(keeper_field, [])
@@ -71,7 +71,7 @@ def build_card_embedding(
     else:
         offset += GOAL_KEEPER_BLOCK_DIM
 
-    # Effect text + hand-defined axes (64 + 16 = 80) for ACTION/RULE only
+    # Effect text + hand-defined axes (action/rules only)
     if card_type in ("ACTION", "RULE"):
         embedding[offset : offset + EFFECT_TEXT_DIM] = model.encode(CARD_DATA[card_name]["card_effect"])
         offset += EFFECT_TEXT_DIM

@@ -119,7 +119,7 @@ class PPOGeneralized:
             "player_1": None
         }
         self.opponent_pool = OpponentPool(env.game.game_config, 1, device=self.device, seed=ss_opponent_pool)
-        base_opponent = PPOAgent(env.game.game_config, 1)
+        base_opponent = PPOAgentGeneralized(env.game.game_config, 1)
         self.opponent_pool.add_agent(base_opponent)
 
         self.run_name = run_name

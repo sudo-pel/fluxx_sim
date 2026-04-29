@@ -24,8 +24,9 @@ import numpy as np
 import torch
 from torch.distributions import Categorical
 
+from src.agents.Agent import Agent
 from src.training.TrainingEnums import BufferEntry
-from card_embeddings import CARD_EMBED_DIM, get_embedding_table
+from src.agents.card_embeddings import CARD_EMBED_DIM, get_embedding_table
 from src.neural_networks.FluxxActorNetwork import FluxxActorNetwork
 
 # Adjust this import path to match where convert_decision_encoding lives in
@@ -45,12 +46,13 @@ MAX_GOALS_IN_PLAY = 100
 MAX_RULES_IN_PLAY = 100
 
 
-class PPOAgentGeneralized:
+class PPOAgentGeneralized(Agent):
     def __init__(
         self,
         game_config: GameConfig,
         player_number: int,
     ):
+        super(PPOAgentGeneralized, self).__init__()
         self.game_config = game_config
         self.player_number = player_number
         self.decision_context_vectors = decision_context_vectors
