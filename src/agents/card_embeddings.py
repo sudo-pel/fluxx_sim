@@ -18,24 +18,23 @@ from sentence_transformers import SentenceTransformer
 from src.game.cards.card_data import CARD_DATA
 
 
-model = SentenceTransformer('all-mpnet-base-v2')
-
-# EXAMPLE USAGE FOR REFERENCE WHILE DEVELOPING
-embedding = model.encode("Draw 3 cards.")
+model = SentenceTransformer('nomic-ai/nomic-embed-text-v1.5', truncate_dim=64)
+def model_encode(text: str) -> np.ndarray:
+    return model.encode(f"clustering: {text}", convert_to_numpy=True)
 
 
 CARD_TYPES = ["KEEPER", "GOAL", "ACTION", "RULE"]
 CARD_TYPE_TO_IDX = {t: i for i, t in enumerate(CARD_TYPES)}
 
-NAME_EMBED_DIM = 768
-EFFECT_TEXT_DIM = 768
+NAME_EMBED_DIM = 64
+EFFECT_TEXT_DIM = 64
 HAND_AXES_DIM = 16
 EFFECT_BLOCK_DIM = EFFECT_TEXT_DIM + HAND_AXES_DIM
 
 TYPE_DIM = len(CARD_TYPES)
 GOAL_KEEPER_BLOCK_DIM = NAME_EMBED_DIM * 3  # requisite + disallowed + optional
 CARD_EMBED_DIM = TYPE_DIM + NAME_EMBED_DIM + GOAL_KEEPER_BLOCK_DIM + EFFECT_BLOCK_DIM
-assert CARD_EMBED_DIM == 3860
+assert CARD_EMBED_DIM == 340
 
 def convert_card_name(card_name: str) -> str:
     return card_name.replace(" ", "_")
@@ -55,7 +54,7 @@ def build_card_embedding(
     offset += TYPE_DIM
 
     # Name embedding
-    embedding[offset : offset + NAME_EMBED_DIM] = model.encode(card_name)
+    embedding[offset : offset + NAME_EMBED_DIM] = model_encode(card_name)
     offset += NAME_EMBED_DIM
 
     # Keeper pools (goal only)
@@ -64,7 +63,7 @@ def build_card_embedding(
             keeper_names = CARD_DATA.get(keeper_field, [])
             if keeper_names:
                 pooled = np.sum(
-                    [model.encode(convert_card_name(k)) for k in keeper_names], axis=0
+                    [model_encode(convert_card_name(k)) for k in keeper_names], axis=0
                 )
                 embedding[offset : offset + NAME_EMBED_DIM] = pooled
             offset += NAME_EMBED_DIM
@@ -73,7 +72,7 @@ def build_card_embedding(
 
     # Effect text + hand-defined axes (action/rules only)
     if card_type in ("ACTION", "RULE"):
-        embedding[offset : offset + EFFECT_TEXT_DIM] = model.encode(CARD_DATA[card_name]["card_effect"])
+        embedding[offset : offset + EFFECT_TEXT_DIM] = model_encode(CARD_DATA[card_name]["card_effect"])
         offset += EFFECT_TEXT_DIM
         embedding[offset : offset + HAND_AXES_DIM] = CARD_DATA[card_name]["effect_parameters"]
         offset += HAND_AXES_DIM
