@@ -23,9 +23,12 @@ class AgentBattler:
     def __init__(self, env: FluxxEnv):
         self.env: FluxxEnv = env
 
-    def run_games(self, agents: list[Agent], game_count: int, turn_limit: int, log_games: bool = False, log_config: Optional[GameLogConfig] = None):
+    def run_games(self, agents: list[Agent], game_count: int, turn_limit: int, log_games: bool = False, log_config: Optional[GameLogConfig] = None, step_limit: Optional[int] = None):
         if log_games and log_config is None:
             raise ValueError("log_name must be specified if log_games is True")
+
+        if step_limit is None:
+            step_limit = turn_limit * 10
 
         wins = {f"player_{i}": 0 for i in range(self.env.game.player_count)}
         wins["draws"] = 0
@@ -39,12 +42,17 @@ class AgentBattler:
 
         for i in range(game_count):
             self.env.reset()
+            timestep = 0
 
             if log_games:
                 game_logger = GameLogLogger(f"{log_name}/game_{i}")
                 self.env.game.logger = game_logger
 
             for agent in self.env.agent_iter():
+                if timestep >= step_limit:
+                    break
+                timestep += 1
+
                 observation, _, termination, truncation, _ = self.env.last()
 
                 if termination or truncation:
