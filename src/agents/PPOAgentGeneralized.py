@@ -58,7 +58,10 @@ class PPOAgentGeneralized(Agent):
         self.decision_context_vectors = decision_context_vectors
 
         action_dim = len(game_config.card_list) + 1
-        self.policy_network = FluxxActorNetwork(action_dim=action_dim)
+        self.policy_network = FluxxActorNetwork(
+            action_dim=action_dim,
+            card_list=game_config.card_list,
+        )
         self.action_dim = action_dim
 
         self.card_to_index = {c: i for i, c in enumerate(game_config.card_list)}

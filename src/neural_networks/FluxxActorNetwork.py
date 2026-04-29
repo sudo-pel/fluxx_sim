@@ -2,7 +2,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from src.agents.card_embeddings import CARD_EMBED_DIM
+from src.agents.card_embeddings import CARD_EMBED_DIM, get_embedding_table
 
 class DeepSetsPool(nn.Module):
     def __init__(
@@ -78,23 +78,49 @@ class FluxxStateEncoder(nn.Module):
 
 
 class FluxxActorNetwork(nn.Module):
-    """
-    Actor network: encoder (FluxxStateEncoder) -> head -> action logits.
-
-    Modularity is relevant: The PPO critic also uses FluxxStateEncoder.
-    """
-
-    def __init__(self, action_dim: int, hidden_dim: int = 256):
+    def __init__(
+        self,
+        action_dim: int,
+        card_list: list[str],
+        hidden_dim: int = 256,
+        embed_dim: int = CARD_EMBED_DIM,
+    ):
         super().__init__()
+        assert action_dim == len(card_list) + 1, (
+            f"action_dim ({action_dim}) must equal len(card_list) + 1 "
+            f"({len(card_list) + 1}); the +1 is the no-op slot."
+        )
+
         self.encoder = FluxxStateEncoder()
-        self.head = nn.Sequential(
+
+        self.trunk = nn.Sequential(
             nn.Linear(self.encoder.output_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, action_dim),
         )
 
+        self.query_head = nn.Linear(hidden_dim, embed_dim)
+        self.no_op_head = nn.Linear(hidden_dim, 1)
+
+        embedding_table = get_embedding_table()
+        card_embeds = torch.stack(
+            [
+                torch.as_tensor(embedding_table[name], dtype=torch.float32)
+                for name in card_list
+            ],
+            dim=0,
+        )  # (num_cards, embed_dim)
+        self.register_buffer("card_embeds", card_embeds)
+
     def forward(self, obs: dict[str, torch.Tensor]) -> torch.Tensor:
-        state_vec = self.encoder(obs)
-        return self.head(state_vec)
+        state_vec = self.encoder(obs)               # (B, encoder.output_dim)
+        trunk_out = self.trunk(state_vec)           # (B, hidden_dim)
+
+        query = self.query_head(trunk_out)          # (B, embed_dim)
+        # (B, embed_dim) @ (embed_dim, num_cards) -> (B, num_cards)
+        card_logits = query @ self.card_embeds.T
+
+        no_op_logit = self.no_op_head(trunk_out)    # (B, 1)
+
+        return torch.cat([card_logits, no_op_logit], dim=-1)  # (B, num_cards + 1)
