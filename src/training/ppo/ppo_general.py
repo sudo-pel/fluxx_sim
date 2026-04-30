@@ -233,7 +233,7 @@ class PPOGeneralized:
                     actor_loss = policy_loss - self.entropy_coefficient * entropy_bonus
 
                     self.actor_optim.zero_grad()
-                    actor_loss.backward(retain_graph=True)
+                    actor_loss.backward(retain_graph=False)
                     self.actor_optim.step()
 
                     critic_loss = torch.nn.MSELoss()(V_mb, mb_returns)
