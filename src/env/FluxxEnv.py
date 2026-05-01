@@ -1,4 +1,7 @@
+from typing import Any
+
 import numpy.typing as npt
+from pettingzoo.utils.env import ObsType
 
 from src.game.Game import Game
 

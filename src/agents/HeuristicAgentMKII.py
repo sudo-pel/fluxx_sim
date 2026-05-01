@@ -10,12 +10,6 @@ from src.game.cards.card_data import CARD_DATA
 from src.game.FluxxEnums import GameConfig, GameState, GamePhaseType
 from src.game.utils.general_utils import print_game_state
 
-"""
-
-Implementation plan
-
-
-"""
 
 @dataclass
 class Gameplan:
@@ -535,5 +529,3 @@ class HeuristicAgentMKII(Agent):
             return len(action_mask)-1, [], None
         else:
             return self.game_config.card_list.index(choice), [], None
-
-
