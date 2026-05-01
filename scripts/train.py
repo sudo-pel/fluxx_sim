@@ -171,6 +171,9 @@ def main():
     elif args.script == "ppo_general":
         generate_embedding_table(card_lists.base_deck)
         training_script = PPOGeneralized(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device)
+    elif args.script == "ppo_general_with_reward_shaping":
+        generate_embedding_table(card_lists.base_deck)
+        training_script = PPOGeneralized(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device)
     else:
         logging.error("Unknown training script: {}".format(args.script))
         return 1
