@@ -99,6 +99,10 @@ class PPOAgentGeneralized(Agent):
         hand_size = len(game_state.hands[self.player_number])
         discard_pile_size = len(game_state.discard_pile)
         own_keepers_in_play_count = len(game_state.keepers[self.player_number])
+        opponent_keepers_in_play_count = sum(
+                len(game_state.keepers[i])
+                for i in range(self.game_config.player_count)
+                if i != self.player_number)
         goals_in_play_count = len(game_state.goals)
         rules_in_play_count = len(game_state.rules)
 
@@ -118,6 +122,7 @@ class PPOAgentGeneralized(Agent):
             hand_size=hand_size,
             discard_pile_size=discard_pile_size,
             own_keepers_in_play_count=own_keepers_in_play_count,
+            opponent_keepers_in_play_count=opponent_keepers_in_play_count,
             goals_in_play_count=goals_in_play_count,
             rules_in_play_count=rules_in_play_count,
         )
@@ -225,6 +230,7 @@ class PPOAgentGeneralized(Agent):
         hand_size = np.empty((N, 1), dtype=np.float32)
         discard_pile_size = np.empty((N, 1), dtype=np.float32)
         own_keepers_in_play_count = np.empty((N, 1), dtype=np.float32)
+        opponent_keepers_in_play_count = np.empty((N, 1), dtype=np.float32)
         goals_in_play_count = np.empty((N, 1), dtype=np.float32)
         rules_in_play_count = np.empty((N, 1), dtype=np.float32)
 
@@ -252,6 +258,7 @@ class PPOAgentGeneralized(Agent):
             hand_size[i, 0] = entry.hand_size
             discard_pile_size[i, 0] = entry.discard_pile_size
             own_keepers_in_play_count[i, 0] = entry.own_keepers_in_play_count
+            opponent_keepers_in_play_count[i, 0] = entry.opponent_keepers_in_play_count
             goals_in_play_count[i, 0] = entry.goals_in_play_count
             rules_in_play_count[i, 0] = entry.rules_in_play_count
 
@@ -279,6 +286,7 @@ class PPOAgentGeneralized(Agent):
             "hand_size": torch.from_numpy(hand_size).to(device),
             "discard_pile_size": torch.from_numpy(discard_pile_size).to(device),
             "own_keepers_in_play_count": torch.from_numpy(own_keepers_in_play_count).to(device),
+            "opponent_keepers_in_play_count": torch.from_numpy(opponent_keepers_in_play_count).to(device),
             "goals_in_play_count": torch.from_numpy(goals_in_play_count).to(device),
             "rules_in_play_count": torch.from_numpy(rules_in_play_count).to(device)
         }

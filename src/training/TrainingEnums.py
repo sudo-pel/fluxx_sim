@@ -29,5 +29,6 @@ class BufferEntry:
     hand_size: int
     discard_pile_size: int
     own_keepers_in_play_count: int
+    opponent_keepers_in_play_count: int
     goals_in_play_count: int
     rules_in_play_count: int
