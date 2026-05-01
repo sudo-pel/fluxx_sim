@@ -26,3 +26,8 @@ class BufferEntry:
     draw_pile_size: int
     opponent_hand_size: int
     action_mask: np.ndarray
+    hand_size: int
+    discard_pile_size: int
+    own_keepers_in_play_count: int
+    goals_in_play_count: int
+    rules_in_play_count: int

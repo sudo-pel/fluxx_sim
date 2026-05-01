@@ -58,6 +58,7 @@ class FluxxStateEncoder(nn.Module):
             self.DECISION_CONTEXT_DIM
             + self.NUM_POOLS * self.POOL_OUTPUT_DIM
             + 2  # draw_pile_size, opponent_hand_size
+            + FluxxStateEncoder.NUM_POOLS # also encode cardinality of each pooled set
         )
 
     def forward(self, obs: dict[str, torch.Tensor]) -> torch.Tensor:
@@ -72,6 +73,12 @@ class FluxxStateEncoder(nn.Module):
                 self.rules_pool(obs["rules_embeds"], obs["rules_mask"]),
                 obs["draw_pile_size"],
                 obs["opponent_hand_size"],
+                obs["hand_size"],
+                obs["discard_pile_size"],
+                obs["own_keepers_in_play_count"],
+                obs["opponent_keepers_in_play_count"],
+                obs["goals_in_play_count"],
+                obs["rules_in_play_count"]
             ],
             dim=-1,
         )
