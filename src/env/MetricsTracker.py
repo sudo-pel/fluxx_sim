@@ -52,13 +52,7 @@ class MetricsTracker:
             if not values:
                 continue
             arr = np.asarray(values)
-            if key in self.flat_statistics:
-                summary[key] = arr.mean()
-            else:
-                summary[f"{key}/mean"] = arr.mean()
-                summary[f"{key}/std"] = arr.std()
-                summary[f"{key}/min"] = arr.min()
-                summary[f"{key}/max"] = arr.max()
+            summary[key] = arr.mean()
 
         if self.episode_returns:
             summary["episode_return/mean"] = np.mean(self.episode_returns)
