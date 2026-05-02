@@ -20,10 +20,6 @@ from src.training.TrainingEnums import BufferEntry
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-
-torch.set_num_threads(1)
-torch.set_num_interop_threads(1)
-
 # Limit to how many BufferEntry objects are collate()d at once to limit memory load on GPUs
 Q_CHUNK_SIZE = 256
 
