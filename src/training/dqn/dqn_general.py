@@ -403,9 +403,12 @@ class DQNGeneralized:
 
                 # Close out the previous trainee transition if one is pending.
                 if pending is not None:
-                    next_entry = self.actor.encode(observation)
                     if done:
-                        print(f"[terminal] next_entry phase = {observation.stack[-1].type if observation.stack else 'EMPTY'}, "f"action_mask sum = {next_entry.action_mask.sum()}", flush=True)
+                        next_entry = pending[0]
+                        # terminal states will not always have legal actions (for example, could win before drawing a card and top of stack is PLAY_CARD_FOR_TURN with an empty hand
+                        # terminal state reward is zeroed so although this is dishonest, has no significant impact on execution
+                    else:
+                        next_entry = self.actor.encode(observation)
                     prev_entry, prev_action = pending
                     self.buffer.push(
                         prev_entry,
