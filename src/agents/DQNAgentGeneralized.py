@@ -1,39 +1,19 @@
-"""
-PPOAgent: PPO actor that takes a raw GameState, extracts a BufferEntry,
-collates batches into tensor dicts for its policy network, and selects
-actions.
-
-Key methods:
-    extract_entry(game_state) -> BufferEntry
-        Pulls the agent-relevant fields out of a raw game state.
-    collate(entries, device) -> dict[str, Tensor]
-        Converts N entries into batched, padded tensor dict for the encoder.
-    act(game_state) -> (action, log_prob, entry)
-        Public rollout interface. Extracts -> collates batch-of-1 ->
-        runs policy -> samples masked action.
-
-The same collate is also used by PPO during minibatching: collect a list
-of N BufferEntry objects, call self.actor.collate(entries, device), and
-hand the resulting dict to the actor's forward.
-"""
-
 from __future__ import annotations
-from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
-from torch.distributions import Categorical
 
 from src.agents.Agent import Agent
-from src.training.TrainingEnums import BufferEntry
+from src.agents.agent_utils import (
+    convert_decision_encoding,
+    decision_context_vectors,
+    populate_card_vector,
+)
 from src.agents.card_embeddings import CARD_EMBED_DIM, get_embedding_table
-from src.neural_networks.FluxxActorNetworkPPO import FluxxActorNetwork
-
-from src.agents.agent_utils import convert_decision_encoding, decision_context_vectors, populate_card_vector
-from src.game.FluxxEnums import GameState
-from src.game.FluxxEnums import GameConfig
-from src.game.FluxxEnums import GamePhaseType
+from src.game.FluxxEnums import GameConfig, GamePhaseType, GameState
 from src.game.cards.card_data import CARD_DATA
+from src.neural_networks.FluxxActorNetworkDQN import FluxxActorNetworkDQN
+from src.training.TrainingEnums import BufferEntry
 
 MAX_HAND_SIZE = 100
 MAX_DISCARD_SIZE = 100
@@ -43,19 +23,20 @@ MAX_GOALS_IN_PLAY = 100
 MAX_RULES_IN_PLAY = 100
 
 
-class PPOAgentGeneralized(Agent):
+class DQNAgentGeneralized(Agent):
     def __init__(
         self,
         game_config: GameConfig,
         player_number: int,
+        seed: np.random.SeedSequence = None,
     ):
-        super(PPOAgentGeneralized, self).__init__()
+        super(DQNAgentGeneralized, self).__init__()
         self.game_config = game_config
         self.player_number = player_number
         self.decision_context_vectors = decision_context_vectors
 
         action_dim = len(game_config.card_list) + 1
-        self.policy_network = FluxxActorNetwork(
+        self.q_network = FluxxActorNetworkDQN(
             action_dim=action_dim,
             card_list=game_config.card_list,
         )
@@ -63,10 +44,12 @@ class PPOAgentGeneralized(Agent):
 
         self.card_to_index = {c: i for i, c in enumerate(game_config.card_list)}
 
+        if seed is None:
+            self.rng = np.random.default_rng()
+        else:
+            self.rng = np.random.default_rng(seed)
+
     def extract_entry(self, game_state: GameState) -> BufferEntry:
-        """
-        Converts a specific GameState into a BufferEntry.
-        """
         current_phase = game_state.stack[-1]
 
         decision_context = convert_decision_encoding(
@@ -97,9 +80,10 @@ class PPOAgentGeneralized(Agent):
         discard_pile_size = len(game_state.discard_pile)
         own_keepers_in_play_count = len(game_state.keepers[self.player_number])
         opponent_keepers_in_play_count = sum(
-                len(game_state.keepers[i])
-                for i in range(self.game_config.player_count)
-                if i != self.player_number)
+            len(game_state.keepers[i])
+            for i in range(self.game_config.player_count)
+            if i != self.player_number
+        )
         goals_in_play_count = len(game_state.goals)
         rules_in_play_count = len(game_state.rules)
 
@@ -124,12 +108,14 @@ class PPOAgentGeneralized(Agent):
             rules_in_play_count=rules_in_play_count,
         )
 
-
-    # TODO: consider making a separate agent_utils function
     def build_action_mask(self, game_state, current_phase) -> np.ndarray:
-
-        cards_in_hand_vec = populate_card_vector(self.game_config.card_list, game_state.hands[self.player_number])
-        keeper_vecs = [populate_card_vector(self.game_config.card_list, kl) for kl in game_state.keepers]
+        cards_in_hand_vec = populate_card_vector(
+            self.game_config.card_list, game_state.hands[self.player_number]
+        )
+        keeper_vecs = [
+            populate_card_vector(self.game_config.card_list, kl)
+            for kl in game_state.keepers
+        ]
         own_keeper_vec = keeper_vecs[self.player_number]
         other_keeper_vecs = (
             keeper_vecs[: self.player_number]
@@ -151,23 +137,33 @@ class PPOAgentGeneralized(Agent):
         elif current_phase_type == GamePhaseType.DISCARD_RULE_IN_PLAY:
             action_mask = rules_vec
         elif current_phase_type == GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE:
-            action_mask = populate_card_vector(self.game_config.card_list, [c.name for c in current_phase.latent_space])
+            action_mask = populate_card_vector(
+                self.game_config.card_list,
+                [c.name for c in current_phase.latent_space],
+            )
         elif current_phase_type == GamePhaseType.ADD_CARD_IN_PLAY_TO_HAND:
             action_mask = np.bitwise_or.reduce((*keeper_vecs, rules_vec, goals_vec))
         elif current_phase_type == GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND:
-            action_mask = populate_card_vector(self.game_config.card_list, [c.name for c in current_phase.latent_space])
+            action_mask = populate_card_vector(
+                self.game_config.card_list,
+                [c.name for c in current_phase.latent_space],
+            )
         elif current_phase_type == GamePhaseType.PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE:
             action_mask = populate_card_vector(
                 self.game_config.card_list,
                 [
-                    c for c in game_state.discard_pile
+                    c
+                    for c in game_state.discard_pile
                     if CARD_DATA[c]["card_type"] in ("RULE", "ACTION")
-                ]
+                ],
             )
         elif current_phase_type == GamePhaseType.DISCARD_KEEPER_IN_PLAY:
             action_mask = np.bitwise_or.reduce(keeper_vecs)
         elif current_phase_type == GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT:
-            action_mask = populate_card_vector(self.game_config.card_list, [c.name for c in current_phase.latent_space])
+            action_mask = populate_card_vector(
+                self.game_config.card_list,
+                [c.name for c in current_phase.latent_space],
+            )
         elif current_phase_type == GamePhaseType.SELECT_KEEPER_TO_STEAL:
             action_mask = np.bitwise_or.reduce(other_keeper_vecs)
         elif current_phase_type == GamePhaseType.SELECT_OPPONENT_KEEPER_FOR_EXCHANGE:
@@ -176,13 +172,16 @@ class PPOAgentGeneralized(Agent):
             action_mask = own_keeper_vec.copy()
             action_mask[self.card_to_index[current_phase.labelled_card.name]] = 0
         elif current_phase_type == GamePhaseType.ACTIVATE_FREE_ACTION:
-            action_mask = populate_card_vector(self.game_config.card_list, list(game_state.available_free_actions))
+            action_mask = populate_card_vector(
+                self.game_config.card_list, list(game_state.available_free_actions)
+            )
             no_free_action_legal = True
         elif current_phase_type == GamePhaseType.DISCARD_OWN_KEEPER_IN_PLAY:
             action_mask = own_keeper_vec
         elif current_phase_type == GamePhaseType.DISCARD_VARIABLE_CARDS_FROM_HAND:
             valid = [
-                c for c in game_state.hands[self.player_number]
+                c
+                for c in game_state.hands[self.player_number]
                 if CARD_DATA[c]["card_type"] in [t.name for t in current_phase.card_types]
             ]
             action_mask = populate_card_vector(self.game_config.card_list, valid)
@@ -204,10 +203,8 @@ class PPOAgentGeneralized(Agent):
     ) -> dict[str, torch.Tensor]:
         N = len(entries)
 
-        # TODO: implement embedding table
         embedding_table = get_embedding_table()
 
-        # Pre-allocate batched arrays
         decision_context = np.empty((N, 19), dtype=np.float32)
         hand_embeds = np.zeros((N, MAX_HAND_SIZE, CARD_EMBED_DIM), dtype=np.float32)
         hand_mask = np.zeros((N, MAX_HAND_SIZE), dtype=np.float32)
@@ -231,7 +228,6 @@ class PPOAgentGeneralized(Agent):
         goals_in_play_count = np.empty((N, 1), dtype=np.float32)
         rules_in_play_count = np.empty((N, 1), dtype=np.float32)
 
-        # helper function, consider moving outside
         def fill_row(embeds_arr, mask_arr, row_idx, names, max_size, label):
             n = len(names)
             if n > max_size:
@@ -261,8 +257,6 @@ class PPOAgentGeneralized(Agent):
 
             action_mask[i] = entry.action_mask.astype(bool)
 
-
-        # Single transfer to device per tensor
         return {
             "decision_context": torch.from_numpy(decision_context).to(device),
             "hand_embeds": torch.from_numpy(hand_embeds).to(device),
@@ -285,26 +279,33 @@ class PPOAgentGeneralized(Agent):
             "own_keepers_in_play_count": torch.from_numpy(own_keepers_in_play_count).to(device),
             "opponent_keepers_in_play_count": torch.from_numpy(opponent_keepers_in_play_count).to(device),
             "goals_in_play_count": torch.from_numpy(goals_in_play_count).to(device),
-            "rules_in_play_count": torch.from_numpy(rules_in_play_count).to(device)
+            "rules_in_play_count": torch.from_numpy(rules_in_play_count).to(device),
         }
 
-    def act(self, game_state: "GameState") -> tuple[int, torch.Tensor, BufferEntry]:
-        """
-        Returns:
-            action: int (sampled action index)
-            log_prob: 0-d torch.Tensor (log probability of the sampled action)
-            entry: BufferEntry (to be stored in the replay buffer)
-        """
-        device = next(self.policy_network.parameters()).device
+    def act(
+        self,
+        game_state: "GameState",
+        epsilon: float = 0.0,
+    ) -> tuple[int, torch.Tensor, BufferEntry]:
+        device = next(self.q_network.parameters()).device
 
         entry = self.extract_entry(game_state)
-        obs_dict = self.collate([entry], device)   # batch of 1
+        obs_dict = self.collate([entry], device)  # batch of 1
 
-        logits = self.policy_network(obs_dict)              # (1, action_dim)
-        logits = logits.masked_fill(~obs_dict["action_mask"], float("-inf"))
+        with torch.no_grad():
+            q_values = self.q_network(obs_dict)               # (1, action_dim)
+            masked_q = q_values.masked_fill(~obs_dict["action_mask"], float("-inf"))
 
-        dist = Categorical(logits=logits)
-        action = dist.sample()                              # (1,)
-        log_prob = dist.log_prob(action)                    # (1,)
+        if self.rng.random() < epsilon:
+            legal = np.flatnonzero(entry.action_mask.astype(bool))
+            action = int(self.rng.choice(legal))
+        else:
+            action = int(masked_q.argmax(dim=-1).item())
 
-        return action.item(), log_prob.squeeze(0), entry
+        # Get q-value of chosen action for logging purposes
+        chosen_q = masked_q[0, action].detach()
+
+        return action, chosen_q, entry
+
+    def encode(self, game_state: "GameState") -> BufferEntry:
+        return self.extract_entry(game_state)

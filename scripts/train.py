@@ -49,6 +49,7 @@ from src.env.FluxxEnv import FluxxEnv
 from src.game.Game import Game
 from src.game.cards import card_lists
 from src.training.dqn.dqn import DQN
+from src.training.dqn.dqn_general import DQNGeneralized
 from src.training.ppo.ppo import PPO
 from src.training.ppo.ppo_general import PPOGeneralized
 
@@ -174,6 +175,9 @@ def main():
     elif args.script == "ppo_general_with_reward_shaping":
         generate_embedding_table(card_lists.base_deck)
         training_script = PPOGeneralized(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device)
+    elif args.script == "dqn_general":
+        generate_embedding_table(card_lists.base_deck)
+        training_script = DQNGeneralized(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device)
     else:
         logging.error("Unknown training script: {}".format(args.script))
         return 1

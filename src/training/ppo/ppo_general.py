@@ -9,7 +9,7 @@ from torch.optim import Adam
 import numpy as np
 
 from src.agents.Agent import Agent
-from src.neural_networks.FluxxActorNetwork import FluxxStateEncoder
+from src.neural_networks.FluxxActorNetworkPPO import FluxxStateEncoder
 from src.training.TrainingEnums import LearningCheckpoint
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgentGeneralized import PPOAgentGeneralized

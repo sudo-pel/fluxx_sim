@@ -1,9 +1,11 @@
 from __future__ import annotations
+
 import torch
 import torch.nn as nn
 
 from src.agents.card_embeddings import CARD_EMBED_DIM, get_embedding_table
 
+# TODO: Move this into a module?
 class DeepSetsPool(nn.Module):
     def __init__(
         self,
@@ -84,7 +86,8 @@ class FluxxStateEncoder(nn.Module):
         )
 
 
-class FluxxActorNetwork(nn.Module):
+
+class FluxxActorNetworkDQN(nn.Module):
     def __init__(
         self,
         action_dim: int,
@@ -107,7 +110,10 @@ class FluxxActorNetwork(nn.Module):
             nn.ReLU(),
         )
 
-        self.query_head = nn.Linear(hidden_dim, embed_dim)
+        self.query_head = nn.Sequential(
+            nn.Linear(hidden_dim, embed_dim),
+            nn.LayerNorm(embed_dim),
+        )
         self.no_op_head = nn.Linear(hidden_dim, 1)
 
         embedding_table = get_embedding_table()
@@ -118,16 +124,19 @@ class FluxxActorNetwork(nn.Module):
             ],
             dim=0,
         )  # (num_cards, embed_dim)
-        self.register_buffer("card_embeds", card_embeds)
+        card_embeds = card_embeds / card_embeds.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+
+        self.register_buffer("card_embeds", card_embeds, persistent=False)
 
     def forward(self, obs: dict[str, torch.Tensor]) -> torch.Tensor:
         state_vec = self.encoder(obs)               # (B, encoder.output_dim)
         trunk_out = self.trunk(state_vec)           # (B, hidden_dim)
 
         query = self.query_head(trunk_out)          # (B, embed_dim)
+
         # (B, embed_dim) @ (embed_dim, num_cards) -> (B, num_cards)
-        card_logits = query @ self.card_embeds.T
+        card_q_values = query @ self.card_embeds.T
 
-        no_op_logit = self.no_op_head(trunk_out)    # (B, 1)
+        no_op_q = self.no_op_head(trunk_out)        # (B, 1)
 
-        return torch.cat([card_logits, no_op_logit], dim=-1)  # (B, num_cards + 1)
+        return torch.cat([card_q_values, no_op_q], dim=-1)  # (B, num_cards + 1)
