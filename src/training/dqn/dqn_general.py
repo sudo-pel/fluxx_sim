@@ -15,7 +15,7 @@ from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.RandomAgent import RandomAgent
 from src.env.AgentBattler import AgentBattler
 from src.env.MetricsTracker import MetricsTracker
-from src.game.FluxxEnums import GameConfig, GamePhaseType
+from src.game.FluxxEnums import GameConfig
 from src.training.TrainingEnums import BufferEntry
 
 
@@ -403,10 +403,7 @@ class DQNGeneralized:
 
                 # Close out the previous trainee transition if one is pending.
                 if pending is not None:
-                    if done:
-                        next_entry = pending[0]
-                    else:
-                        next_entry = self.actor.encode(observation)
+                    next_entry = self.actor.encode(observation)
                     prev_entry, prev_action = pending
                     self.buffer.push(
                         prev_entry,

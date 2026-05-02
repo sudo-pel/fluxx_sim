@@ -809,6 +809,12 @@ class Game(GameSchema):
 
         if len(winners) == 1:
             self.winner = winners[0].id
+            self.stack.append(
+                GamePhase(
+                  GamePhaseType.GAME_OVER,
+                self.winner
+                )
+            )
             if self.logger is not None:
                 self.logger.game_over(self.winner, self.get_game_state())
 
