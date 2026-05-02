@@ -19,7 +19,11 @@ def convert_decision_encoding(decision_encoding: list[DecisionEncodingType], dec
     decision_context_vector = np.zeros(19, dtype=np.int8)
     for d in decision_encoding:
         decision_context_vector[d.value] = 1
-    decision_context_vector[16] = decisions_left
+
+    if decisions_left is None:
+        decision_context_vector[16] = 0
+    else:
+        decision_context_vector[16] = decisions_left
 
     if counter is None:
         decision_context_vector[17] = 0
