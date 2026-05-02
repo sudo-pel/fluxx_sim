@@ -404,6 +404,8 @@ class DQNGeneralized:
                 # Close out the previous trainee transition if one is pending.
                 if pending is not None:
                     next_entry = self.actor.encode(observation)
+                    if done:
+                        print(f"[terminal] next_entry phase = {observation.stack[-1].type if observation.stack else 'EMPTY'}, "f"action_mask sum = {next_entry.action_mask.sum()}", flush=True)
                     prev_entry, prev_action = pending
                     self.buffer.push(
                         prev_entry,
