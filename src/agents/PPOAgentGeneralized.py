@@ -127,6 +127,10 @@ class PPOAgentGeneralized(Agent):
 
     # TODO: consider making a separate agent_utils function
     def build_action_mask(self, game_state, current_phase) -> np.ndarray:
+        if current_phase.type == GamePhaseType.GAME_OVER:
+            action_mask = np.zeros(len(self.game_config.card_list), dtype=np.int8)
+            action_mask[-1] = 1 # want to avoid strange behaviour if no actions are legal in a state
+            return action_mask
 
         cards_in_hand_vec = populate_card_vector(self.game_config.card_list, game_state.hands[self.player_number])
         keeper_vecs = [populate_card_vector(self.game_config.card_list, kl) for kl in game_state.keepers]

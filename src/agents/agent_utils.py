@@ -63,6 +63,7 @@ decision_context_vectors: dict[GamePhaseType, list[DecisionEncodingType]] = {
                                                          DecisionEncodingType.REMAIN_PLAYER_HAND],
         GamePhaseType.DISCARD_GOAL_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE,
                                              DecisionEncodingType.REMAIN_IN_PLAY],
+        GamePhaseType.GAME_OVER: []
 }
 
 def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):

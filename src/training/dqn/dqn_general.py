@@ -403,10 +403,10 @@ class DQNGeneralized:
 
                 # Close out the previous trainee transition if one is pending.
                 if pending is not None:
-                    if self.env.game.stack[-1].type == GamePhaseType.POST_PLAY_CARD_FOR_TURN:
-                        print("ERROR: INVALID GAMEPHASETYPE ON TOP OF STACK UPON YIELDING")
-                        print(self.env.game.stack)
-                    next_entry = self.actor.encode(observation)
+                    if done:
+                        next_entry = pending[0]
+                    else:
+                        next_entry = self.actor.encode(observation)
                     prev_entry, prev_action = pending
                     self.buffer.push(
                         prev_entry,

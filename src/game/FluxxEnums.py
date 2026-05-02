@@ -50,6 +50,7 @@ class GamePhaseType(Enum):
     DISCARD_VARIABLE_CARDS_FROM_HAND = 21,
     DISCARD_GOAL_IN_PLAY = 22,
     DEFERRED_PLAY_GOAL = 23,
+    GAME_OVER = 24 # This state has a decision encoding so that actor.encode(obs) in dqn_general doesn't crash
 
     def is_actionless(self):
         return self in {GamePhaseType.GAME_START, GamePhaseType.TURN_END, GamePhaseType.POST_PLAY_CARD_FOR_TURN, GamePhaseType.DEFERRED_ADD_CARD_TO_DISCARD_PILE, GamePhaseType.DEFERRED_DRAW_CARD, GamePhaseType.DEFERRED_PLAY_GOAL}
