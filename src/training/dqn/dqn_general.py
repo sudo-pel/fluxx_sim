@@ -15,7 +15,7 @@ from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.RandomAgent import RandomAgent
 from src.env.AgentBattler import AgentBattler
 from src.env.MetricsTracker import MetricsTracker
-from src.game.FluxxEnums import GameConfig
+from src.game.FluxxEnums import GameConfig, GamePhaseType
 from src.training.TrainingEnums import BufferEntry
 
 
@@ -403,6 +403,9 @@ class DQNGeneralized:
 
                 # Close out the previous trainee transition if one is pending.
                 if pending is not None:
+                    if self.env.game.stack[-1].GamePhaseType == GamePhaseType.POST_PLAY_CARD_FOR_TURN:
+                        print("ERROR: INVALID GAMEPHASETYPE ON TOP OF STACK UPON YIELDING")
+                        print(self.env.game.stack)
                     next_entry = self.actor.encode(observation)
                     prev_entry, prev_action = pending
                     self.buffer.push(
