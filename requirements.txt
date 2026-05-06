@@ -1,0 +1,5 @@
+torch
+pettingzoo
+numpy
+tensorboard
+sentence-transformers
