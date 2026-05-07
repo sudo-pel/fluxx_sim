@@ -132,8 +132,9 @@ agents["dqn"].q_network.eval()
 # TODO: dqn_general and ppo_general_with_reward_shaping
 
 # (Temporary) filter out uninitialized agents
-for agent_name, agent in agents.items():
-    if agent is None:
+agent_names = agents.keys()
+for agent_name in agent_names:
+    if agents[agent_name] is None:
         del agents[agent_name]
 
 results: dict[tuple[str, str], dict[str, float]] = {}
