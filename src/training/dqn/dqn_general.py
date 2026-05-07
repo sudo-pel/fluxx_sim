@@ -242,7 +242,7 @@ class DQNGeneralized:
     def init_hyperparameters(self):
         # replay / learning
         self.buffer_capacity = 350_000
-        self.batch_size = 128
+        self.batch_size = 512
         self.gamma = 0.99
         self.n_step = 3
         self.lr = 3e-4
