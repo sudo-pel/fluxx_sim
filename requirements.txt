@@ -1,5 +1,5 @@
-torch
-pettingzoo
-numpy
-tensorboard
-sentence-transformers
+torch==2.11.0
+pettingzoo==1.25.0
+numpy==2.2.6
+tensorboard==2.20.0
+sentence-transformers==5.4.1
