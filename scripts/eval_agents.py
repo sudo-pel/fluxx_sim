@@ -122,7 +122,8 @@ agents = {
 agents["ppo"].policy_network.load_state_dict(torch.load(f"{PROJECT_ROOT}/experiments/ppo_2026-04-28_17-11-02/final/final_model_50004751.pt"))
 agents["ppo"].policy_network.eval()
 
-agents["ppo_general"].policy_network.load_state_dict(torch.load(f"{PROJECT_ROOT}/experiments/ppo_general_2026-05-02_09-11-14/models/model_42008245.pt"))
+# strict=False because card embeds was a part of state_dict when this code was run
+agents["ppo_general"].policy_network.load_state_dict(torch.load(f"{PROJECT_ROOT}/experiments/ppo_general_2026-05-02_09-11-14/models/model_42008245.pt", strict=False))
 agents["ppo_general"].policy_network.eval()
 
 agents["dqn"].q_network.load_state_dict(torch.load(f"{PROJECT_ROOT}/experiments/dqn_2026-04-29_08-06-30/final/final_model_50000050.pt"))

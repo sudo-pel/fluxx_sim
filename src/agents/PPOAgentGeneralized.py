@@ -27,8 +27,11 @@ from torch.distributions import Categorical
 from src.agents.Agent import Agent
 from src.training.TrainingEnums import BufferEntry
 from src.agents.card_embeddings import CARD_EMBED_DIM, get_embedding_table
-from src.neural_networks.FluxxActorNetworkPPO import FluxxActorNetwork
+from src.neural_networks.FluxxActorNetwork import FluxxActorNetwork
 
+# Adjust this import path to match where convert_decision_encoding lives in
+# your project. It is a pure utility (state-free) so a direct module import
+# is correct -- no need to inject it.
 from src.agents.agent_utils import convert_decision_encoding, decision_context_vectors, populate_card_vector
 from src.game.FluxxEnums import GameState
 from src.game.FluxxEnums import GameConfig
@@ -127,10 +130,6 @@ class PPOAgentGeneralized(Agent):
 
     # TODO: consider making a separate agent_utils function
     def build_action_mask(self, game_state, current_phase) -> np.ndarray:
-        if current_phase.type == GamePhaseType.GAME_OVER:
-            action_mask = np.zeros(len(self.game_config.card_list) + 1, dtype=np.int8)
-            action_mask[-1] = 1 # want to avoid strange behaviour if no actions are legal in a state
-            return action_mask
 
         cards_in_hand_vec = populate_card_vector(self.game_config.card_list, game_state.hands[self.player_number])
         keeper_vecs = [populate_card_vector(self.game_config.card_list, kl) for kl in game_state.keepers]
