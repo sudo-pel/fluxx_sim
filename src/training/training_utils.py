@@ -106,7 +106,7 @@ for card in CARD_DATA:
         for keeper in CARD_DATA[card]["required_keepers"]:
             keeper_to_goal[keeper].append(card)
 
-def get_gameplans_from_cards(cards: list[str], game_state: GameState, player_number: int, hand_visible: bool = True, sort_by: Optional[GameplanExtendedSortingOptions] = None, reverse: bool = False) -> tuple[list[Gameplan], dict[str, list[Gameplan]]]:
+def get_gameplans_from_cards(cards: list[str], game_state: GameState, player_number: int, hand_visible: bool = True, sort_by: Optional[GameplanExtendedSortingOptions] = None, reverse: bool = False) -> tuple[list[GameplanExtended], dict[str, list[GameplanExtended]]]:
     """
     Takes a list of cards (strings) and returns:
     - list of Gameplans that can be achieved with any subset of those cards
