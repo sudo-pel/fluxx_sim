@@ -164,7 +164,7 @@ def get_gameplans_from_cards(cards: list[str], game_state: GameState, player_num
             cards_in_discard = {card for card in game_state.discard_pile if (card in required_cards_set)}
             in_discard_count = len(cards_in_discard)
             disallowed_cards_in_play_count = len(disallowed_cards_in_play)
-            missing_optional_subgoal_count = len({s for s in held_optional_cards if len(s) == 0})
+            missing_optional_subgoal_count = len({1 for s in held_optional_cards if len(s) == 0}) # the subgoal sets are not hashable and not important for counting anyway
 
             # TODO: add support for goals with optional or disallowed keepers (must enrich Gameplan datatype)
             gameplan = GameplanExtended(
