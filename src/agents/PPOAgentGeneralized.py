@@ -302,6 +302,14 @@ class PPOAgentGeneralized(Agent):
         device = next(self.policy_network.parameters()).device
 
         entry = self.extract_entry(game_state)
+
+        if not entry.action_mask.any():
+            raise RuntimeError(
+                f"All-zero action mask in phase {game_state.stack[-1].type}. "
+                f"Hand size: {len(game_state.hands[self.player_number])}, "
+                f"own keepers: {len(game_state.keepers[self.player_number])}"
+            )
+
         obs_dict = self.collate([entry], device)   # batch of 1
 
         logits = self.policy_network(obs_dict)              # (1, action_dim)
