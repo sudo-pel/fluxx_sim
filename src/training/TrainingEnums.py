@@ -17,12 +17,12 @@ class LearningCheckpoint:
 @dataclass
 class BufferEntry:
     decision_context: np.ndarray
-    hand: list[str]
-    discard: list[str]
-    own_keepers: list[str]
-    opp_keepers: list[str]
-    goals: list[str]
-    rules: list[str]
+    hand_ids: np.ndarray            # CHANGED: was hand: list[str]
+    discard_ids: np.ndarray         # CHANGED: was discard: list[str]
+    own_keeper_ids: np.ndarray      # CHANGED: was own_keepers: list[str]
+    opp_keeper_ids: np.ndarray      # CHANGED: was opp_keepers: list[str]
+    goal_ids: np.ndarray            # CHANGED: was goals: list[str]
+    rules_ids: np.ndarray           # CHANGED: was rules: list[str]
     draw_pile_size: int
     opponent_hand_size: int
     action_mask: np.ndarray
