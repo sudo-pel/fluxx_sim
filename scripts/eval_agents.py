@@ -143,6 +143,8 @@ for agent_name, agent in agents.items():
     for other_agent_name, other_agent in agents.items():
         if agent_name == other_agent_name: continue
         print(f"RUNNING {agent_name} vs {other_agent_name}")
+        agent.player_number = 0
+        other_agent.player_number = 1
         results[(agent_name, other_agent_name)] = agent_battler.run_games([agent, other_agent], 10, 10000, log_games=False)
         print(f"RESULTS: {results[(agent_name, other_agent_name)]}")
 

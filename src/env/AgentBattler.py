@@ -49,7 +49,6 @@ class AgentBattler:
                 self.env.game.logger = game_logger
 
             for agent in self.env.agent_iter():
-                print(agent)
                 if timestep >= step_limit:
                     break
                 timestep += 1
