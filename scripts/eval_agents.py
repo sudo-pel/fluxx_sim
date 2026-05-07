@@ -3,7 +3,6 @@ from pathlib import Path
 import torch
 
 from src.agents.DQNAgent import DQNAgent
-from src.agents.DQNAgentGeneralized import DQNAgentGeneralized
 from src.agents.HeuristicAgentMKI import HeuristicAgentMKI
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgent import PPOAgent
