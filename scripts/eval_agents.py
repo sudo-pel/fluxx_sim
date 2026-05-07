@@ -15,23 +15,30 @@ from src.env.FluxxEnv import FluxxEnv
 from src.game.Game import Game
 from src.game.cards import card_lists
 
-def format_matchup_grid(results: dict[tuple[str, str], dict[str, float]]) -> str:
+def format_matchup_grid(
+    results: dict[tuple[str, str], dict[str, float]],
+) -> str:
     """
     Format pairwise agent matchup results as a readable grid.
 
     Each cell shows the row agent's win rate against the column agent,
     plus the average game length in parentheses. Diagonal cells (self-play)
-    are filled with "—" if not present in the results.
+    are filled with "—".
+
+    The function looks up each cell's stats by trying both directions:
+        - results[(row, col)] with row as player_0 -> use player_wins["player_0"]
+        - results[(col, row)] with row as player_1 -> use player_wins["player_1"]
+    Whichever direction is present in `results` is used. If both are present,
+    the (row, col) direction takes precedence.
 
     Args:
-        results: Mapping from (agent_a, agent_b) tuples to a dict of stat (piped straight from agent battler output).
+        results: Mapping from (agent_a, agent_b) tuples to a dict of stats.
             Each stats dict must contain:
-                - "player_wins": int, wins for agent_a in this matchup.
-                - "total_games": int, total games played.
+                - "player_wins": dict with keys "player_0" and "player_1".
+                  agent_a is treated as player_0 and agent_b as player_1.
+                - "total_games": int, total games played in this matchup.
                 - "average_game_length": float, mean game length.
-            The dict is treated as directional: results[(a, b)] describes
-            agent_a's performance against agent_b. Both directions can be
-            present and will be rendered in their respective cells.
+            Draws (if any) are inferred as total_games - sum of wins.
 
     Returns:
         A multi-line string containing the formatted grid.
@@ -49,51 +56,82 @@ def format_matchup_grid(results: dict[tuple[str, str], dict[str, float]]) -> str
     if not results:
         return "No matchup data."
 
-    # Collect the set of agent names from both sides of each pairing.
+    # Collect all agent names from both sides of every pairing.
     agents = sorted({name for pair in results for name in pair})
 
-    # Decide column width. Each cell is "XX.X% (YY.Y)" plus padding.
     name_col_width = max(len("Agent"), max(len(a) for a in agents))
     cell_width = max(12, max(len(a) for a in agents))
 
-    def fmt_cell(stats: dict[str, float] | None) -> str:
-        if stats is None:
+    def lookup_cell(row: str, col: str) -> tuple[int, int, float] | None:
+        """Return (row_wins, total_games, avg_game_length) for row vs col, or None."""
+        # Try the (row, col) direction first: row is player_0
+        if (row, col) in results:
+            stats = results[(row, col)]
+            return (
+                stats["player_wins"]["player_0"],
+                stats["total_games"],
+                stats["average_game_length"],
+            )
+        # Fall back to the reverse: row is player_1 in results[(col, row)]
+        if (col, row) in results:
+            stats = results[(col, row)]
+            return (
+                stats["player_wins"]["player_1"],
+                stats["total_games"],
+                stats["average_game_length"],
+            )
+        return None
+
+    def fmt_cell(row: str, col: str) -> str:
+        if row == col:
+            return "—".ljust(cell_width)
+        looked_up = lookup_cell(row, col)
+        if looked_up is None:
             return "—".center(cell_width)
-        wins = stats["player_wins"]
-        total = stats["total_games"]
+        wins, total, avg_len = looked_up
         winrate = (wins / total) * 100 if total else 0.0
-        avg_len = stats["average_game_length"]
         text = f"{winrate:5.1f}% ({avg_len:.1f})"
         return text.ljust(cell_width)
 
     lines: list[str] = []
 
-    # Header
+    # Title
     title = "Matchup win rates (row vs column) — avg game length in parens"
     lines.append(title)
     lines.append("═" * len(title))
 
-    # Column header row
-    header = " " * name_col_width + " │ " + " │ ".join(a.ljust(cell_width) for a in agents) + " │"
+    # Column header
+    header = (
+        " " * name_col_width
+        + " │ " + " │ ".join(a.ljust(cell_width) for a in agents)
+        + " │"
+    )
     lines.append(header)
 
-    # Separator under header
-    sep = "─" * name_col_width + "─┼─" + "─┼─".join("─" * cell_width for _ in agents) + "─┤"
+    # Separator
+    sep = (
+        "─" * name_col_width
+        + "─┼─" + "─┼─".join("─" * cell_width for _ in agents)
+        + "─┤"
+    )
     lines.append(sep)
 
     # Body rows
     for row_agent in agents:
-        cells: list[str] = []
-        for col_agent in agents:
-            if row_agent == col_agent:
-                cells.append("—".ljust(cell_width))
-            else:
-                cells.append(fmt_cell(results.get((row_agent, col_agent))))
-        line = row_agent.ljust(name_col_width) + " │ " + " │ ".join(cells) + " │"
+        cells = [fmt_cell(row_agent, col_agent) for col_agent in agents]
+        line = (
+            row_agent.ljust(name_col_width)
+            + " │ " + " │ ".join(cells)
+            + " │"
+        )
         lines.append(line)
 
     # Bottom border
-    bottom = "─" * name_col_width + "─┴─" + "─┴─".join("─" * cell_width for _ in agents) + "─┘"
+    bottom = (
+        "─" * name_col_width
+        + "─┴─" + "─┴─".join("─" * cell_width for _ in agents)
+        + "─┘"
+    )
     lines.append(bottom)
 
     return "\n".join(lines)
@@ -109,12 +147,12 @@ agent_battler = AgentBattler(env)
 # Prepare the agents.
 agents = {
     "ppo": PPOAgent(env.game.game_config, 0),
-    "ppo_general": PPOAgentGeneralized(env.game.game_config, 0),
-    "dqn": DQNAgent(env.game.game_config, 0),
+    "ppo_general": None, #PPOAgentGeneralized(env.game.game_config, 0),
+    "dqn": None, #DQNAgent(env.game.game_config, 0),
     "dqn_general": None,
     "ppo_general_with_reward_shaping": None,
-    "random": RandomAgent(env.game.game_config, 0),
-    "heuristic_agent_mki": HeuristicAgentMKI(env.game.game_config, 0),
+    "random": None, #RandomAgent(env.game.game_config, 0),
+    "heuristic_agent_mki": None, #HeuristicAgentMKI(env.game.game_config, 0),
     "heuristic_agent_mkii": HeuristicAgentMKII(env.game.game_config, 0),
 }
 
