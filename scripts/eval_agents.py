@@ -132,7 +132,7 @@ agents["dqn"].q_network.eval()
 # TODO: dqn_general and ppo_general_with_reward_shaping
 
 # (Temporary) filter out uninitialized agents
-agent_names = agents.keys()
+agent_names = [a for a in agents.keys()]
 for agent_name in agent_names:
     if agents[agent_name] is None:
         del agents[agent_name]
