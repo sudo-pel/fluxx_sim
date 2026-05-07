@@ -55,7 +55,7 @@ class AgentBattler:
 
                 observation, _, termination, truncation, _ = self.env.last()
 
-                if termination or truncation:
+                if termination or truncation or self.env.game.winner is not None:
                     action = None
                 else:
                     action, _, _ = agents[agent].act(observation)
