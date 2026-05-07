@@ -147,12 +147,12 @@ agent_battler = AgentBattler(env)
 # Prepare the agents.
 agents = {
     "ppo": PPOAgent(env.game.game_config, 0),
-    "ppo_general": None, #PPOAgentGeneralized(env.game.game_config, 0),
-    "dqn": None, #DQNAgent(env.game.game_config, 0),
+    "ppo_general": PPOAgentGeneralized(env.game.game_config, 0),
+    "dqn": DQNAgent(env.game.game_config, 0),
     "dqn_general": None,
     "ppo_general_with_reward_shaping": None,
-    "random": None, #RandomAgent(env.game.game_config, 0),
-    "heuristic_agent_mki": None, #HeuristicAgentMKI(env.game.game_config, 0),
+    "random": RandomAgent(env.game.game_config, 0),
+    "heuristic_agent_mki": HeuristicAgentMKI(env.game.game_config, 0),
     "heuristic_agent_mkii": HeuristicAgentMKII(env.game.game_config, 0),
 }
 
