@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 
 import torch
@@ -35,6 +36,25 @@ agent_names = [
     "heuristic_agent_mkii",
 ]
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Evaluate agents by pitting them against each other.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "games",
+        type=int,
+        help="Number of games to run",
+    )
+    parser.add_argument(
+        "-t", "--turn-limit",
+        type=int,
+        default=1000,
+        help="Maximum number of turns per game"
+    )
+    return parser.parse_args()
+
+args = parse_args()
 results: dict[tuple[str, str], dict[str, float]] = {}
 
 for card_list in card_lists:
@@ -84,5 +104,5 @@ for card_list in card_lists:
             print(f"RUNNING {agent_name} vs {other_agent_name}")
             agent.player_number = 0
             other_agent.player_number = 1
-            results[(agent_name, other_agent_name)] = agent_battler.run_games([agent, other_agent], 1000, 10000, log_games=False)
+            results[(agent_name, other_agent_name)] = agent_battler.run_games([agent, other_agent], args.games, args.turn_limit, log_games=False)
             print(f"RESULTS: {results[(agent_name, other_agent_name)]}")
