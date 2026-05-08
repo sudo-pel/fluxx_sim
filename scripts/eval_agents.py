@@ -30,7 +30,6 @@ agent_names = [
     "ppo",
     "ppo_general",
     "dqn",
-    "dqn_general",
     "random",
     "heuristic_agent_mki",
     "heuristic_agent_mkii",
