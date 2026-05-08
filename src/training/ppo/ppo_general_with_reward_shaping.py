@@ -414,7 +414,7 @@ class PPOGeneralizedRewardShaped:
                     break
 
                 game_state, reward, termination, truncation, info = self.env.last()
-                reward *= 100
+                reward *= 150
 
                 env_reward_component = 0.0
                 shaping_term = 0.0
