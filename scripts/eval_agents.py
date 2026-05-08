@@ -18,12 +18,11 @@ from src.game.cards import card_lists
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Card lists
-card_lists = [
-    #card_lists.simple_fluxx_deck,
-    card_lists.base_deck,
-    card_lists.expanded_deck
-]
-
+card_lists = {
+    "simple_fluxx_deck": card_lists.simple_fluxx_deck,
+    "base_deck": card_lists.base_deck,
+    "expanded_deck": card_lists.expanded_deck
+}
 
 # (Temporary) filter out uninitialized agents
 agent_names = [
@@ -51,13 +50,22 @@ def parse_args():
         default=1000,
         help="Maximum number of turns per game"
     )
+    parser.add_argument(
+        "-cls", "--card-lists",
+        nargs="+",
+        type=str,
+        default=["base_deck"],
+        choices=["base_deck", "expanded_deck", "simple_fluxx_deck"]
+    )
     return parser.parse_args()
 
 args = parse_args()
 results: dict[tuple[str, str], dict[str, float]] = {}
 
-for card_list in card_lists:
+for card_list in args.card_lists:
     print(f"PLAYING WITH: CARD LIST: {card_list}")
+
+    card_list = card_lists[card_list]
     generate_embedding_table(card_list)
     two_player_fluxx = Game(2, card_list, disable_game_messages=True, logger=None)
     env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
