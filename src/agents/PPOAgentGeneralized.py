@@ -132,32 +132,32 @@ class PPOAgentGeneralized(Agent):
             action_mask[-1] = 1 # want to avoid strange behaviour if no actions are legal in a state
             return action_mask
 
-        cards_in_hand_vec = populate_card_vector(self.game_config.card_list, game_state.hands[self.player_number])
-        keeper_vecs = [populate_card_vector(self.game_config.card_list, kl) for kl in game_state.keepers]
-        own_keeper_vec = keeper_vecs[self.player_number]
-        other_keeper_vecs = (
-            keeper_vecs[: self.player_number]
-            + keeper_vecs[self.player_number + 1 :]
+        cards_in_hand_vector = populate_card_vector(self.game_config.card_list, game_state.hands[self.player_number])
+        keeper_vectors = [populate_card_vector(self.game_config.card_list, kl) for kl in game_state.keepers]
+        own_keeper_vector = keeper_vectors[self.player_number]
+        other_keeper_vectors = (
+            keeper_vectors[: self.player_number]
+            + keeper_vectors[self.player_number + 1 :]
         )
-        rules_vec = populate_card_vector(self.game_config.card_list, game_state.rules)
-        goals_vec = populate_card_vector(self.game_config.card_list, game_state.goals)
+        rules_vector = populate_card_vector(self.game_config.card_list, game_state.rules)
+        goals_vector = populate_card_vector(self.game_config.card_list, game_state.goals)
 
         action_mask = np.zeros(len(self.game_config.card_list), dtype=np.int8)
         no_free_action_legal = False
 
         current_phase_type = current_phase.type
         if current_phase_type == GamePhaseType.PLAY_CARD_FOR_TURN:
-            action_mask = cards_in_hand_vec
+            action_mask = cards_in_hand_vector
         elif current_phase_type == GamePhaseType.DISCARD_CARD_FROM_HAND:
-            action_mask = cards_in_hand_vec
+            action_mask = cards_in_hand_vector
         elif current_phase_type == GamePhaseType.DISCARD_KEEPER:
-            action_mask = own_keeper_vec
+            action_mask = own_keeper_vector
         elif current_phase_type == GamePhaseType.DISCARD_RULE_IN_PLAY:
-            action_mask = rules_vec
+            action_mask = rules_vector
         elif current_phase_type == GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE:
             action_mask = populate_card_vector(self.game_config.card_list, [c.name for c in current_phase.latent_space])
         elif current_phase_type == GamePhaseType.ADD_CARD_IN_PLAY_TO_HAND:
-            action_mask = np.bitwise_or.reduce((*keeper_vecs, rules_vec, goals_vec))
+            action_mask = np.bitwise_or.reduce((*keeper_vectors, rules_vector, goals_vector))
         elif current_phase_type == GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND:
             action_mask = populate_card_vector(self.game_config.card_list, [c.name for c in current_phase.latent_space])
         elif current_phase_type == GamePhaseType.PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE:
@@ -169,21 +169,21 @@ class PPOAgentGeneralized(Agent):
                 ]
             )
         elif current_phase_type == GamePhaseType.DISCARD_KEEPER_IN_PLAY:
-            action_mask = np.bitwise_or.reduce(keeper_vecs)
+            action_mask = np.bitwise_or.reduce(keeper_vectors)
         elif current_phase_type == GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT:
             action_mask = populate_card_vector(self.game_config.card_list, [c.name for c in current_phase.latent_space])
         elif current_phase_type == GamePhaseType.SELECT_KEEPER_TO_STEAL:
-            action_mask = np.bitwise_or.reduce(other_keeper_vecs)
+            action_mask = np.bitwise_or.reduce(other_keeper_vectors)
         elif current_phase_type == GamePhaseType.SELECT_OPPONENT_KEEPER_FOR_EXCHANGE:
-            action_mask = np.bitwise_or.reduce(other_keeper_vecs)
+            action_mask = np.bitwise_or.reduce(other_keeper_vectors)
         elif current_phase_type == GamePhaseType.SELECT_PLAYER_KEEPER_FOR_EXCHANGE:
-            action_mask = own_keeper_vec.copy()
+            action_mask = own_keeper_vector.copy()
             action_mask[self.card_to_index[current_phase.labelled_card.name]] = 0
         elif current_phase_type == GamePhaseType.ACTIVATE_FREE_ACTION:
             action_mask = populate_card_vector(self.game_config.card_list, list(game_state.available_free_actions))
             no_free_action_legal = True
         elif current_phase_type == GamePhaseType.DISCARD_OWN_KEEPER_IN_PLAY:
-            action_mask = own_keeper_vec
+            action_mask = own_keeper_vector
         elif current_phase_type == GamePhaseType.DISCARD_VARIABLE_CARDS_FROM_HAND:
             valid = [
                 c for c in game_state.hands[self.player_number]
@@ -192,7 +192,21 @@ class PPOAgentGeneralized(Agent):
             action_mask = populate_card_vector(self.game_config.card_list, valid)
             no_free_action_legal = True
         elif current_phase_type == GamePhaseType.DISCARD_GOAL_IN_PLAY:
-            action_mask = goals_vec
+            action_mask = goals_vector
+        elif current_phase.type == GamePhaseType.PLAY_GOAL_FROM_DISCARD_PILE:
+            valid_cards_in_discard_pile = []
+            for card in game_state.discard_pile:
+                if CARD_DATA[card]["card_type"] == "GOAL":
+                    valid_cards_in_discard_pile.append(card)
+            action_mask = populate_card_vector(self.game_config.card_list, valid_cards_in_discard_pile)
+        elif current_phase.type == GamePhaseType.SELECT_KEEPER_FROM_DISCARD_PILE:
+            valid_cards_in_discard_pile = []
+            for card in game_state.discard_pile:
+                if CARD_DATA[card]["card_type"] == "KEEPER":
+                    valid_cards_in_discard_pile.append(card)
+            action_mask = populate_card_vector(self.game_config.card_list, valid_cards_in_discard_pile)
+        elif current_phase.type == GamePhaseType.GIVE_KEEPER_TO_OPPONENT:
+            action_mask = own_keeper_vector
         else:
             raise Exception(f"Invalid game phase type: {current_phase_type}")
 

@@ -169,8 +169,6 @@ def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):
         action_mask = agent_keeper_vector
         action_mask[card_to_index[
             current_phase.labelled_card.name]] = 0  # mask out the keeper that was stolen from the opponent in this exchange
-    elif current_phase.type == GamePhaseType.GIVE_KEEPER_TO_OPPONENT:
-        action_mask = agent_keeper_vector
     elif current_phase.type == GamePhaseType.ACTIVATE_FREE_ACTION:
         action_mask = populate_card_vector(game_config.card_list,
             [free_action_name for free_action_name in game_state.available_free_actions])
@@ -198,6 +196,8 @@ def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):
             if CARD_DATA[card]["card_type"] == "KEEPER":
                 valid_cards_in_discard_pile.append(card)
         action_mask = populate_card_vector(game_config.card_list, valid_cards_in_discard_pile)
+    elif current_phase.type == GamePhaseType.GIVE_KEEPER_TO_OPPONENT:
+        action_mask = agent_keeper_vector
     else:
         raise Exception(f"Invalid game phase type: {current_phase.type}")
 
