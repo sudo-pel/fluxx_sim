@@ -18,8 +18,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Card lists
 card_lists = [
-    card_lists.base_deck,
     card_lists.simple_fluxx_deck,
+    card_lists.base_deck,
     card_lists.expanded_deck
 ]
 
