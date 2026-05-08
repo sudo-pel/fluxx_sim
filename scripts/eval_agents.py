@@ -104,7 +104,7 @@ for card_list in args.card_lists:
     for agent_name in agent_names:
         for other_agent_name in agent_names:
             if agent_name == other_agent_name or (other_agent_name, agent_name) in seen_matchups: continue
-            seen_matchups.add((other_agent_name, agent_name))
+            seen_matchups.add((agent_name, other_agent_name))
 
             agent = agents[agent_name]
             other_agent = agents[other_agent_name]
