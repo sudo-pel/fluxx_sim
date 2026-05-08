@@ -276,8 +276,10 @@ def activate_rotate_hands(game_state: 'GameSchema', user_number: int, rng: Rando
 
 def activate_pandoras_box(game_state: 'GameSchema', user_number: int, rng: Random):
     rules_played = 0
+    seen_cards = set()
     while rules_played < 3:
         card = game_state.get_card_from_draw_pile()
+        seen_cards.add(card)
         if card is None:
             game_state.game_message(
                 "<< Pandora's Box: deck exhausted before 3 Rules played >>",
@@ -289,10 +291,18 @@ def activate_pandoras_box(game_state: 'GameSchema', user_number: int, rng: Rando
                 f"<< Pandora's Box revealed Rule: {card.name} >>",
                 GameMessageType.SPECIAL_EFFECT,
             )
-            game_state.activate_card(user_number, card)
+            game_state.stack.append(GamePhase(
+                GamePhaseType.DEFERRED_PLAY_CARD,
+                user_number,
+                card=card
+            ))
             rules_played += 1
         else:
             game_state.discard_pile.append(card)
+
+        # If there are fewer than 3 rule cards in the draw pile, avoid entering an infinite loop
+        if card in seen_cards:
+            break
 
 
 def activate_rewind(game_state: 'GameSchema', user_number: int, rng: Random):
@@ -321,7 +331,7 @@ def activate_robin_hood(game_state: 'GameSchema', user_number: int, rng: Random)
         return
 
     game_state.stack.append(
-        GamePhase(GamePhaseType.GIVE_KEEPER_TO_OPPONENT, opponent_number, decisions_left=1)
+        GamePhase(GamePhaseType.GIVE_KEEPER_TO_OPPONENT, user_number, decisions_left=1)
     )
     return
 
@@ -353,7 +363,7 @@ def activate_gift_giveaway(game_state: 'GameSchema', user_number: int, rng: Rand
         return
 
     n = len(game_state.players)
-    for offset in range(1, n + 2):
+    for offset in range(1, n + 1):
         giver_number = (user_number + offset) % n
         if len(game_state.players[giver_number].keepers) == 0:
             continue
@@ -559,6 +569,10 @@ ACTION_FUNCTIONS = {
     "supernova": activate_supernova,
     "destroy_all_keepers": activate_destroy_all_keepers,
     "oops": activate_oops,
+    "close_enough": activate_close_enough,
+    "roll_for_it": activate_roll_for_it,
+    "brain_drain": activate_brain_drain,
+    "rough_seas": activate_rough_seas,
 }
 
 

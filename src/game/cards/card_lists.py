@@ -97,7 +97,7 @@ expanded_deck = [
     "trade_hands",
     "no_limits",
     "take_another_turn",
-    "discard_and_draw"
+    "discard_and_draw",
     
     # Rule cards from base deck
     "double_agenda",

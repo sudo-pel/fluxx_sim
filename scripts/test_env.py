@@ -1,5 +1,6 @@
 import torch
 
+from scripts.debug_utils import printout_state
 from src.agents.DQNAgent import DQNAgent
 from src.agents.HeuristicAgentMKI import HeuristicAgentMKI
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
@@ -22,6 +23,7 @@ def main(one_turn_win_simple_fluxx=None):
 
     env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
 
+    """
     actor = PPOAgent(env.game.game_config, 0)  # same architecture
     actor.policy_network.load_state_dict(torch.load("../from_remote/ppo_2026-04-23_12-33-19_final.pt"))
     actor.policy_network.eval()
@@ -29,6 +31,7 @@ def main(one_turn_win_simple_fluxx=None):
     actor2 = DQNAgent(env.game.game_config, 1)
     actor2.q_network.load_state_dict(torch.load("../from_remote/dqn-normalized_nn_2026-04-23_02-45-56_final.pt"))
     actor2.q_network.eval()
+    """
 
     agents = {
         "player_0": RandomAgent(env.game.game_config, 0),
@@ -69,7 +72,7 @@ def main(one_turn_win_simple_fluxx=None):
 
                 #print(f"Agent {agent} took action {action}")
                 env.step(action)
-                #printout_state(env.get_player_number(agent), env.game.get_game_state())
+                #print("\n".join(printout_state(env.get_player_number(agent), env.game.get_game_state())))
                 #print(env.game.stack)
 
             #print(env.game.winner)

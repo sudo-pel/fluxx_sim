@@ -23,36 +23,17 @@ card_lists = [
     card_lists.expanded_deck
 ]
 
-# Prepare the agents.
-agents = {
-    "ppo": PPOAgent(env.game.game_config, 0),
-    "ppo_general": PPOAgentGeneralized(env.game.game_config, 0),
-    "dqn": DQNAgent(env.game.game_config, 0),
-    "dqn_general": None,
-    "ppo_general_with_reward_shaping": None,
-    "random": RandomAgent(env.game.game_config, 0),
-    "heuristic_agent_mki": HeuristicAgentMKI(env.game.game_config, 0),
-    "heuristic_agent_mkii": HeuristicAgentMKII(env.game.game_config, 0),
-}
-
-# Load the trained state dicts.
-agents["ppo"].policy_network.load_state_dict(torch.load(f"{PROJECT_ROOT}/experiments/ppo_2026-04-28_17-11-02/final/final_model_50004751.pt"))
-agents["ppo"].policy_network.eval()
-
-# strict=False because card embeds was a part of state_dict when this code was run
-agents["ppo_general"].policy_network.load_state_dict(torch.load(f"{PROJECT_ROOT}/experiments/ppo_general_2026-05-02_09-11-14/final/final_model_50006336.pt"), strict=False)
-agents["ppo_general"].policy_network.eval()
-
-agents["dqn"].q_network.load_state_dict(torch.load(f"{PROJECT_ROOT}/experiments/dqn_2026-04-29_08-06-30/final/final_model_50000050.pt"))
-agents["dqn"].q_network.eval()
-
-# TODO: dqn_general and ppo_general_with_reward_shaping
 
 # (Temporary) filter out uninitialized agents
-agent_names = [a for a in agents.keys()]
-for agent_name in agent_names:
-    if agents[agent_name] is None:
-        del agents[agent_name]
+agent_names = [
+    "ppo",
+    "ppo_general",
+    "dqn",
+    "dqn_general",
+    "random",
+    "heuristic_agent_mki",
+    "heuristic_agent_mkii",
+]
 
 results: dict[tuple[str, str], dict[str, float]] = {}
 
@@ -63,11 +44,45 @@ for card_list in card_lists:
     env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
     agent_battler = AgentBattler(env)
 
-    for agent_name, agent in agents.items():
-        for other_agent_name, other_agent in agents.items():
-            if agent_name == other_agent_name: continue
+    # Prepare the agents.
+    agents = {
+        "ppo": PPOAgent(env.game.game_config, 0),
+        "ppo_general": PPOAgentGeneralized(env.game.game_config, 0),
+        "dqn": DQNAgent(env.game.game_config, 0),
+        "dqn_general": None,
+        "ppo_general_with_reward_shaping": None,
+        "random": RandomAgent(env.game.game_config, 0),
+        "heuristic_agent_mki": HeuristicAgentMKI(env.game.game_config, 0),
+        "heuristic_agent_mkii": HeuristicAgentMKII(env.game.game_config, 0),
+    }
+
+    # Load the trained state dicts.
+    agents["ppo"].policy_network.load_state_dict(
+        torch.load(f"{PROJECT_ROOT}/experiments/ppo_2026-04-28_17-11-02/final/final_model_50004751.pt"))
+    agents["ppo"].policy_network.eval()
+
+    # strict=False because card embeds was a part of state_dict when this code was run
+    agents["ppo_general"].policy_network.load_state_dict(
+        torch.load(f"{PROJECT_ROOT}/experiments/ppo_general_2026-05-02_09-11-14/final/final_model_50006336.pt"),
+        strict=False)
+    agents["ppo_general"].policy_network.eval()
+
+    agents["dqn"].q_network.load_state_dict(
+        torch.load(f"{PROJECT_ROOT}/experiments/dqn_2026-04-29_08-06-30/final/final_model_50000050.pt"))
+    agents["dqn"].q_network.eval()
+
+    # TODO: dqn_general and ppo_general_with_reward_shaping
+
+    seen_matchups = set()
+    for agent_name in agent_names:
+        for other_agent_name, other_agent in agent_names:
+            if agent_name == other_agent_name or {agent_name, other_agent_name} in seen_matchups: continue
+            seen_matchups.add({agent_name, other_agent_name})
+
+            agent = agents[agent_name]
+            other_agent = agents[other_agent_name]
             print(f"RUNNING {agent_name} vs {other_agent_name}")
             agent.player_number = 0
             other_agent.player_number = 1
-            results[(agent_name, other_agent_name)] = agent_battler.run_games([agent, other_agent], 10000, 10000, log_games=False)
+            results[(agent_name, other_agent_name)] = agent_battler.run_games([agent, other_agent], 1000, 10000, log_games=False)
             print(f"RESULTS: {results[(agent_name, other_agent_name)]}")

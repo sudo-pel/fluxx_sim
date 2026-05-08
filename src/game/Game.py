@@ -171,7 +171,7 @@ class Game(GameSchema):
             if card_name == phase.labelled_card.name: return False, "Keeper to be exchanged cannot be exchanged for itself"
 
         elif phase.type == GamePhaseType.GIVE_KEEPER_TO_OPPONENT:
-            if card_name not in self.get_all_keepers_by_name()[phase.acting_player]: return False, "Keeper to be exchanged not owned (by player)"
+            if card_name not in self.get_all_keepers_by_name()[phase.acting_player]: return False, "Keeper to be given not owned (by player)"
 
         elif phase.type == GamePhaseType.ACTIVATE_FREE_ACTION:
             if card_name != "no_free_action" and card_name not in self.get_available_free_actions(): return False, "Free action to be activated not available"
@@ -411,6 +411,9 @@ class Game(GameSchema):
 
             elif current_phase.type == GamePhaseType.DEFERRED_PLAY_GOAL:
                 self.goals.append(current_phase.card)
+
+            elif current_phase.type == GamePhaseType.DEFERRED_PLAY_CARD:
+                self.activate_card(acting_player, current_phase.card)
 
         # ---
         # CORRECTNESS ASSERTION
