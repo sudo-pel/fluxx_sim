@@ -363,7 +363,12 @@ class HeuristicAgentMKI(Agent):
         current_phase = state.stack[-1]
         action_mask = agent_utils.observe_hot_encoded(self, state, self.game_config)["action_mask"]
         cards_to_choose_from = [self.game_config.card_list[i] for i in range(len(self.game_config.card_list)) if action_mask[i] == 1]
-        priorities: dict[int, set[str]] = HeuristicAgentMKI.game_phase_to_eval_function[current_phase.type](self, state, cards_to_choose_from)
+
+        # new phases not taken into account
+        if current_phase.type not in HeuristicAgentMKI.game_phase_to_eval_function:
+            priorities: dict[int, set[str]] = {0: {c for c in cards_to_choose_from}}
+        else:
+            priorities: dict[int, set[str]] = HeuristicAgentMKI.game_phase_to_eval_function[current_phase.type](self, state, cards_to_choose_from)
 
         # adding "no free action" if masked in
         if action_mask[-1] == 1:

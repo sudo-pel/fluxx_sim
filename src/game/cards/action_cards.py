@@ -270,6 +270,260 @@ def activate_rotate_hands(game_state: 'GameSchema', user_number: int, rng: Rando
         elif current_index == n:
             current_index = 0
 
+# ----------------
+# Expanded set cards
+# ----------------
+
+def activate_pandoras_box(game_state: 'GameSchema', user_number: int, rng: Random):
+    rules_played = 0
+    while rules_played < 3:
+        card = game_state.get_card_from_draw_pile()
+        if card is None:
+            game_state.game_message(
+                "<< Pandora's Box: deck exhausted before 3 Rules played >>",
+                GameMessageType.SPECIAL_EFFECT,
+            )
+            return
+        if card.card_type == CardType.RULE:
+            game_state.game_message(
+                f"<< Pandora's Box revealed Rule: {card.name} >>",
+                GameMessageType.SPECIAL_EFFECT,
+            )
+            game_state.activate_card(user_number, card)
+            rules_played += 1
+        else:
+            game_state.discard_pile.append(card)
+
+
+def activate_rewind(game_state: 'GameSchema', user_number: int, rng: Random):
+    goals_in_discard = [c for c in game_state.discard_pile if c.card_type == CardType.GOAL]
+    if len(goals_in_discard) == 0:
+        return
+    game_state.stack.append(
+        GamePhase(GamePhaseType.PLAY_GOAL_FROM_DISCARD_PILE, user_number, decisions_left=1)
+    )
+
+def activate_robin_hood(game_state: 'GameSchema', user_number: int, rng: Random):
+    user_player = game_state.players[user_number]
+    opponent_number = user_number ^ 1
+    opponent = game_state.players[opponent_number]
+
+    user_count = len(user_player.keepers)
+    opp_count = len(opponent.keepers)
+
+    if user_count == 0 and opp_count == 0:
+        return  # nothing to move
+
+    if opp_count > user_count:
+        game_state.stack.append(
+            GamePhase(GamePhaseType.SELECT_KEEPER_TO_STEAL, user_number, decisions_left=1)
+        )
+        return
+
+    game_state.stack.append(
+        GamePhase(GamePhaseType.GIVE_KEEPER_TO_OPPONENT, opponent_number, decisions_left=1)
+    )
+    return
+
+
+def activate_time_vortex(game_state: 'GameSchema', user_number: int, rng: Random):
+    pool = []
+    for p in game_state.players:
+        pool.extend(p.hand)
+        p.hand = []
+
+    if len(pool) == 0:
+        return
+
+    rng.shuffle(pool)
+
+    n = len(game_state.players)
+    for i in range(len(pool)):
+        recipient_number = (user_number + i) % n
+        game_state.players[recipient_number].hand.append(pool[i])
+
+    game_state.game_message(
+        f"<< Time Vortex: redealt {len(pool)} cards across {n} players >>",
+        GameMessageType.SPECIAL_EFFECT,
+    )
+
+
+def activate_gift_giveaway(game_state: 'GameSchema', user_number: int, rng: Random):
+    if all(len(p.keepers) == 0 for p in game_state.players):
+        return
+
+    n = len(game_state.players)
+    for offset in range(1, n + 2):
+        giver_number = (user_number + offset) % n
+        if len(game_state.players[giver_number].keepers) == 0:
+            continue
+        game_state.stack.append(GamePhase(
+            GamePhaseType.GIVE_KEEPER_TO_OPPONENT,
+            giver_number,
+            decisions_left=1,
+        ))
+
+
+def activate_dig_up_the_past(game_state: 'GameSchema', user_number: int, rng: Random):
+    keepers_in_discard = [c for c in game_state.discard_pile if c.card_type == CardType.KEEPER]
+    if len(keepers_in_discard) == 0:
+        return
+    game_state.stack.append(
+        GamePhase(GamePhaseType.SELECT_KEEPER_FROM_DISCARD_PILE, user_number, decisions_left=1)
+    )
+
+
+def activate_space_jackpot(game_state: 'GameSchema', user_number: int, rng: Random):
+    user_player = game_state.players[user_number]
+    for _ in range(5 + game_state.inflation()):
+        game_state.draw(user_player)
+
+    discards_required = min(2, len(user_player.hand))
+    if discards_required == 0:
+        return
+    game_state.stack.append(GamePhase(
+        GamePhaseType.DISCARD_CARD_FROM_HAND,
+        user_number,
+        decisions_left=discards_required,
+    ))
+
+
+def activate_supernova(game_state: 'GameSchema', user_number: int, rng: Random):
+    spared = {"dog", "cat", "monkey"}
+
+    for player in game_state.players:
+        kept = []
+        for keeper in player.keepers:
+            if keeper.name in spared:
+                kept.append(keeper)
+            else:
+                game_state.discard_pile.append(keeper)
+        player.keepers = kept
+
+    game_state.draw_pile += game_state.discard_pile
+    discard_size = len(game_state.discard_pile)
+    game_state.discard_pile = []
+    rng.shuffle(game_state.draw_pile)
+
+    game_state.game_message(
+        f"<< Supernova: shuffled {discard_size} cards back into deck. "
+        f"Spared: {sorted(spared) if spared else 'none'} >>",
+        GameMessageType.SPECIAL_EFFECT,
+    )
+
+def activate_destroy_all_keepers(game_state: 'GameSchema', user_number: int, rng: Random):
+    total = 0
+    for player in game_state.players:
+        for keeper in player.keepers:
+            game_state.discard_pile.append(keeper)
+            total += 1
+        player.keepers = []
+    if total > 0:
+        game_state.game_message(
+            f"<< Destroy All Keepers: discarded {total} Keepers >>",
+            GameMessageType.SPECIAL_EFFECT,
+        )
+
+
+def activate_roll_for_it(game_state: 'GameSchema', user_number: int, rng: Random):
+    roll = rng.randint(1, 6)
+    game_state.game_message(
+        f"<< Roll For It! rolled a {roll} >>", GameMessageType.SPECIAL_EFFECT
+    )
+    user_player = game_state.players[user_number]
+
+    if roll == 1:
+        latent_space = [game_state.get_card_from_draw_pile()]
+        latent_space = [c for c in latent_space if c is not None]
+        if len(latent_space) == 0:
+            return
+        game_state.stack.append(GamePhase(
+            GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE,
+            user_number,
+            decisions_left=1,
+            latent_space=latent_space,
+        ))
+    elif roll == 2:
+        for _ in range(2):
+            game_state.draw(user_player)
+    elif roll == 3:
+        for _ in range(3):
+            game_state.draw(user_player)
+    elif roll == 4:
+        activate_trash_a_new_rule(game_state, user_number, rng)
+    elif roll == 5:
+        activate_steal_a_keeper(game_state, user_number, rng)
+    elif roll == 6:
+        activate_take_another_turn(game_state, user_number, rng)
+
+
+def activate_close_enough(game_state: 'GameSchema', user_number: int, rng: Random):
+    for current_goal in game_state.goals:
+        required = set(getattr(current_goal, "required_keepers", []) or [])
+        if len(required) == 0:
+            return
+
+        user_keeper_names = {k.name for k in game_state.players[user_number].keepers}
+        if required & user_keeper_names:
+            game_state.game_message(
+                f"<< Close Enough! Player {user_number} wins! >>",
+                GameMessageType.SPECIAL_EFFECT,
+            )
+            game_state.winner = user_number
+
+
+def activate_psychic_paper(game_state: 'GameSchema', user_number: int, rng: Random):
+    opponent_number = user_number ^ 1
+    opponent = game_state.players[opponent_number]
+    actions_in_hand = [c for c in opponent.hand if c.card_type == CardType.ACTION]
+    if len(actions_in_hand) == 0:
+        return
+    # New phase: SELECT_ACTION_FROM_OPPONENT_HAND — resolver removes the
+    # chosen Action from opponent.hand and routes it through activate_card
+    # under user_number, so the user (the chooser) resolves its effect —
+    # matching how use_what_you_take currently activates the stolen card.
+    game_state.stack.append(GamePhase(
+        GamePhaseType.SELECT_ACTION_FROM_OPPONENT_HAND,
+        user_number,
+        decisions_left=1,
+        target_player_number=opponent_number,
+    ))
+
+
+def activate_rough_seas(game_state: 'GameSchema', user_number: int, rng: Random):
+    for p_num, player in enumerate(game_state.players):
+        for _ in range(max(0, len(player.hand) - 3)):
+            game_state.stack.append(GamePhase(
+                GamePhaseType.DISCARD_CARD_FROM_HAND, p_num, decisions_left=1,
+            ))
+        for _ in range(max(0, len(player.keepers) - 2)):
+            # Reuse the existing DISCARD_KEEPER_IN_PLAY phase, but constrained
+            # to the player's own keepers via phase metadata.
+            game_state.stack.append(GamePhase(
+                GamePhaseType.DISCARD_KEEPER, p_num,
+                decisions_left=1,
+            ))
+
+
+def activate_brain_drain(game_state: 'GameSchema', user_number: int, rng: Random):
+    for p_num, player in enumerate(game_state.players):
+        if len(player.hand) == 0:
+            continue
+        game_state.stack.append(GamePhase(
+            GamePhaseType.DISCARD_CARD_FROM_HAND, p_num, decisions_left=1,
+        ))
+
+def activate_oops(game_state: 'GameSchema', user_number: int, rng: Random):
+    user_player = game_state.players[user_number]
+    if len(user_player.hand) == 0:
+        return
+    discarded = len(user_player.hand)
+    game_state.discard_pile.extend(user_player.hand)
+    user_player.hand = []
+    game_state.game_message(
+        f"<< Oops! Player {user_number} discarded {discarded} cards >>",
+        GameMessageType.SPECIAL_EFFECT,
+    )
 
 ACTION_FUNCTIONS = {
     "use_what_you_take": activate_use_what_you_take,
@@ -295,6 +549,16 @@ ACTION_FUNCTIONS = {
     "everybody_gets_1": activate_everybody_gets_1,
     "take_another_turn": activate_take_another_turn,
     "rotate_hands": activate_rotate_hands,
+    "pandoras_box": activate_pandoras_box,
+    "rewind": activate_rewind,
+    "robin_hood": activate_robin_hood,
+    "time_vortex": activate_time_vortex,
+    "gift_giveaway": activate_gift_giveaway,
+    "dig_up_the_past": activate_dig_up_the_past,
+    "space_jackpot": activate_space_jackpot,
+    "supernova": activate_supernova,
+    "destroy_all_keepers": activate_destroy_all_keepers,
+    "oops": activate_oops,
 }
 
 

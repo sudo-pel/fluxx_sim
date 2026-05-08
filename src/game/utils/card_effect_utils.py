@@ -18,6 +18,12 @@ def trash_selected_card(game: GameSchema, user_number: int, card_location: CardL
         rule_discarded = get_selected_card(game, card_location)
         if rule_discarded.name == "double_agenda" and len(game.goals) == 2:
             game.stack.append(GamePhase(GamePhaseType.DISCARD_GOAL_IN_PLAY, user_number, decisions_left=1))
+        if rule_discarded.name == "triple_agenda":
+            limit = 1
+            if "double_agenda" in game.get_rules_by_name():
+                limit = 2
+            if len(game.goals) > limit:
+                game.stack.append(GamePhase(GamePhaseType.DISCARD_GOAL_IN_PLAY, user_number, decisions_left=len(game.goals) - limit))
         if add_to_discard:
             game.discard_pile.append(game.rules[card_location.index])
         del game.rules[card_location.index]

@@ -149,6 +149,14 @@ class Game(GameSchema):
             if card_name not in self.get_discard_pile_by_name(): return False, "Card to be played not in discard pile"
             if self.discard_pile[index_of_card(self.discard_pile, card_name)].card_type not in [CardType.ACTION, CardType.RULE]: return False, "Card to be played not an action or rule"
 
+        elif phase.type == GamePhaseType.PLAY_GOAL_FROM_DISCARD_PILE:
+            if card_name not in self.get_discard_pile_by_name(): return False, "Card to be played not in discard pile"
+            if self.discard_pile[index_of_card(self.discard_pile, card_name)].card_type not in [CardType.GOAL]: return False, "Card to be played not a goal"
+
+        elif phase.type == GamePhaseType.SELECT_KEEPER_FROM_DISCARD_PILE:
+            if card_name not in self.get_discard_pile_by_name(): return False, "Card to be played not in discard pile"
+            if self.discard_pile[index_of_card(self.discard_pile, card_name)].card_type not in [CardType.KEEPER]: return False, "Card to be played not a keeper"
+
         elif phase.type == GamePhaseType.DISCARD_KEEPER_IN_PLAY:
             if card_name not in self.get_all_keepers_by_name_flat(): return False, "Keeper to be discarded not in play"
 
@@ -161,6 +169,9 @@ class Game(GameSchema):
         elif phase.type == GamePhaseType.SELECT_PLAYER_KEEPER_FOR_EXCHANGE:
             if card_name not in self.get_all_keepers_by_name()[phase.acting_player]: return False, "Keeper to be exchanged not owned (by player)"
             if card_name == phase.labelled_card.name: return False, "Keeper to be exchanged cannot be exchanged for itself"
+
+        elif phase.type == GamePhaseType.GIVE_KEEPER_TO_OPPONENT:
+            if card_name not in self.get_all_keepers_by_name()[phase.acting_player]: return False, "Keeper to be exchanged not owned (by player)"
 
         elif phase.type == GamePhaseType.ACTIVATE_FREE_ACTION:
             if card_name != "no_free_action" and card_name not in self.get_available_free_actions(): return False, "Free action to be activated not available"
@@ -323,6 +334,12 @@ class Game(GameSchema):
             del self.players[acting_player].keepers[card_index]
             self.players[acting_player ^ 1].keepers.append(card)
 
+        elif current_phase.type == GamePhaseType.GIVE_KEEPER_TO_OPPONENT:
+            card_index = index_of_card(self.players[acting_player].keepers, card_name)
+            card = self.players[acting_player].keepers[card_index]
+            del self.players[acting_player].keepers[card_index]
+            self.players[acting_player ^ 1].keepers.append(card)
+
         elif current_phase.type == GamePhaseType.ACTIVATE_FREE_ACTION:
             if card_name != "no_free_action":
                 self.play_free_action(card_name)
@@ -352,6 +369,18 @@ class Game(GameSchema):
             card = self.goals[card_index]
             del self.goals[card_index]
             self.discard_pile.append(card)
+
+        elif current_phase.type == GamePhaseType.PLAY_GOAL_FROM_DISCARD_PILE:
+            card_index = index_of_card(self.discard_pile, card_name)
+            card_to_play = self.discard_pile[card_index]
+            del self.discard_pile[card_index]
+            self.activate_card(acting_player, card_to_play)
+
+        elif current_phase.type == GamePhaseType.SELECT_KEEPER_FROM_DISCARD_PILE:
+            card_index = index_of_card(self.discard_pile, card_name)
+            card_to_play = self.discard_pile[card_index]
+            del self.discard_pile[card_index]
+            self.players[acting_player].keepers.append(card_to_play)
 
         # early stop if the game is over
         if self.winner is not None:
@@ -486,6 +515,12 @@ class Game(GameSchema):
 
     def play_goal(self, player_number: int, goal: Goal):
         """Play a goal card. Does not perform validation."""
+        if self.rule_in_play("triple_agenda"):
+            if len(self.goals) == 3:
+                self.stack.append(GamePhase(GamePhaseType.DEFERRED_PLAY_GOAL, player_number, decisions_left=1, card=goal))
+                self.stack.append(GamePhase(GamePhaseType.DISCARD_GOAL_IN_PLAY, player_number, decisions_left=1))
+            else:
+                self.goals.append(goal)
         if self.rule_in_play("double_agenda"):
             if len(self.goals) == 2:
                 self.stack.append(GamePhase(GamePhaseType.DEFERRED_PLAY_GOAL, player_number, decisions_left=1, card=goal))

@@ -21,6 +21,233 @@ EFFECT PARAMETER AXES
 """
 
 CARD_DATA = {
+
+    # -----------------------------------------------
+    # EXPANDED SET CARDS
+    # -----------------------------------------------
+    # *Note that some of these cards were invented solely for this project.
+
+    # Actions
+    "pandoras_box": {"card_type": "ACTION", "card_effect": "draw cards from the draw pile one at a time put any new rule cards into play and discard the rest until you have played three new rules", "effect_parameters": [0, 0, 0, 0, 9, 4, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0]},
+    "rewind": {"card_type": "ACTION", "card_effect": "search the discard pile choose any goal card and play it again", "effect_parameters": [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 6, 8, 0, 0]},
+    "robin_hood": {"card_type": "ACTION", "card_effect": "move a keeper from the player with the most keepers to the player with the fewest if everyone has the same number of keepers move one from yourself to your opponent", "effect_parameters": [0, 0, 0, 0, 2, 4, 0, 0, 4, 4, 0, 0, 6, 3, 0, 0]},
+    "time_vortex": {"card_type": "ACTION", "card_effect": "gather all cards in players hands shuffle them together and deal them back out evenly at random starting with yourself", "effect_parameters": [3, 3, 0, 0, 9, 7, 0, 0, 0, 0, 0, 9, 7, 0, 0, 0]},
+    "gift_giveaway": {"card_type": "ACTION", "card_effect": "all players pick up one of their keepers and give it to another player gifts are given in turn order starting with the player to your left and players without keepers receive gifts first", "effect_parameters": [0, 0, 0, 0, 4, 7, 0, 0, 5, 5, 0, 0, 7, 4, 0, 0]},
+    "dig_up_the_past": {"card_type": "ACTION", "card_effect": "take any keeper out of the discard pile and add it to your hand", "effect_parameters": [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 8, 1, 6]},
+    "space_jackpot": {"card_type": "ACTION", "card_effect": "draw five extra cards add them to your hand then discard two cards", "effect_parameters": [9, 0, 0, 0, 3, 0, 2, 0, 0, 0, 0, 0, 5, 5, 7, 9]},
+    "supernova": {"card_type": "ACTION", "card_effect": "discard all keepers in play except up to three named keepers then shuffle the discard pile back into the draw pile", "effect_parameters": [0, 0, 0, 0, 5, 5, 0, 0, 9, 9, 0, 0, 10, 2, 0, 0]},
+    "destroy_all_keepers": {"card_type": "ACTION", "card_effect": "destroy all keepers currently in play", "effect_parameters": [0, 0, 0, 0, 0, 4, 0, 0, 9, 9, 0, 0, 9, 0, 0, 0]},
+    "roll_for_it": {"card_type": "ACTION", "card_effect": "roll a six sided die one draw one card and play it two draw two cards three draw three cards four trash a new rule five steal a keeper six take another turn", "effect_parameters": [4, 0, 1, 0, 10, 3, 2, 1, 0, 1, 0, 0, 6, 0, 3, 3]},
+    "close_enough": {"card_type": "ACTION", "card_effect": "if you have one of the keepers required by the current goal you win otherwise nothing happens", "effect_parameters": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0]},
+    "rough_seas": {"card_type": "ACTION", "card_effect": "all players must discard down to three cards in hand and two keepers in play", "effect_parameters": [0, 0, 0, 0, 0, 5, 0, 0, 5, 5, 0, 7, 8, 5, 0, 0]},
+    "brain_drain": {"card_type": "ACTION", "card_effect": "each player must discard one card from their hand", "effect_parameters": [0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 4, 4, 2, 0, 0]},
+    "oops": {"card_type": "ACTION", "card_effect": "discard your entire hand", "effect_parameters": [0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0]},
+
+    # Free Action Rules
+    "card_transfusion": {"card_type": "RULE", "RulesOptions": {"free_action": True}, "card_effect": "once per turn you may discard as many cards from your hand as you choose and draw the same number of cards", "effect_parameters": [4, 0, 0, 0, 4, 1, 0, 0, 0, 0, 0, 0, 5, 5, 0, 5]},
+    "plunder": {"card_type": "RULE", "RulesOptions": {"free_action": True}, "card_effect": "once per turn you may steal any keeper another player has in play and put it in front of you", "effect_parameters": [0, 0, 0, 0, 0, 1, 0, 0, 0, 9, 0, 0, 9, 8, 1, 0]},
+
+    # Keepers
+    "cat": {"card_type": "KEEPER"},
+    "dog": {"card_type": "KEEPER"},
+    "monkey": {"card_type": "KEEPER"},
+    "horse": {"card_type": "KEEPER"},
+    "cow": {"card_type": "KEEPER"},
+    "sheep": {"card_type": "KEEPER"},
+    "farmer": {"card_type": "KEEPER"},
+    "grass": {"card_type": "KEEPER"},
+    "field": {"card_type": "KEEPER"},
+    "fire": {"card_type": "KEEPER"},
+    "wood": {"card_type": "KEEPER"},
+    "rain": {"card_type": "KEEPER"},
+    "sunshine": {"card_type": "KEEPER"},
+    "book": {"card_type": "KEEPER"},
+    "map": {"card_type": "KEEPER"},
+    "key": {"card_type": "KEEPER"},
+    "excalibur": {"card_type": "KEEPER"},
+    "air": {"card_type": "KEEPER"},
+    "the_void": {"card_type": "KEEPER"},
+
+    # Goals
+    "the_farm": {
+        "card_type": "GOAL",
+        "required_keepers": ["farmer", "field"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "tending_the_flock": {
+        "card_type": "GOAL",
+        "required_keepers": ["farmer", "sheep"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "dairy_farm": {
+        "card_type": "GOAL",
+        "required_keepers": ["farmer", "cow"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "plowing": {
+        "card_type": "GOAL",
+        "required_keepers": ["farmer", "horse"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "pasture": {
+        "card_type": "GOAL",
+        "required_keepers": ["field", "grass"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "cows_in_the_field": {
+        "card_type": "GOAL",
+        "required_keepers": ["field", "cow"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "open_range": {
+        "card_type": "GOAL",
+        "required_keepers": ["field", "horse"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "grazing_sheep": {
+        "card_type": "GOAL",
+        "required_keepers": ["grass", "sheep"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "growing_grass": {
+        "card_type": "GOAL",
+        "required_keepers": ["grass", "rain"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "key_lost_in_the_grass": {
+        "card_type": "GOAL",
+        "required_keepers": ["grass", "key"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "sheepdog": {
+        "card_type": "GOAL",
+        "required_keepers": ["sheep", "dog"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "milking_in_the_sun": {
+        "card_type": "GOAL",
+        "required_keepers": ["cow", "sunshine"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "galloping_on_air": {
+        "card_type": "GOAL",
+        "required_keepers": ["horse", "air"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "rainbow": {
+        "card_type": "GOAL",
+        "required_keepers": ["rain", "sunshine"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "cat_in_the_rain": {
+        "card_type": "GOAL",
+        "required_keepers": ["rain", "cat"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "sunbathing_cat": {
+        "card_type": "GOAL",
+        "required_keepers": ["sunshine", "cat"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "reading_dog": {
+        "card_type": "GOAL",
+        "required_keepers": ["book", "dog"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "treasure_map": {
+        "card_type": "GOAL",
+        "required_keepers": ["book", "map"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "reading_by_fire": {
+        "card_type": "GOAL",
+        "required_keepers": ["book", "fire"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "curious_monkey": {
+        "card_type": "GOAL",
+        "required_keepers": ["book", "monkey"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "cartographer": {
+        "card_type": "GOAL",
+        "required_keepers": ["map", "key"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "skymap": {
+        "card_type": "GOAL",
+        "required_keepers": ["map", "air"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "campfire": {
+        "card_type": "GOAL",
+        "required_keepers": ["wood", "fire"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "tree_climber": {
+        "card_type": "GOAL",
+        "required_keepers": ["wood", "monkey"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "sword_in_the_stone": {
+        "card_type": "GOAL",
+        "required_keepers": ["excalibur"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "farmer_and_an_animal": {
+        "card_type": "GOAL",
+        "required_keepers": ["farmer"],
+        "disallowed_keepers": [],
+        "optional_keepers": [["cat", "dog", "monkey", "horse", "cow"]]
+    },
+    "all_the_animals": {
+        "card_type": "GOAL",
+        "required_keepers": ["cat", "dog", "monkey", "horse", "cow"],
+        "disallowed_keepers": [],
+        "optional_keepers": []
+    },
+    "nothingness": {
+        "card_type": "GOAL",
+        "required_keepers": ["the_void"],
+        "disallowed_keepers": ["cat", "dog", "monkey", "horse", "cow", "sheep", "farmer", "grass", "field", "fire", "wood", "rain", "sunshine", "book", "map", "key", "excalibur", "air"],
+        "optional_keepers": []
+    },
+
+    # Actions
+
+
+    # Rules
+    "triple_agenda": {"card_type": "RULE", "RulesOptions": {}, "card_effect": "three goal cards may be in play at the same time and a player wins if they meet either goal", "effect_parameters": [0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0]},
+
+    # -----------------------------------------------
+    # BASE SET CARDS
+    # -----------------------------------------------
+
     # Rules - Draw/Play/Limits
     "hand_limit_2": {"card_type": "RULE", "RulesOptions": {"hand_limit": 2}, "card_effect": "at the end of your turn discard down to two cards in hand other players must also discard down to two between turns", "effect_parameters": [0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 7, 5, 0, 0, 0]},
     "hand_limit_1": {"card_type": "RULE", "RulesOptions": {"hand_limit": 1}, "card_effect": "at the end of your turn discard down to one card in hand other players must also discard down to one between turns", "effect_parameters": [0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 9, 6, 0, 0, 0]},

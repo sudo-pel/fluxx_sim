@@ -67,7 +67,10 @@ decision_context_vectors: dict[GamePhaseType, list[DecisionEncodingType]] = {
                                                          DecisionEncodingType.REMAIN_PLAYER_HAND],
         GamePhaseType.DISCARD_GOAL_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE,
                                              DecisionEncodingType.REMAIN_IN_PLAY],
-        GamePhaseType.GAME_OVER: []
+        GamePhaseType.GAME_OVER: [],
+        GamePhaseType.PLAY_GOAL_FROM_DISCARD_PILE: [DecisionEncodingType.PLAY, DecisionEncodingType.REMAIN_DISCARD_PILE],
+        GamePhaseType.GIVE_KEEPER_TO_OPPONENT: [DecisionEncodingType.PLACE_OPPONENT_KEEPERS, DecisionEncodingType.REMAIN_PLAYER_KEEPERS],
+        GamePhaseType.SELECT_KEEPER_FROM_DISCARD_PILE: [DecisionEncodingType.PLACE_PLAYER_HAND, DecisionEncodingType.REMAIN_DISCARD_PILE],
 }
 
 def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):
@@ -166,6 +169,8 @@ def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):
         action_mask = agent_keeper_vector
         action_mask[card_to_index[
             current_phase.labelled_card.name]] = 0  # mask out the keeper that was stolen from the opponent in this exchange
+    elif current_phase.type == GamePhaseType.GIVE_KEEPER_TO_OPPONENT:
+        action_mask = agent_keeper_vector
     elif current_phase.type == GamePhaseType.ACTIVATE_FREE_ACTION:
         action_mask = populate_card_vector(game_config.card_list,
             [free_action_name for free_action_name in game_state.available_free_actions])
@@ -181,6 +186,18 @@ def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):
         no_free_action_legal = True
     elif current_phase.type == GamePhaseType.DISCARD_GOAL_IN_PLAY:
         action_mask = goals_in_play_vector
+    elif current_phase.type == GamePhaseType.PLAY_GOAL_FROM_DISCARD_PILE:
+        valid_cards_in_discard_pile = []
+        for card in game_state.discard_pile:
+            if CARD_DATA[card]["card_type"] == "GOAL":
+                valid_cards_in_discard_pile.append(card)
+        action_mask = populate_card_vector(game_config.card_list, valid_cards_in_discard_pile)
+    elif current_phase.type == GamePhaseType.SELECT_KEEPER_FROM_DISCARD_PILE:
+        valid_cards_in_discard_pile = []
+        for card in game_state.discard_pile:
+            if CARD_DATA[card]["card_type"] == "KEEPER":
+                valid_cards_in_discard_pile.append(card)
+        action_mask = populate_card_vector(game_config.card_list, valid_cards_in_discard_pile)
     else:
         raise Exception(f"Invalid game phase type: {current_phase.type}")
 

@@ -12,12 +12,12 @@ from src.game.game_states import two_player_p0_one_turn_win, two_player_p0_two_t
 
 
 def main(one_turn_win_simple_fluxx=None):
-    two_player_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True)
+    two_player_fluxx = Game(2, card_lists.expanded_deck, disable_game_messages=True)
     two_player_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True)
     one_turn_win_simple_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True, force_game_state=two_player_p0_one_turn_win)
     two_turn_win_simple_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True, force_game_state=two_player_p0_two_turn_win)
 
-    action_testing = Game(2, card_lists.for_action_testing, disable_game_messages=True)
+    #action_testing = Game(2, card_lists.for_action_testing, disable_game_messages=True)
 
 
     env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
@@ -31,7 +31,7 @@ def main(one_turn_win_simple_fluxx=None):
     actor2.q_network.eval()
 
     agents = {
-        "player_0": actor,
+        "player_0": RandomAgent(env.game.game_config, 0),
         "player_1": HeuristicAgentMKII(env.game.game_config, 1)
     }
 

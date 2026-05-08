@@ -35,6 +35,19 @@ def can_use_recycling(game_state: 'Game', player_number: int, rng: Random) -> bo
     player = game_state.players[player_number]
     return "recycling" not in game_state.played_free_actions and len(player.keepers) > 0
 
+def can_use_card_transfusion(game_state: 'Game', player_number: int, rng: Random) -> bool:
+    player = game_state.players[player_number]
+    return "card_transfusion" not in game_state.played_free_actions and len(player.hand) > 0
+
+def can_use_plunder(game_state: 'Game', player_number: int, rng: Random) -> bool:
+    if "plunder" in game_state.played_free_actions:
+        return False
+    return any(
+        len(p.keepers) > 0
+        for i, p in enumerate(game_state.players)
+        if i != player_number
+    )
+
 # ---------------------
 # FREE ACTION EFFECTS
 # ---------------------
@@ -97,6 +110,23 @@ def activate_recycling(game_state: 'Game', user_number: int, rng: Random):
         decisions_left=1,
     ))
 
+def activate_card_transfusion(game_state: 'Game', user_number: int, rng: Random):
+    game_state.stack.append(GamePhase(
+        GamePhaseType.DISCARD_VARIABLE_CARDS_FROM_HAND,
+        user_number,
+        decisions_left=0,
+        counter=0,
+        card_types={CardType.GOAL, CardType.KEEPER, CardType.ACTION, CardType.RULE},
+        on_complete=OnCompleteBehaviour.DRAW
+    ))
+
+def activate_plunder(game_state: 'Game', user_number: int, rng: Random):
+    game_state.stack.append(GamePhase(
+        GamePhaseType.SELECT_KEEPER_TO_STEAL,
+        user_number,
+        decisions_left=1,
+    ))
+
 
 FREE_ACTIONS = {
     "mystery_play": {
@@ -118,9 +148,16 @@ FREE_ACTIONS = {
     "recycling": {
         "can_use": can_use_recycling,
         "activate": activate_recycling
-    }
+    },
+    "card_transfusion": {
+        "can_use": can_use_card_transfusion,
+        "activate": activate_card_transfusion
+    },
+    "plunder": {
+        "can_use": can_use_plunder,
+        "activate": activate_plunder
+    },
 }
-
 
 def can_use_free_action(game_state: 'Game', player_number: int, free_action_name: str, rng: Random) -> bool:
     free_action = FREE_ACTIONS.get(free_action_name)
