@@ -87,6 +87,12 @@ def parse_args():
         default=None,
         help="CUDA device to use: 'cuda:0', 'cuda:1', ... , 'cpu'"
     )
+    parser.add_argument(
+        "-c", "--checkpoint",
+        type=int,
+        default=None,
+        help="Load a checkpoint and resume training from there"
+    )
     return parser.parse_args()
 
 def git_info() -> dict:
@@ -169,13 +175,13 @@ def main():
     if args.script == "dqn":
         training_script = DQN(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device)
     elif args.script == "ppo":
-        training_script = PPO(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device)
+        training_script = PPO(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device, from_checkpoint=args.checkpoint)
     elif args.script == "ppo_general":
         generate_embedding_table(card_lists.base_deck)
-        training_script = PPOGeneralized(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device)
+        training_script = PPOGeneralized(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device, from_checkpoint=args.checkpoint)
     elif args.script == "ppo_general_with_reward_shaping":
         generate_embedding_table(card_lists.base_deck)
-        training_script = PPOGeneralizedRewardShaped(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device)
+        training_script = PPOGeneralizedRewardShaped(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device, from_checkpoint=args.checkpoint)
     elif args.script == "dqn_general":
         generate_embedding_table(card_lists.base_deck)
         training_script = DQNGeneralized(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device)

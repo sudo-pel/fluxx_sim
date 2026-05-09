@@ -159,7 +159,12 @@ class PPOGeneralizedRewardShaped:
             )
             self.actor.policy_network.load_state_dict(state_dict)
             print(f"Loaded model from checkpoint {self.run_name}")
-            # TODO: critic checkpoint loading
+            critic_state_dict = torch.load(
+                f"{PROJECT_ROOT}/experiments/{self.run_name}/models/model_{self.global_timestep}_critic.pt",
+                map_location="cpu", weights_only=True,
+            )
+            self.critic.load_state_dict(critic_state_dict)
+            print(f"Loaded critic from checkpoint {self.run_name}")
 
         # Reward shaping
         self.phi_previous: float = 0.0
