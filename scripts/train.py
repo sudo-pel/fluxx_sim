@@ -190,8 +190,8 @@ def main():
             logging.error("Must pass all three of -cname, -ct and -cpt when using checkpointing")
             return 1
         checkpoint = LearningCheckpoint(
-            args.checkpoint_name,
             args.checkpoint_timestep,
+            args.checkpoint_name,
             args.checkpoint_points_taken,
         )
     else:
