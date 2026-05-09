@@ -12,7 +12,7 @@ from src.agents.agent_utils import (
 from src.agents.card_embeddings import (
     CARD_EMBED_DIM,
     get_embedding_table,
-    get_embedding_tensor,  # CHANGED: new import for GPU-side gather
+    get_embedding_table,  # CHANGED: new import for GPU-side gather
 )
 from src.game.FluxxEnums import GameConfig, GamePhaseType, GameState
 from src.game.cards.card_data import CARD_DATA
@@ -221,7 +221,7 @@ class DQNAgentGeneralized(Agent):
     ) -> dict[str, torch.Tensor]:
         N = len(entries)
 
-        embedding_tensor = get_embedding_tensor(device)  # (N_cards + 1, CARD_EMBED_DIM) on `device`
+        embedding_table = get_embedding_table(device)  # (N_cards + 1, CARD_EMBED_DIM) on `device`
 
         hand_ids = np.zeros((N, MAX_HAND_SIZE), dtype=np.int32)
         hand_mask = np.zeros((N, MAX_HAND_SIZE), dtype=np.float32)
@@ -282,12 +282,12 @@ class DQNAgentGeneralized(Agent):
         goal_ids_t = to_dev(goal_ids).long()
         rules_ids_t = to_dev(rules_ids).long()
 
-        hand_embeds = embedding_tensor[hand_ids_t]
-        discard_embeds = embedding_tensor[discard_ids_t]
-        own_keeper_embeds = embedding_tensor[own_keeper_ids_t]
-        opp_keeper_embeds = embedding_tensor[opp_keeper_ids_t]
-        goal_embeds = embedding_tensor[goal_ids_t]
-        rules_embeds = embedding_tensor[rules_ids_t]
+        hand_embeds = embedding_table[hand_ids_t]
+        discard_embeds = embedding_table[discard_ids_t]
+        own_keeper_embeds = embedding_table[own_keeper_ids_t]
+        opp_keeper_embeds = embedding_table[opp_keeper_ids_t]
+        goal_embeds = embedding_table[goal_ids_t]
+        rules_embeds = embedding_table[rules_ids_t]
 
         scalars_t = to_dev(scalars)
 
