@@ -48,6 +48,7 @@ from src.agents.card_embeddings import generate_embedding_table
 from src.env.FluxxEnv import FluxxEnv
 from src.game.Game import Game
 from src.game.cards import card_lists
+from src.training.TrainingEnums import LearningCheckpoint
 from src.training.dqn.dqn import DQN
 from src.training.dqn.dqn_general import DQNGeneralized
 from src.training.ppo.ppo import PPO
@@ -88,10 +89,22 @@ def parse_args():
         help="CUDA device to use: 'cuda:0', 'cuda:1', ... , 'cpu'"
     )
     parser.add_argument(
-        "-c", "--checkpoint",
+        "-cname", "--checkpoint-name",
+        type=str,
+        default=None,
+        help="Run name of a checkpoint. Must also pass -ct and -cpt"
+    )
+    parser.add_argument(
+        "-ct", "--checkpoint-timestep",
         type=int,
         default=None,
-        help="Load a checkpoint and resume training from there"
+        help="Timestep of a checkpoint. Must also pass -cname and -cpt"
+    )
+    parser.add_argument(
+        "-cpt", "--checkpoint-points-taken",
+        type=int,
+        default=None,
+        help="Number of points taken from checkpointed run up to this point. Must also pass -cname and -ct"
     )
     return parser.parse_args()
 
@@ -171,17 +184,30 @@ def main():
     # write metadata before training kicks off
     write_metadata(run_dir, args, master_seed)
 
+    # checkpointing
+    if args.checkpoint_name is not None or args.checkpoint_timestep is not None or args.checkpoint_points_taken is not None:
+        if args.checkpoint_name is None or args.checkpoint_timestep is None or args.checkpoint_points_taken is None:
+            logging.error("Must pass all three of -cname, -ct and -cpt when using checkpointing")
+            return 1
+        checkpoint = LearningCheckpoint(
+            args.checkpoint_name,
+            args.checkpoint_timestep,
+            args.checkpoint_points_taken,
+        )
+    else:
+        checkpoint = None
+
     # create an instance of the correct training script
     if args.script == "dqn":
         training_script = DQN(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device)
     elif args.script == "ppo":
-        training_script = PPO(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device, from_checkpoint=args.checkpoint)
+        training_script = PPO(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device, from_checkpoint=checkpoint)
     elif args.script == "ppo_general":
         generate_embedding_table(card_lists.base_deck)
-        training_script = PPOGeneralized(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device, from_checkpoint=args.checkpoint)
+        training_script = PPOGeneralized(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device, from_checkpoint=checkpoint)
     elif args.script == "ppo_general_with_reward_shaping":
         generate_embedding_table(card_lists.base_deck)
-        training_script = PPOGeneralizedRewardShaped(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device, from_checkpoint=args.checkpoint)
+        training_script = PPOGeneralizedRewardShaped(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device, from_checkpoint=checkpoint)
     elif args.script == "dqn_general":
         generate_embedding_table(card_lists.base_deck)
         training_script = DQNGeneralized(env, ["player_0", "player_1"], run_name, seed=training_ss, device=device)
