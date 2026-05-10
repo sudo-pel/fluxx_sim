@@ -103,9 +103,9 @@ for card_list in args.card_lists:
         torch.load(f"{PROJECT_ROOT}/final_experiments/dqn_general_2026-05-02_21-23-41/models/model_20000002.pt"))
     agents["dqn_general"].q_network.eval()
 
-    agents["ppo_general_with_reward_shaping"].q_network.load_state_dict(
+    agents["ppo_general_with_reward_shaping"].policy_network.load_state_dict(
         torch.load(f"{PROJECT_ROOT}/final_experiments/ppo_general_with_reward_shaping_2026-05-07_20-52-04/final/final_model_50003737.pt"))
-    agents["ppo_general_with_reward_shaping"].q_network.eval()
+    agents["ppo_general_with_reward_shaping"].policy_network.eval()
 
     seen_matchups: set[tuple[str, str]] = set()
     for agent_name in agent_names:
