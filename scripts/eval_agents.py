@@ -118,5 +118,5 @@ for card_list in args.card_lists:
             print(f"RUNNING {agent_name} vs {other_agent_name}")
             agent.player_number = 0
             other_agent.player_number = 1
-            results[(agent_name, other_agent_name)] = agent_battler.run_games([agent, other_agent], args.games, args.turn_limit, log_games=False, step_limit=args.turn_limit * 20)
+            results[(agent_name, other_agent_name)] = agent_battler.run_games([agent, other_agent], args.games, args.turn_limit, log_games=False, step_limit=args.turn_limit * 10, print_game_number=True)
             print(f"RESULTS: {results[(agent_name, other_agent_name)]}")
