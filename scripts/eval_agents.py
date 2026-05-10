@@ -100,7 +100,7 @@ for card_list in args.card_lists:
     agents["dqn"].q_network.eval()
 
     agents["dqn_general"].q_network.load_state_dict(
-        torch.load(f"{PROJECT_ROOT}/final_experiments/dqn_2026-04-29_08-06-30/models/model_20000002.pt"))
+        torch.load(f"{PROJECT_ROOT}/final_experiments/dqn_general_2026-05-02_21-23-41/models/model_20000002.pt"))
     agents["dqn_general"].q_network.eval()
 
     agents["ppo_general_with_reward_shaping"].q_network.load_state_dict(
