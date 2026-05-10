@@ -1,4 +1,5 @@
 import argparse
+import os
 from pathlib import Path
 
 import torch
@@ -62,6 +63,8 @@ def parse_args():
 
 args = parse_args()
 results: dict[tuple[str, str], dict[str, float]] = {}
+num_workers = min(os.cpu_count(), args.games)
+print(f"Running games across {num_workers} workers")
 
 for card_list in args.card_lists:
     print(f"PLAYING WITH: CARD LIST: {card_list}")
@@ -118,5 +121,5 @@ for card_list in args.card_lists:
             print(f"RUNNING {agent_name} vs {other_agent_name}")
             agent.player_number = 0
             other_agent.player_number = 1
-            results[(agent_name, other_agent_name)] = agent_battler.run_games([agent, other_agent], args.games, args.turn_limit, log_games=False, step_limit=args.turn_limit * 10, print_game_number=True)
+            results[(agent_name, other_agent_name)] = agent_battler.run_games([agent, other_agent], args.games, args.turn_limit, log_games=False, step_limit=args.turn_limit * 10, print_game_number=True, num_workers=num_workers)
             print(f"RESULTS: {results[(agent_name, other_agent_name)]}")
