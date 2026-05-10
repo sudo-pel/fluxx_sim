@@ -4,6 +4,7 @@ from pathlib import Path
 import torch
 
 from src.agents.DQNAgent import DQNAgent
+from src.agents.DQNAgentGeneralized import DQNAgentGeneralized
 from src.agents.HeuristicAgentMKI import HeuristicAgentMKI
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgent import PPOAgent
@@ -76,8 +77,8 @@ for card_list in args.card_lists:
         "ppo": PPOAgent(env.game.game_config, 0),
         "ppo_general": PPOAgentGeneralized(env.game.game_config, 0),
         "dqn": DQNAgent(env.game.game_config, 0),
-        "dqn_general": None,
-        "ppo_general_with_reward_shaping": None,
+        "dqn_general": DQNAgentGeneralized(env.game.game_config, 0),
+        "ppo_general_with_reward_shaping": PPOAgentGeneralized(env.game.game_config, 0),
         "random": RandomAgent(env.game.game_config, 0),
         "heuristic_agent_mki": HeuristicAgentMKI(env.game.game_config, 0),
         "heuristic_agent_mkii": HeuristicAgentMKII(env.game.game_config, 0),
@@ -85,20 +86,26 @@ for card_list in args.card_lists:
 
     # Load the trained state dicts.
     agents["ppo"].policy_network.load_state_dict(
-        torch.load(f"{PROJECT_ROOT}/experiments/ppo_2026-04-28_17-11-02/final/final_model_50004751.pt"))
+        torch.load(f"{PROJECT_ROOT}/final_experiments/ppo_2026-04-28_17-11-02/final/final_model_50004751.pt"))
     agents["ppo"].policy_network.eval()
 
     # strict=False because card embeds was a part of state_dict when this code was run
     agents["ppo_general"].policy_network.load_state_dict(
-        torch.load(f"{PROJECT_ROOT}/experiments/ppo_general_2026-05-02_09-11-14/final/final_model_50006336.pt"),
+        torch.load(f"{PROJECT_ROOT}/final_experiments/ppo_general_2026-05-02_09-11-14/final/final_model_50006336.pt"),
         strict=False)
     agents["ppo_general"].policy_network.eval()
 
     agents["dqn"].q_network.load_state_dict(
-        torch.load(f"{PROJECT_ROOT}/experiments/dqn_2026-04-29_08-06-30/final/final_model_50000050.pt"))
+        torch.load(f"{PROJECT_ROOT}/final_experiments/dqn_2026-04-29_08-06-30/final/final_model_50000050.pt"))
     agents["dqn"].q_network.eval()
 
-    # TODO: dqn_general and ppo_general_with_reward_shaping
+    agents["dqn_general"].q_network.load_state_dict(
+        torch.load(f"{PROJECT_ROOT}/final_experiments/dqn_2026-04-29_08-06-30/models/model_20000002.pt"))
+    agents["dqn_general"].q_network.eval()
+
+    agents["ppo_general_with_reward_shaping"].q_network.load_state_dict(
+        torch.load(f"{PROJECT_ROOT}/final_experiments/ppo_general_with_reward_shaping_2026-05-07_20-52-04/final/final_model_50003737.pt"))
+    agents["ppo_general_with_reward_shaping"].q_network.eval()
 
     seen_matchups: set[tuple[str, str]] = set()
     for agent_name in agent_names:
