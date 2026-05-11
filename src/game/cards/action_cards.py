@@ -279,7 +279,6 @@ def activate_pandoras_box(game_state: 'GameSchema', user_number: int, rng: Rando
     seen_cards = set()
     while rules_played < 3:
         card = game_state.get_card_from_draw_pile()
-        seen_cards.add(card)
         if card is None:
             game_state.game_message(
                 "<< Pandora's Box: deck exhausted before 3 Rules played >>",
@@ -303,6 +302,7 @@ def activate_pandoras_box(game_state: 'GameSchema', user_number: int, rng: Rando
         # If there are fewer than 3 rule cards in the draw pile, avoid entering an infinite loop
         if card in seen_cards:
             break
+        seen_cards.add(card)
 
 
 def activate_rewind(game_state: 'GameSchema', user_number: int, rng: Random):
