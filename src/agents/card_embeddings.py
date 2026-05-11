@@ -18,7 +18,7 @@ from sentence_transformers import SentenceTransformer
 from src.game.cards.card_data import CARD_DATA
 
 
-model = SentenceTransformer('nomic-ai/nomic-embed-text-v1.5', truncate_dim=64)
+model = SentenceTransformer('transformer_models/nomic-embed', truncate_dim=64)
 def model_encode(text: str) -> np.ndarray:
     return model.encode(f"clustering: {text}", convert_to_numpy=True)
 
