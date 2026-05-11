@@ -17,7 +17,7 @@ from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgent import PPOAgent
 from src.agents.PPOAgentGeneralized import PPOAgentGeneralized
 from src.agents.RandomAgent import RandomAgent
-from src.agents.card_embeddings import generate_embedding_table
+from src.agents.card_embeddings import generate_embedding_table, get_embedding_table
 from src.env.AgentBattlerParallel import AgentBattler
 from src.env.FluxxEnv import FluxxEnv
 from src.game.Game import Game
@@ -84,7 +84,6 @@ class EnvFactory:
         self.card_list = card_list
 
     def __call__(self):
-        generate_embedding_table(self.card_list)
         return FluxxEnv(
             Game(2, self.card_list, disable_game_messages=True), 2, render_mode="human"
         )
@@ -145,6 +144,8 @@ if __name__ == "__main__":
         print(f"PLAYING WITH: CARD LIST: {card_list_name}")
 
         card_list = CARD_LISTS[card_list_name]
+        generate_embedding_table(card_list)
+        embedding_table = get_embedding_table()
 
         game_config = Game(2, card_list, disable_game_messages=True).game_config
         env_factory = EnvFactory(card_list)
@@ -172,6 +173,7 @@ if __name__ == "__main__":
                         agent_factories[agent_name],
                         agent_factories[other_agent_name],
                     ],
+                    embedding_table=embedding_table
                 )
                 results[(agent_name, other_agent_name)] = result
                 print(f"RESULTS: {result}")

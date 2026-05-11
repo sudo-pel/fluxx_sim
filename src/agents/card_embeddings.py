@@ -18,11 +18,6 @@ from sentence_transformers import SentenceTransformer
 from src.game.cards.card_data import CARD_DATA
 
 
-model = SentenceTransformer('transformer_models/nomic-embed', truncate_dim=64)
-def model_encode(text: str) -> np.ndarray:
-    return model.encode(f"clustering: {text}", convert_to_numpy=True)
-
-
 CARD_TYPES = ["KEEPER", "GOAL", "ACTION", "RULE"]
 CARD_TYPE_TO_IDX = {t: i for i, t in enumerate(CARD_TYPES)}
 
@@ -41,10 +36,15 @@ def convert_card_name(card_name: str) -> str:
 
 def build_card_embedding(
     card_name: str,
+    model
 ) -> np.ndarray:
     """
     Build the 3860-dim embedding for a single card. Slots that don't apply for the card's type are zeroed.
     """
+    # Placed here so that the model is only loaded when this function is called
+    def model_encode(text: str) -> np.ndarray:
+        return model.encode(f"clustering: {text}", convert_to_numpy=True)
+
     embedding = np.zeros(CARD_EMBED_DIM, dtype=np.float32)
     offset = 0
 
@@ -97,8 +97,13 @@ _EMBEDDING_TABLE: dict[str, np.ndarray] | None = None
 
 def generate_embedding_table(card_list: list[str]) -> None:
     global _EMBEDDING_TABLE
-    _EMBEDDING_TABLE = {card: build_card_embedding(card) for card in card_list}
+    model = SentenceTransformer('transformer_models/nomic-embed', truncate_dim=64)
+    _EMBEDDING_TABLE = {card: build_card_embedding(card, model) for card in card_list}
 
+# For worker threads being passed the embedding table
+def set_embedding_table(table: dict[str, np.ndarray]) -> None:
+    global _EMBEDDING_TABLE
+    _EMBEDDING_TABLE = table
 
 def get_embedding_table() -> dict[str, np.ndarray]:
     if _EMBEDDING_TABLE is None:
