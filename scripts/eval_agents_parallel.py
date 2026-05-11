@@ -34,6 +34,7 @@ CARD_LISTS = {
 AGENT_NAMES = [
     "ppo",
     "ppo_general",
+    "ppo_general_with_reward_shaping"
     "dqn",
     "random",
     "heuristic_agent_mki",
@@ -159,6 +160,9 @@ if __name__ == "__main__":
         for agent_name in AGENT_NAMES:
             for other_agent_name in AGENT_NAMES:
                 if agent_name == other_agent_name or (other_agent_name, agent_name) in seen_matchups:
+                    continue
+                # TODO: remove later
+                if agent_name != "ppo_general_with_reward_shaping" and other_agent_name != "ppo_general_with_reward_shaping":
                     continue
                 seen_matchups.add((agent_name, other_agent_name))
 
