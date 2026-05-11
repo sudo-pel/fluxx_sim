@@ -19,7 +19,7 @@ from src.game.utils.general_utils import index_of_card
 
 
 class Game(GameSchema):
-    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool = False, force_game_state: Optional[GameState] = None, logger: Optional[Logger] = None, seed: Optional[np.random.SeedSequence] = None):
+    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool = False, force_game_state: Optional[GameState] = None, logger: Optional[Logger] = None, seed: Optional[np.random.SeedSequence] = None, step_limit: Optional[int] = 100000):
         GameSchema.__init__(self, player_count, card_list, disable_game_messages, force_game_state, logger, seed)
 
     # there is a class for game state although it is not currently used.

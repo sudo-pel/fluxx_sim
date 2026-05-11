@@ -13,7 +13,7 @@ from src.game.Player import Player
 
 
 class GameSchema(metaclass=abc.ABCMeta):
-    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool, force_game_state: Optional[GameState], logger: Optional[Logger] = None, seed: Optional[np.random.SeedSequence] = None):
+    def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool, force_game_state: Optional[GameState], logger: Optional[Logger] = None, seed: Optional[np.random.SeedSequence] = None, step_limit: Optional[int] = 100000):
         self.card_list = card_list # static, not shuffled
         self.player_count: int = player_count
         self.players: list[Player] = [Player(i) for i in range(player_count)]
@@ -37,6 +37,8 @@ class GameSchema(metaclass=abc.ABCMeta):
             card_list
         )
         self.logger = logger
+        self.step_limit = step_limit
+        self.steps = 0
 
         # seed setting
         if seed is None:
@@ -60,6 +62,7 @@ class GameSchema(metaclass=abc.ABCMeta):
         self.played_free_actions = set()
         self.stack = []
         self.extra_turns_taken = 0
+        self.steps = 0
 
         for player in self.players:
             player.hand = []

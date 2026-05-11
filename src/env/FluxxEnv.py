@@ -176,6 +176,11 @@ class FluxxEnv(AECEnv):
                 self.rewards[agent] = -1.0
             winner = self.determine_winner()
             self.rewards[winner] = 1.0
+        elif self.game.steps > self.game.step_limit:
+            print("Game step limit reached")
+            for agent in self.agents:
+                self.truncations[agent] = True
+                self.rewards[agent] = -1.0
 
         # Accumulate rewards into _cumulative_rewards
         self._accumulate_rewards()
