@@ -34,7 +34,7 @@ CARD_LISTS = {
 AGENT_NAMES = [
     "ppo",
     "ppo_general",
-    "ppo_general_with_reward_shaping"
+    "ppo_general_with_reward_shaping",
     "dqn",
     "random",
     "heuristic_agent_mki",
