@@ -23,7 +23,7 @@ class AgentBattler:
     def __init__(self, env: FluxxEnv):
         self.env: FluxxEnv = env
 
-    def run_games(self, agents: list[Agent], game_count: int, turn_limit: int, log_games: bool = False, log_config: Optional[GameLogConfig] = None, step_limit: Optional[int] = None, print_game_number: bool = False):
+    def run_games(self, agents: list[Agent], game_count: int, turn_limit: int, log_games: bool = False, log_config: Optional[GameLogConfig] = None, step_limit: Optional[int] = None):
         if log_games and log_config is None:
             raise ValueError("log_name must be specified if log_games is True")
 
@@ -41,8 +41,6 @@ class AgentBattler:
             os.makedirs(f"{PROJECT_ROOT}/game_logs/{log_name}")
 
         for i in range(game_count):
-            if print_game_number:
-                print(f"game {i}")
             self.env.reset()
             timestep = 0
 
