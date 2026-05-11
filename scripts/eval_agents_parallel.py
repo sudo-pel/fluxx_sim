@@ -161,9 +161,6 @@ if __name__ == "__main__":
             for other_agent_name in AGENT_NAMES:
                 if agent_name == other_agent_name or (other_agent_name, agent_name) in seen_matchups:
                     continue
-                # TODO: remove later
-                if agent_name != "ppo_general_with_reward_shaping" and other_agent_name != "ppo_general_with_reward_shaping":
-                    continue
                 seen_matchups.add((agent_name, other_agent_name))
 
                 print(f"RUNNING {agent_name} vs {other_agent_name}")
