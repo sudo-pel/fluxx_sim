@@ -126,7 +126,6 @@ def parse_args():
                         choices=["base_deck", "expanded_deck", "simple_fluxx_deck"])
     return parser.parse_args()
 
-
 if __name__ == "__main__":
     import multiprocessing
     multiprocessing.set_start_method("spawn", force=True)
@@ -174,3 +173,4 @@ if __name__ == "__main__":
                 )
                 results[(agent_name, other_agent_name)] = result
                 print(f"RESULTS: {result}")
+    print(results)
