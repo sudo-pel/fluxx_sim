@@ -148,6 +148,7 @@ if __name__ == "__main__":
         n_workers = max(1, len(os.sched_getaffinity(0)) - 1)
     except AttributeError:
         n_workers = max(1, os.cpu_count() - 1)
+    n_workers = min(args.games, n_workers)
 
     print(f"RUNNING {args.games} GAMES WITH {n_workers} WORKERS")
     for card_list_name in args.card_lists:

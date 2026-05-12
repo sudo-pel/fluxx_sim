@@ -9,17 +9,12 @@ from src.agents.RandomAgent import RandomAgent
 from src.env.FluxxEnv import FluxxEnv
 from src.game.cards import card_lists
 from src.game.Game import Game
-from src.game.game_states import two_player_p0_one_turn_win, two_player_p0_two_turn_win
+from src.game.game_states import puzzle_a, puzzle_b
 
 
 def main(one_turn_win_simple_fluxx=None):
-    two_player_fluxx = Game(2, card_lists.expanded_deck, disable_game_messages=True)
+    two_player_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True, force_game_state=puzzle_b)
     two_player_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True)
-    one_turn_win_simple_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True, force_game_state=two_player_p0_one_turn_win)
-    two_turn_win_simple_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True, force_game_state=two_player_p0_two_turn_win)
-
-    #action_testing = Game(2, card_lists.for_action_testing, disable_game_messages=True)
-
 
     env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
 
@@ -65,7 +60,6 @@ def main(one_turn_win_simple_fluxx=None):
                 if termination or truncation:
                     action = None
                 else:
-                    # this is where you would insert your policy
                     action, _, _ = agents[agent].act(observation)
                     action = env.decode_action(action)
                     #input("Press enter to continue...")

@@ -95,6 +95,12 @@ class GameSchema(metaclass=abc.ABCMeta):
             for rule in self.force_game_state.rules:
                 self.rules.append(make_card(rule))
 
+            self.stack = self.force_game_state.stack.copy()
+
+            for i, player in enumerate(self.players):
+                if self.force_game_state.cards_drawn is not None:
+                    player.cards_drawn = self.force_game_state.cards_drawn[i]
+
             if self.force_game_state.starting_player is not None:
                 self.player_turn = self.force_game_state.starting_player
 

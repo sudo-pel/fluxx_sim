@@ -1,5 +1,8 @@
 import argparse
 import os
+
+from src.game.game_states import puzzle_a, puzzle_a2, puzzle_b, puzzle_b2, puzzle_c, puzzle_c2
+
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -80,14 +83,47 @@ AGENT_REGISTRY = {
     },
 }
 
+PUZZLES = {
+    "puzzle_a": {
+        "game_state": puzzle_a,
+        "card_list": card_list_module.base_deck,
+        "testee_player_number": 0
+    },
+    "puzzle_a2": {
+        "game_state": puzzle_a2,
+        "card_list": card_list_module.expanded_deck,
+        "testee_player_number": 0
+    },
+    "puzzle_b": {
+        "game_state": puzzle_b,
+        "card_list": card_list_module.base_deck,
+        "testee_player_number": 0
+    },
+    "puzzle_b2": {
+        "game_state": puzzle_b2,
+        "card_list": card_list_module.expanded_deck,
+        "testee_player_number": 0
+    },
+    "puzzle_c": {
+        "game_state": puzzle_c,
+        "card_list": card_list_module.base_deck,
+        "testee_player_number": 1
+    },
+    "puzzle_c2": {
+        "game_state": puzzle_c2,
+        "card_list": card_list_module.expanded_deck,
+        "testee_player_number": 1
+    }
+}
 
 class EnvFactory:
-    def __init__(self, card_list):
+    def __init__(self, card_list, force_game_state=None):
         self.card_list = card_list
+        self.force_game_state = force_game_state
 
     def __call__(self):
         return FluxxEnv(
-            Game(2, self.card_list, disable_game_messages=True), 2, render_mode="human"
+            Game(2, self.card_list, disable_game_messages=True, force_game_state=self.force_game_state), 2, render_mode="human"
         )
 
 
@@ -142,23 +178,28 @@ if __name__ == "__main__":
     multiprocessing.set_start_method("spawn", force=True)
 
     args = parse_args()
-    results: dict[tuple[str, str], dict] = {}
+    results: dict[str, dict] = {}
 
     try:
         n_workers = max(1, len(os.sched_getaffinity(0)) - 1)
     except AttributeError:
         n_workers = max(1, os.cpu_count() - 1)
+    n_workers = min(args.games, n_workers)
 
     print(f"RUNNING {args.games} GAMES WITH {n_workers} WORKERS")
-    for card_list_name in args.card_lists:
-        print(f"PLAYING WITH: CARD LIST: {card_list_name}")
+    puzzles = [p for p in PUZZLES.keys()]
+    for puzzle in puzzles:
+        print(f"PLAYING PUZZLE: {puzzle}")
 
-        card_list = CARD_LISTS[card_list_name]
+        puzzle_data = PUZZLES[puzzle]
+        card_list = puzzle_data["card_list"]
+        game_state = puzzle_data["game_state"]
+
         generate_embedding_table(card_list)
         embedding_table = get_embedding_table()
 
-        game_config = Game(2, card_list, disable_game_messages=True).game_config
-        env_factory = EnvFactory(card_list)
+        game_config = Game(2, card_list, disable_game_messages=True, force_game_state=game_state).game_config
+        env_factory = EnvFactory(card_list, force_game_state=game_state)
         agent_battler = AgentBattler()
 
         agent_factories = {
@@ -168,25 +209,29 @@ if __name__ == "__main__":
 
         seen_matchups: set[tuple[str, str]] = set()
         for agent_name in AGENT_NAMES:
-            for other_agent_name in AGENT_NAMES:
-                if agent_name == other_agent_name or (other_agent_name, agent_name) in seen_matchups:
-                    continue
-                if args.evaluate_specific and (agent_name not in args.evaluate_specific and other_agent_name not in args.evaluate_specific):
-                    continue
-                seen_matchups.add((agent_name, other_agent_name))
+            if args.evaluate_specific and agent_name not in args.evaluate_specific:
+                continue
 
-                print(f"RUNNING {agent_name} vs {other_agent_name}")
-                result = agent_battler.run_games(
-                    game_count=args.games,
-                    turn_limit=args.turn_limit,
-                    n_workers=n_workers,
-                    env_factory=env_factory,
-                    agent_factories=[
-                        agent_factories[agent_name],
-                        agent_factories[other_agent_name],
-                    ],
-                    embedding_table=embedding_table
-                )
-                results[(agent_name, other_agent_name)] = result
-                print(f"RESULTS: {result}")
+            if puzzle_data["testee_player_number"] == 0:
+                current_agent_factories=[
+                    agent_factories[agent_name],
+                    agent_factories["random"],
+                ]
+            else:
+                current_agent_factories=[
+                    agent_factories["random"],
+                    agent_factories[agent_name],
+                ]
+
+            print(f"RUNNING {agent_name}")
+            result = agent_battler.run_games(
+                game_count=args.games,
+                turn_limit=args.turn_limit,
+                n_workers=n_workers,
+                env_factory=env_factory,
+                agent_factories=current_agent_factories,
+                embedding_table=embedding_table
+            )
+            results[agent_name] = result
+            print(f"RESULTS: {result}")
     print(results)

@@ -87,11 +87,12 @@ class Game(GameSchema):
 
     def reset(self):
         super().reset()
-        for player in self.players:
-            for i in range(3):
-                self.draw(player)
-        self.start_of_turn()
-        self.add_player_turn_to_stack()
+        if self.force_game_state is None:
+            for player in self.players:
+                for i in range(3):
+                    self.draw(player)
+            self.start_of_turn()
+            self.add_player_turn_to_stack()
 
     def assert_nonempty_stack(self):
         assert len(self.stack) > 0, (

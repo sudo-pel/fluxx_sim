@@ -1,4 +1,4 @@
-from src.game.FluxxEnums import GameState
+from src.game.FluxxEnums import GameState, GamePhase, GamePhaseType
 
 # ---------------
 # PUZZLES
@@ -20,7 +20,12 @@ puzzle_a = GameState(
     discard_pile=[],
     draw_pile=[],
     rules=[],
-    stack=[],
+    stack=[
+        GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, 0, decisions_left=1),
+        GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, 0, decisions_left=1),
+    ],
+    starting_player=0,
+    cards_drawn=[1, 0],
 )
 
 # PUZZLE A2: p0 must play "sheep" to win via "sheepdog", or else the opponent will play "excalibur" and win via "sword_in_the_stone".
@@ -39,7 +44,12 @@ puzzle_a2 = GameState(
     discard_pile=[],
     draw_pile=[],
     rules=[],
-    stack=[],
+    stack=[
+        GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, 0, decisions_left=1),
+        GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, 0, decisions_left=1),
+    ],
+    starting_player=0,
+    cards_drawn=[1, 0],
 )
 
 # PUZZLE B:
@@ -60,9 +70,14 @@ puzzle_b = GameState(
     ],
     goals=["time_is_money"],
     discard_pile=[],
-    draw_pile=["time", "the_moon", "time_is_money"],
+    draw_pile=["time_is_money", "the_moon", "time"],
     rules=[],
-    stack=[],
+    stack=[
+        GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, 0, decisions_left=1),
+        GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, 0, decisions_left=1),
+    ],
+    starting_player=0,
+    cards_drawn=[1,0],
 )
 
 # PUZZLE B2:
@@ -83,9 +98,14 @@ puzzle_b2 = GameState(
     ],
     goals=["sheepdog"],
     discard_pile=[],
-    draw_pile=["sheep", "map", "sheepdog"],
+    draw_pile=["sheepdog", "map", "sheep"],
     rules=[],
-    stack=[],
+    stack=[
+        GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, 0, decisions_left=1),
+        GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, 0, decisions_left=1),
+    ],
+    starting_player=0,
+    cards_drawn=[1, 0],
 )
 
 # PUZZLE C:
@@ -101,18 +121,23 @@ puzzle_c = GameState(
     turn_count=0,
     player_count=2,
     hands=[
-        ["hand_limit_3"],
-        ["the_sun", "dreams", "day_dreams", "cookies", "time", "the_eye"]
+        ["hand_limit_2"],
+        ["the_brain_no_tv", "the_brain", "day_dreams", "cookies", "time", "the_eye"]
     ],
     keepers=[
         [],
         []
     ],
-    goals=["sheepdog"],
+    goals=["toast"],
     discard_pile=[],
-    draw_pile=["5_keepers", "play_3", "toast", "winning_the_lottery"],
+    draw_pile=["winning_the_lottery", "music", "play_3", "5_keepers"],
     rules=["goal_mill"],
-    stack=[],
+    stack=[
+        GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, 0, decisions_left=1),
+        GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, 0, decisions_left=1),
+    ],
+    starting_player=0,
+    cards_drawn=[1, 0],
 )
 
 # PUZZLE C2:
@@ -128,8 +153,8 @@ puzzle_c2 = GameState(
     turn_count=0,
     player_count=2,
     hands=[
-        ["hand_limit_3"],
-        ["sheep", "dog", "sheepdog", "air", "excalibur", "the_void"]
+        ["hand_limit_2"],
+        ["sword_in_the_stone", "excalibur", "sheepdog", "air", "excalibur", "the_void"]
     ],
     keepers=[
         [],
@@ -137,7 +162,12 @@ puzzle_c2 = GameState(
     ],
     goals=["sheepdog"],
     discard_pile=[],
-    draw_pile=["space_jackpot", "play_4", "sunshine", "fire"],
+    draw_pile=["fire", "sunshine", "play_4", "space_jackpot"],
     rules=["goal_mill"],
-    stack=[],
+    stack=[
+        GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, 0, decisions_left=1),
+        GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, 0, decisions_left=1),
+    ],
+    starting_player=0,
+    cards_drawn=[1, 0],
 )
