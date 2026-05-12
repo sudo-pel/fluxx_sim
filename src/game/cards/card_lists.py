@@ -14,6 +14,55 @@ expanded_deck = [
     "play_4",
     "play_3",
 
+    # New action cards
+    "pandoras_box",
+    "rewind",
+    "robin_hood",
+    "time_vortex",
+    "gift_giveaway",
+    "dig_up_the_past",
+    "space_jackpot",
+    "supernova",
+    "destroy_all_keepers",
+    "roll_for_it",
+    "close_enough",
+    "rough_seas",
+    "brain_drain",
+    "oops",
+
+    # New rule cards
+    "triple_agenda",
+    "card_transfusion",
+    "plunder",
+
+    # Action cards from base deck
+    "zap_a_card",
+    "trash_a_keeper",
+    "draw_3_play_2_of_them",
+    "jackpot",
+    "exchange_keepers",
+    "lets_simplify",
+    "lets_do_that_again",
+    "trade_hands",
+    "no_limits",
+    "take_another_turn",
+    "discard_and_draw",
+    
+    # Rule cards from base deck
+    "double_agenda",
+    "recycling",
+    "goal_mill",
+    "no_hand_bonus",
+    "party_bonus",
+    "poor_bonus",
+    "rich_bonus",
+    "swap_plays_for_draws",
+    "get_on_with_it",
+
+    # Goal cards from base deck
+    "5_keepers",
+    "10_cards_in_hand",
+
     # Keepers
     "cat",
     "dog",
@@ -64,55 +113,6 @@ expanded_deck = [
     "farmer_and_an_animal",
     "all_the_animals",
     "nothingness",
-
-    # New action cards
-    "pandoras_box",
-    "rewind",
-    "robin_hood",
-    "time_vortex",
-    "gift_giveaway",
-    "dig_up_the_past",
-    "space_jackpot",
-    "supernova",
-    "destroy_all_keepers",
-    "roll_for_it",
-    "close_enough",
-    "rough_seas",
-    "brain_drain",
-    "oops",
-
-    # New rule cards
-    "triple_agenda",
-    "card_transfusion",
-    "plunder",
-
-    # Action cards from base deck
-    "zap_a_card",
-    "trash_a_keeper",
-    "draw_3_play_2_of_them",
-    "jackpot",
-    "exchange_keepers",
-    "lets_simplify",
-    "lets_do_that_again",
-    "trade_hands",
-    "no_limits",
-    "take_another_turn",
-    "discard_and_draw",
-    
-    # Rule cards from base deck
-    "double_agenda",
-    "recycling",
-    "goal_mill",
-    "no_hand_bonus",
-    "party_bonus",
-    "poor_bonus",
-    "rich_bonus",
-    "swap_plays_for_draws",
-    "get_on_with_it",
-
-    # Goal cards from base deck
-    "5_keepers",
-    "10_cards_in_hand",
 
 ]
 
