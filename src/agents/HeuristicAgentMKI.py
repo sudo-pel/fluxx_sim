@@ -148,7 +148,7 @@ class HeuristicAgentMKI(Agent):
         for card in cards_to_eval:
             # used for one of the heuristics below
             if card in card_to_opponent_gameplan:
-                opponent_gameplan = card_to_opponent_gameplan[card]
+                opponent_gameplan = card_to_opponent_gameplan[card][0]
                 goal_mod = 1 if opponent_gameplan.goal_in_play else 0
 
             if card_type(card) == "GOAL" and current_goal_opponent_gameplan is not None and current_goal_opponent_gameplan.in_play_count > 1:
@@ -162,7 +162,7 @@ class HeuristicAgentMKI(Agent):
                     priorities[-1].add(card)
             elif is_draw_rule(card) and rule_options(card)["draw"] > cards_drawn + 1:
                 priorities[3].add(card)
-            elif card_type(card) == "GOAL" and card_to_gameplan[card].in_play_count > 1 and card_to_gameplan[card].in_discard_count > 0:
+            elif card_type(card) == "GOAL" and card_to_gameplan[card][0].in_play_count > 1 and card_to_gameplan[card][0].in_discard_count > 0:
                 priorities[-2].add(card)
             elif card in card_to_opponent_gameplan and opponent_gameplan.missing_cards == {card}:
                 priorities[-100].add(card)
@@ -179,7 +179,7 @@ class HeuristicAgentMKI(Agent):
 
         for card in cards_to_eval:
             if card in card_to_gameplan:
-                gameplan = card_to_gameplan[card]
+                gameplan = card_to_gameplan[card][0]
                 if gameplan.in_discard_count > 0:
                     priorities[1].add(card)
                 else:
@@ -226,12 +226,12 @@ class HeuristicAgentMKI(Agent):
 
         for card in cards_to_eval:
             if card in card_to_gameplan:
-                gameplan = card_to_gameplan[card]
+                gameplan = card_to_gameplan[card][0]
             if card in card_to_opponent_gameplan:
                 opponent_gameplan = card_to_opponent_gameplan[card]
             if card in card_to_gameplan and (gameplan.missing_count > 0 or gameplan.in_hand_count > state.plays_remaining[self.player_number]):
                 priorities[5].add(card)
-            elif card in card_to_opponent_gameplan and card_to_opponent_gameplan[card].held_count > 0:
+            elif card in card_to_opponent_gameplan and card_to_opponent_gameplan[card][0].held_count > 0:
                 priorities[5].add(card)
             else:
                 priorities[0].add(card)
