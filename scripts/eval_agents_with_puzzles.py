@@ -1,6 +1,7 @@
 import argparse
 import os
 
+from src.agents.PPOAgentGeneralizedWithHeuristic import PPOAgentGeneralizedWithHeuristic
 from src.game.game_states import puzzle_a, puzzle_a2, puzzle_b, puzzle_b2, puzzle_c, puzzle_c2
 
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
@@ -38,6 +39,7 @@ AGENT_NAMES = [
     "ppo",
     "ppo_general",
     "ppo_general_with_reward_shaping",
+    "ppo_general_with_reward_shaping_and_heuristic",
     "dqn_general",
     "dqn",
     "random",
@@ -69,6 +71,11 @@ AGENT_REGISTRY = {
     },
     "ppo_general_with_reward_shaping": {
         "class": PPOAgentGeneralized,
+        "network_attr": "policy_network",
+        "state_dict": "final_experiments/ppo_general_with_reward_shaping_2026-05-07_20-52-04/final/final_model_50003737.pt",
+    },
+    "ppo_general_with_reward_shaping_and_heuristic": {
+        "class": PPOAgentGeneralizedWithHeuristic,
         "network_attr": "policy_network",
         "state_dict": "final_experiments/ppo_general_with_reward_shaping_2026-05-07_20-52-04/final/final_model_50003737.pt",
     },
