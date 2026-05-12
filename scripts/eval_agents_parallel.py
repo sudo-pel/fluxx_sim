@@ -37,6 +37,7 @@ CARD_LISTS = {
 AGENT_NAMES = [
     "ppo",
     "ppo_general",
+    "ppo_general_with_heuristic",
     "ppo_general_with_reward_shaping",
     "ppo_general_with_reward_shaping_and_heuristic",
     "dqn_general",
@@ -54,6 +55,12 @@ AGENT_REGISTRY = {
     },
     "ppo_general": {
         "class": PPOAgentGeneralized,
+        "network_attr": "policy_network",
+        "state_dict": "final_experiments/ppo_general_2026-05-02_09-11-14/final/final_model_50006336.pt",
+        "strict": False,
+    },
+    "ppo_general_with_heuristic": {
+        "class": PPOAgentGeneralizedWithHeuristic,
         "network_attr": "policy_network",
         "state_dict": "final_experiments/ppo_general_2026-05-02_09-11-14/final/final_model_50006336.pt",
         "strict": False,

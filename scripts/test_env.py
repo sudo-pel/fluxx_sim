@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 
 from scripts.debug_utils import printout_state
@@ -5,15 +7,18 @@ from src.agents.DQNAgent import DQNAgent
 from src.agents.HeuristicAgentMKI import HeuristicAgentMKI
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgent import PPOAgent
+from src.agents.PPOAgentGeneralized import PPOAgentGeneralized
 from src.agents.RandomAgent import RandomAgent
+from src.agents.card_embeddings import generate_embedding_table
 from src.env.FluxxEnv import FluxxEnv
 from src.game.cards import card_lists
 from src.game.Game import Game
-from src.game.game_states import puzzle_a, puzzle_b
+from src.game.game_states import puzzle_a, puzzle_b, puzzle_c, puzzle_d
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 def main(one_turn_win_simple_fluxx=None):
-    two_player_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True, force_game_state=puzzle_b)
+    two_player_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True, force_game_state=puzzle_d)
     two_player_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True)
 
     env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
@@ -28,17 +33,24 @@ def main(one_turn_win_simple_fluxx=None):
     actor2.q_network.eval()
     """
 
+    generate_embedding_table(card_lists.base_deck)
+
     agents = {
-        "player_0": RandomAgent(env.game.game_config, 0),
-        "player_1": HeuristicAgentMKII(env.game.game_config, 1)
+        "player_0": PPOAgentGeneralized(env.game.game_config, 0),
+        "player_1": RandomAgent(env.game.game_config, 1)
     }
+
+    agents["player_0"].policy_network.load_state_dict(
+        torch.load(f"{PROJECT_ROOT}/final_experiments/ppo_general_2026-05-02_09-11-14/final/final_model_50006336.pt"),
+        strict=False)
+    agents["player_0"].policy_network.eval()
 
     victories = {
         "player_0": 0,
         "player_1": 0
     }
 
-    GAME_COUNT = 2000
+    GAME_COUNT = 200
 
     for i in range(5):
 
@@ -53,8 +65,8 @@ def main(one_turn_win_simple_fluxx=None):
             for agent in env.agent_iter():
                 observation, reward, termination, truncation, info = env.last()
 
-                if env.game.turn_count > 10000:
-                    print(f"turn limit reached for game {i*2000+j}")
+                if env.game.turn_count > 3:
+                    #print(f"turn limit reached for game {i*2000+j}")
                     break
 
                 if termination or truncation:

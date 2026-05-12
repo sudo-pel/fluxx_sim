@@ -122,7 +122,7 @@ puzzle_c = GameState(
     player_count=2,
     hands=[
         ["hand_limit_2"],
-        ["the_brain_no_tv", "the_brain", "day_dreams", "cookies", "time", "the_eye"]
+        ["the_brain_no_tv", "the_brain", "day_dreams"]
     ],
     keepers=[
         [],
@@ -154,7 +154,7 @@ puzzle_c2 = GameState(
     player_count=2,
     hands=[
         ["hand_limit_2"],
-        ["sword_in_the_stone", "excalibur", "sheepdog", "air", "the_void"]
+        ["sword_in_the_stone", "excalibur", "sheepdog"]
     ],
     keepers=[
         [],
@@ -164,6 +164,33 @@ puzzle_c2 = GameState(
     discard_pile=[],
     draw_pile=["sunshine", "air", "fire", "sunshine", "play_4", "space_jackpot"],
     rules=["goal_mill"],
+    stack=[
+        GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, 0, decisions_left=1),
+        GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, 0, decisions_left=1),
+    ],
+    starting_player=0,
+    cards_drawn=[1, 0],
+)
+
+"""
+for testing goal/keeper prioritisation
+"""
+# PUZZLE D: p0 must play "the_sun" to win via "day dreams", or else the opponent will play "time" and win via "time_is_money".
+puzzle_d = GameState(
+    turn_count=0,
+    player_count=2,
+    hands=[
+        ["the_sun", "the_party", "the_brain", "sleep"],
+        ["time"]
+    ],
+    keepers=[
+        ["dreams"],
+        ["money"]
+    ],
+    goals=["day_dreams", "time_is_money"],
+    discard_pile=[],
+    draw_pile=[],
+    rules=[],
     stack=[
         GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, 0, decisions_left=1),
         GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, 0, decisions_left=1),
