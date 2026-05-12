@@ -122,7 +122,7 @@ puzzle_c = GameState(
     player_count=2,
     hands=[
         ["hand_limit_2"],
-        ["the_brain_no_tv", "the_brain", "day_dreams"]
+        ["the_brain_no_tv", "the_brain", "day_dreams", "bread"]
     ],
     keepers=[
         [],
@@ -154,7 +154,7 @@ puzzle_c2 = GameState(
     player_count=2,
     hands=[
         ["hand_limit_2"],
-        ["sword_in_the_stone", "excalibur", "sheepdog"]
+        ["sword_in_the_stone", "excalibur", "sheepdog", "the_void"]
     ],
     keepers=[
         [],
@@ -180,14 +180,14 @@ puzzle_d = GameState(
     turn_count=0,
     player_count=2,
     hands=[
-        ["the_sun", "the_party"],
-        ["time"]
+        ["the_sun", "the_party", "the_brain", "chocolate"],
+        ["time_is_money"]
     ],
     keepers=[
         ["dreams"],
-        ["money"]
+        ["money", "time"]
     ],
-    goals=["day_dreams", "time_is_money"],
+    goals=["day_dreams"],
     discard_pile=[],
     draw_pile=[],
     rules=[],
