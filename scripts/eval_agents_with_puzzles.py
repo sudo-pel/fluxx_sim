@@ -18,7 +18,7 @@ from src.agents.PPOAgent import PPOAgent
 from src.agents.PPOAgentGeneralized import PPOAgentGeneralized
 from src.agents.RandomAgent import RandomAgent
 from src.agents.card_embeddings import generate_embedding_table, get_embedding_table
-from src.env.AgentBattlerWithBlunders import AgentBattler
+from src.env.AgentBattlerParallel import AgentBattler
 from src.env.FluxxEnv import FluxxEnv
 from src.game.Game import Game
 from src.game.cards import card_lists as card_list_module

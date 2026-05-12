@@ -6,6 +6,7 @@ from typing import Optional, Callable
 
 import numpy as np
 
+from src.agents import agent_utils
 from src.agents.Agent import Agent
 from src.agents.card_embeddings import set_embedding_table
 from src.training.TrainingEnums import GameLogConfig
@@ -40,23 +41,34 @@ def _run_game_batch(
     wins["draws"] = 0
     wins["errors"] = 0
     game_lengths = []
+    blunders = {f"player_{i}": 0 for i in range(player_count)}
+    forced_losses = {f"player_{i}": 0 for i in range(player_count)}
 
     for i in range(game_count):
         env.reset()
         timestep = 0
         global_game_index = game_offset + i
         error_occurred = False
+        last_to_moves = []
+        action_mask_nonzeroes = []
 
         if log_games:
             game_logger = GameLogLogger(f"{log_name}/game_{global_game_index}")
             env.game.logger = game_logger
 
         for agent in env.agent_iter():
+
             if timestep >= step_limit:
                 break
             timestep += 1
 
             observation, _, termination, truncation, _ = env.last()
+
+            if env.game.winner is None:
+                action_mask = agent_utils.observe_hot_encoded(agents[agent], observation, agents[agent].game_config)["action_mask"]
+                action_mask_nonzeroes.append(np.count_nonzero(action_mask))
+                last_to_moves.append(agent)
+
 
             if termination or truncation or env.game.winner is not None:
                 action = None
@@ -78,11 +90,19 @@ def _run_game_batch(
         elif env.game.winner is None:
             wins["draws"] += 1
         else:
-            wins[f"player_{env.game.winner}"] += 1
+            outcome = f"player_{env.game.winner}"
+            wins[outcome] += 1
+            for agent_name in agents.keys():
+                if agent_name != outcome and last_to_moves[-1] == agent_name:
+                    if action_mask_nonzeroes[-1] == 1:
+                        forced_losses[agent_name] += 1
+                    else:
+                        blunders[agent_name] += 1
+
         game_lengths.append(env.game.turn_count)
         env.close()
 
-    return {"wins": wins, "game_lengths": game_lengths}
+    return {"wins": wins, "game_lengths": game_lengths, "blunders": blunders, "forced_losses": forced_losses}
 
 
 class AgentBattler:
@@ -129,6 +149,8 @@ class AgentBattler:
         total_wins = {f"player_{i}": 0 for i in range(player_count)}
         total_wins["draws"] = 0
         total_wins["errors"] = 0
+        total_blunders = {f"player_{i}": 0 for i in range(player_count)}
+        total_forced_losses = {f"player_{i}": 0 for i in range(player_count)}
         all_lengths = []
 
         with ProcessPoolExecutor(max_workers=n_workers) as pool:
@@ -153,10 +175,16 @@ class AgentBattler:
                 result = future.result()
                 for key in total_wins:
                     total_wins[key] += result["wins"][key]
+                for key in total_blunders:
+                    total_blunders[key] += result["blunders"][key]
+                for key in total_forced_losses:
+                    total_forced_losses[key] += result["forced_losses"][key]
                 all_lengths.extend(result["game_lengths"])
 
         return {
             "player_wins": total_wins,
             "total_games": game_count,
             "average_game_length": sum(all_lengths) / len(all_lengths),
+            "blunders": total_blunders,
+            "forced_losses": total_forced_losses
         }
