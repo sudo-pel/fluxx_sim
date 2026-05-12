@@ -54,7 +54,7 @@ def _run_game_batch(
             env.game.logger = game_logger
 
         for agent in env.agent_iter():
-            if env.game.winner is not None:
+            if env.game.winner is None:
                 last_to_move = agent
 
             if timestep >= step_limit:
