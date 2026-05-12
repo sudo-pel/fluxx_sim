@@ -122,7 +122,7 @@ puzzle_c = GameState(
     player_count=2,
     hands=[
         ["hand_limit_2"],
-        ["the_brain_no_tv", "the_brain", "day_dreams", "the_moon", "money"]
+        ["the_brain_no_tv", "the_brain", "day_dreams"]
     ],
     keepers=[
         [],
@@ -154,7 +154,7 @@ puzzle_c2 = GameState(
     player_count=2,
     hands=[
         ["hand_limit_2"],
-        ["sword_in_the_stone", "excalibur", "sheepdog", "monkey", "grass"]
+        ["sword_in_the_stone", "excalibur", "sheepdog"]
     ],
     keepers=[
         [],
