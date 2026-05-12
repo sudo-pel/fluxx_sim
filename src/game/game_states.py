@@ -1,6 +1,13 @@
 from src.game.FluxxEnums import GameState
 
-two_player_p0_one_turn_win = GameState(
+# ---------------
+# PUZZLES
+# ---------------
+
+# PUZZLE A: p0
+puzzle_a = GameState(
+    0,
+    2,
     [
         ["the_sun", "the_party", "the_brain"],
         ["time"]
@@ -23,7 +30,9 @@ two_player_p0_one_turn_win = GameState(
 # p1 will draw into "time" and play it, and then play "time_is_money"
 # p1 will have the keepers required and so will win as soon as "time_is_money" is played: p0 cannot interact with their gameplan and must play two perfect turns
 
-two_player_p0_two_turn_win = GameState(
+puzzle_b = GameState(
+    0,
+    2,
     [
         ["the_sun", "day_dreams", "the_party", "the_brain"],
         []
