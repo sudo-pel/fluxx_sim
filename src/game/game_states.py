@@ -4,12 +4,12 @@ from src.game.FluxxEnums import GameState
 # PUZZLES
 # ---------------
 
-# PUZZLE A: p0
+# PUZZLE A: p0 must play "the_sun" to win via "day dreams", or else the opponent will play "time" and win via "time_is_money".
 puzzle_a = GameState(
     0,
     2,
     [
-        ["the_sun", "the_party", "the_brain"],
+        ["the_sun", "the_party", "the_brain", "sleep", "chocolate"],
         ["time"]
     ],
     [
@@ -17,6 +17,28 @@ puzzle_a = GameState(
         ["money"]
     ],
     ["day_dreams", "time_is_money"],
+    [],
+    [],
+    [],
+    [],
+    [],
+    False,
+    0
+)
+
+# PUZZLE A2: p0 must play "sheep" to win via "sheepdog", or else the opponent will play "excalibur" and win via "sword_in_the_stone".
+puzzle_a2 = GameState(
+    0,
+    2,
+    [
+        ["sheep", "the_party", "the_brain", "sleep", "chocolate"],
+        ["excalibur"]
+    ],
+    [
+        ["dog"],
+        []
+    ],
+    ["sheepdog", "sword_in_the_stone"],
     [],
     [],
     [],

@@ -65,7 +65,7 @@ def _run_game_batch(
             observation, _, termination, truncation, _ = env.last()
 
             if env.game.winner is None:
-                action_mask = agent_utils.observe_hot_encoded(observation, agents[agent].game_config)["action_mask"]
+                action_mask = agent_utils.observe_hot_encoded(agents[agent], observation, agents[agent].game_config)["action_mask"]
                 action_mask_nonzeroes.append(np.count_nonzero(action_mask))
                 last_to_moves.append(agent)
 
