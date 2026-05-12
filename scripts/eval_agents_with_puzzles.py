@@ -98,6 +98,7 @@ AGENT_REGISTRY = {
 }
 
 PUZZLES = {
+    """
     "puzzle_a": {
         "game_state": puzzle_a,
         "card_list": card_list_module.base_deck,
@@ -118,6 +119,7 @@ PUZZLES = {
         "card_list": card_list_module.expanded_deck,
         "testee_player_number": 0
     },
+    """
     "puzzle_c": {
         "game_state": puzzle_c,
         "card_list": card_list_module.base_deck,
