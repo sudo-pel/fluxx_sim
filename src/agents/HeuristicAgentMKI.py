@@ -81,7 +81,6 @@ class Gameplan:
     in_discard_count: int
     goal_in_play: bool
 
-
 ASYMMETRIC_TURN_EXTENDERS = {
     "draw_2_and_use_em",
     "draw_3_play_2_of_them",
