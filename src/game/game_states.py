@@ -180,7 +180,7 @@ puzzle_d = GameState(
     turn_count=0,
     player_count=2,
     hands=[
-        ["the_sun", "the_party", "the_brain", "sleep"],
+        ["the_sun", "the_party"],
         ["time"]
     ],
     keepers=[

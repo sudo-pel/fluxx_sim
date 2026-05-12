@@ -36,14 +36,16 @@ def main(one_turn_win_simple_fluxx=None):
     generate_embedding_table(card_lists.base_deck)
 
     agents = {
-        "player_0": PPOAgentGeneralized(env.game.game_config, 0),
+        "player_0": HeuristicAgentMKI(env.game.game_config, 0),
         "player_1": RandomAgent(env.game.game_config, 1)
     }
 
+    """
     agents["player_0"].policy_network.load_state_dict(
         torch.load(f"{PROJECT_ROOT}/final_experiments/ppo_general_2026-05-02_09-11-14/final/final_model_50006336.pt"),
         strict=False)
     agents["player_0"].policy_network.eval()
+    """
 
     victories = {
         "player_0": 0,
