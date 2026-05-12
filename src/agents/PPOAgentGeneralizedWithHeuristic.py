@@ -107,6 +107,12 @@ def is_limit_rule(card_name: str) -> bool:
     return is_hand_limit_rule(card_name) or is_keeper_limit_rule(card_name)
 
 class PPOAgentGeneralizedWithHeuristic(Agent):
+    keeper_to_goal: dict[str, list[str]] = defaultdict(list[str])
+    for card in CARD_DATA:
+        if CARD_DATA[card]["card_type"] == "GOAL":
+            for keeper in CARD_DATA[card]["required_keepers"]:
+                keeper_to_goal[keeper].append(card)
+
     def __init__(
         self,
         game_config: GameConfig,
