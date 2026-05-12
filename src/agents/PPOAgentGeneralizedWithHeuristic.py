@@ -75,6 +75,37 @@ class Gameplan:
     in_discard_count: int
     goal_in_play: bool
 
+def rule_options(card_name: str) -> dict:
+    """
+    Return the RulesOptions dict for a rule card, or empty dict.
+    """
+    return CARD_DATA[card_name].get("RulesOptions", {})
+
+def card_type(card_name: str) -> str:
+    """
+    Return the card_type string ('KEEPER', 'GOAL', 'RULE', 'ACTION').
+    """
+    return CARD_DATA[card_name]["card_type"]
+
+def is_play_rule(card_name: str) -> bool:
+    return card_type(card_name) == "RULE" and rule_options(card_name).get("play") is not None
+
+
+def is_draw_rule(card_name: str) -> bool:
+    return card_type(card_name) == "RULE" and rule_options(card_name).get("draw") is not None
+
+
+def is_hand_limit_rule(card_name: str) -> bool:
+    return card_type(card_name) == "RULE" and rule_options(card_name).get("hand_limit") is not None
+
+
+def is_keeper_limit_rule(card_name: str) -> bool:
+    return card_type(card_name) == "RULE" and rule_options(card_name).get("keeper_limit") is not None
+
+
+def is_limit_rule(card_name: str) -> bool:
+    return is_hand_limit_rule(card_name) or is_keeper_limit_rule(card_name)
+
 class PPOAgentGeneralizedWithHeuristic(Agent):
     def __init__(
         self,
