@@ -108,12 +108,12 @@ class DQNAgentGeneralized(Agent):
 
         return BufferEntry(
             decision_context=decision_context,
-            hand_ids=self._names_to_embed_ids(hand),
-            discard_ids=self._names_to_embed_ids(discard),
-            own_keeper_ids=self._names_to_embed_ids(own_keepers),
-            opp_keeper_ids=self._names_to_embed_ids(opp_keepers),
-            goal_ids=self._names_to_embed_ids(goals),
-            rules_ids=self._names_to_embed_ids(rules),
+            hand=hand,
+            discard=discard,
+            own_keepers=own_keepers,
+            opp_keepers=opp_keepers,
+            goals=goals,
+            rules=rules,
             draw_pile_size=draw_pile_size,
             opponent_hand_size=opponent_hand_size,
             action_mask=action_mask,
