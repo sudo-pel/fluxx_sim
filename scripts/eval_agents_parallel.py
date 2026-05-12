@@ -35,6 +35,7 @@ AGENT_NAMES = [
     "ppo",
     "ppo_general",
     "ppo_general_with_reward_shaping",
+    "dqn_general",
     "dqn",
     "random",
     "heuristic_agent_mki",
@@ -125,6 +126,15 @@ def parse_args():
     parser.add_argument("-cls", "--card-lists", nargs="+", type=str,
                         default=["base_deck"],
                         choices=["base_deck", "expanded_deck", "simple_fluxx_deck"])
+    parser.add_argument(
+        "-es",
+        "--evaluate-specific",
+        nargs="*",
+        type=str,
+        default=[],
+        choices=AGENT_NAMES,
+        help="Agents to evaluate games against. When specified, only matchups containing agents in this list will be run.",
+    )
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -160,6 +170,8 @@ if __name__ == "__main__":
         for agent_name in AGENT_NAMES:
             for other_agent_name in AGENT_NAMES:
                 if agent_name == other_agent_name or (other_agent_name, agent_name) in seen_matchups:
+                    continue
+                if args.evaluate_specific and (agent_name not in args.evaluate_specific and other_agent_name not in args.evaluate_specific):
                     continue
                 seen_matchups.add((agent_name, other_agent_name))
 
