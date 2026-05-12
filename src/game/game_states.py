@@ -89,7 +89,7 @@ puzzle_b2 = GameState(
     turn_count=0,
     player_count=2,
     hands=[
-        ["monkey", "rainbow", "book", "key"],
+        ["sunshine", "rainbow", "book", "key"],
         []
     ],
     keepers=[
@@ -154,7 +154,7 @@ puzzle_c2 = GameState(
     player_count=2,
     hands=[
         ["hand_limit_2"],
-        ["sword_in_the_stone", "excalibur", "sheepdog", "air", "excalibur", "the_void"]
+        ["sword_in_the_stone", "excalibur", "sheepdog", "air", "the_void"]
     ],
     keepers=[
         [],
@@ -162,7 +162,7 @@ puzzle_c2 = GameState(
     ],
     goals=["sheepdog"],
     discard_pile=[],
-    draw_pile=["fire", "sunshine", "play_4", "space_jackpot"],
+    draw_pile=["sunshine", "air", "fire", "sunshine", "play_4", "space_jackpot"],
     rules=["goal_mill"],
     stack=[
         GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, 0, decisions_left=1),
