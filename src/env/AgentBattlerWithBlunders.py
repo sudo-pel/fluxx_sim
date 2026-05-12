@@ -164,6 +164,8 @@ class AgentBattler:
                 result = future.result()
                 for key in total_wins:
                     total_wins[key] += result["wins"][key]
+                for key in total_blunders:
+                    total_blunders[key] += result["blunders"][key]
                 all_lengths.extend(result["game_lengths"])
 
         return {
