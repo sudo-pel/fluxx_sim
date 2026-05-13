@@ -1,10 +1,7 @@
 import copy
-import os
-import random
 from collections import deque
-from datetime import datetime
 from pathlib import Path
-from typing import Deque, Optional
+from typing import Deque
 
 import numpy as np
 import torch
@@ -210,14 +207,14 @@ class DQN:
     def init_hyperparameters(self):
         # replay / learning
         self.buffer_capacity = 350000
-        self.batch_size = 128          # was 256; halves per-update gradient cost on CPU
+        self.batch_size = 128
         self.gamma = 0.99
-        self.n_step = 3                # was 5; reduces pending-queue bookkeeping + bias
+        self.n_step = 3
         self.lr = 3e-4
 
         # target network + update cadence
         self.target_sync_every = 2_000
-        self.learn_every = 8           # was 4; halves number of gradient updates per env step
+        self.learn_every = 8
         self.warmup_steps = 10_000
 
         # exploration
@@ -231,7 +228,7 @@ class DQN:
         self.log_every_steps = 30000
         self.eval_every_steps = 30000
         self.pool_push_every_steps = 16000
-        self.run_games_every_steps = 50000    # expensive: plays full games vs fixed opponents
+        self.run_games_every_steps = 50000
         self.max_steps_per_episode = 3200
 
     def current_epsilon(self) -> float:
@@ -436,7 +433,7 @@ class DQN:
         torch.save(state_dict, path)
         print(f"Model saved to {path}", flush=True)
 
-
+# Safety guard against opponent not being a DQN agent with an epsilon value
 def current_opponent_act(agent, observation):
     try:
         return agent.act(observation, epsilon=0.05)

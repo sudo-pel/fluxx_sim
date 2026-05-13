@@ -13,13 +13,14 @@ from src.agents.Agent import Agent
 from src.agents.DQNAgentGeneralized import DQNAgentGeneralized
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.RandomAgent import RandomAgent
+from src.agents.utils import generalized_agent_utils
 from src.env.AgentBattler import AgentBattler
 from src.env.MetricsTracker import MetricsTracker
 from src.game.FluxxEnums import GameConfig
 from src.agents.utils.generalized_agent_utils import BufferEntry
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-# Limit to how many BufferEntry objects are collate()d at once to limit memory load on GPUs
+# Limit to how many BufferEntry objects are collate()d at once to limit load on GPUs
 Q_CHUNK_SIZE = 256
 
 
@@ -464,8 +465,8 @@ class DQNGeneralized:
             self.batch_size
         )
 
-        obs = self.actor.collate(entries, self.device)
-        next_obs = self.actor.collate(next_entries, self.device)
+        obs = generalized_agent_utils.collate(entries, self.device)
+        next_obs = generalized_agent_utils.collate(next_entries, self.device)
 
         a = torch.from_numpy(actions).to(self.device)
         R = torch.from_numpy(rewards).to(self.device)
@@ -518,7 +519,6 @@ class DQNGeneralized:
 
 
 def current_opponent_act(agent, observation):
-    # Forward-compatible, allows training against non DQN agents
     try:
         return agent.act(observation, epsilon=0.05)
     except TypeError:

@@ -1,9 +1,7 @@
-import os
 import copy
 from collections import deque
-from datetime import datetime
 from pathlib import Path
-from typing import Deque, Optional
+from typing import Deque
 
 import torch
 from torch.optim import Adam
@@ -12,7 +10,6 @@ import numpy as np
 from src.agents.Agent import Agent
 from src.neural_networks.NormalizedFeedForwardNN import NormalizedFeedForwardNN
 from src.training.TrainingEnums import LearningCheckpoint
-from src.neural_networks.FeedForwardNN import FeedForwardNN
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgent import PPOAgent
 from src.agents.RandomAgent import RandomAgent
@@ -46,7 +43,6 @@ class OpponentPool:
             self.rng = np.random.default_rng(seed)
 
     def add_agent(self, agent: Agent):
-        # Best-effort move any nn.Module attributes on the agent to the pool's device.
         policy = getattr(agent, "policy_network", None)
         if isinstance(policy, torch.nn.Module):
             policy.to(self.device)
@@ -142,7 +138,7 @@ class PPO:
 
 
     def _init_hyperparameters(self):
-        # base hyperparameters
+        # base
         self.max_timesteps_per_episode = 3200
         self.games_per_batch = 128
         self.gamma = 0.99
@@ -244,7 +240,7 @@ class PPO:
                     actor_losses.append(actor_loss.item())
                     critic_losses.append(critic_loss.item())
 
-                # if the kl of this branch exceeds the limt, stop training off the minibatches
+                # If the kl of this branch exceeds the limt, stop training off the minibatches
                 if self.kl_limit is not None:
                     # KLs from this epoch only
                     epoch_kls = kl_divergences[-(batch_size // self.minibatch_size):]
@@ -280,14 +276,6 @@ class PPO:
                 self.save_current_model(f"model_{self.global_timestep}")
 
         self.save_current_model(f"final_model_{self.global_timestep}", final=True)
-
-        # final evaluation
-        vs_heuristicagent = self.agent_battler.run_games([self.actor, HeuristicAgentMKII(self.env.game.game_config, 1)],100, 10000)
-        vs_randomagent = self.agent_battler.run_games([self.actor, RandomAgent(self.env.game.game_config, 1)], 100,10000)
-        self.tracker.close({
-            "final_wr_vs_heuristicagent": vs_heuristicagent["player_wins"]["player_0"]/100,
-            "final_wr_vs_randomagent": vs_randomagent["player_wins"]["player_0"]/100,
-        })
 
     def save_current_model(self, filename, final: bool = False):
         if not final:
@@ -359,8 +347,6 @@ class PPO:
                 else:
                     action, log_probs, observation = self.agents[agent].act(observation)
 
-                    # (For now) only collect training data from the actor agent
-                    # TODO: also collect training data from the opponent agent
                     if agent == "player_0":
                         # Normalize `action` to a plain python int for env.step and storage.
                         if isinstance(action, torch.Tensor):

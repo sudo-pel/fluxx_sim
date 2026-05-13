@@ -9,6 +9,7 @@ from torch.optim import Adam
 import numpy as np
 
 from src.agents.Agent import Agent
+from src.agents.utils import generalized_agent_utils
 from src.neural_networks.FluxxActorNetwork import FluxxStateEncoder
 from src.training.TrainingEnums import LearningCheckpoint
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
@@ -28,6 +29,7 @@ def get_default_device() -> torch.device:
         return torch.device("cuda")
     return torch.device("cpu")
 
+# Need a "special" module for the critic to convert state encoding
 class FluxxCriticNetwork(nn.Module):
     """
     FluxxStateEncoder here has separate parameters from the actor.
@@ -72,7 +74,6 @@ class OpponentPool:
             self.pool.popleft()
 
     def add_ppo(self, policy_network: torch.nn.Module):
-        # consider changing type hint to FluxxActorNetwork
         new_agent = PPOAgentGeneralized(self.game_config, self.player_number)
         cpu_copy = copy.deepcopy(policy_network).to("cpu")
         new_agent.policy_network = cpu_copy.to(self.device)
@@ -148,16 +149,8 @@ class PPOGeneralized:
         self.model_checkpoints_taken = 0
 
         if from_checkpoint is not None:
-            self.run_name = from_checkpoint.run_name
-            self.global_timestep = from_checkpoint.global_timestep
-            self.model_checkpoints_taken = from_checkpoint.model_checkpoints_taken
-            state_dict = torch.load(
-                f"{PROJECT_ROOT}/experiments/{self.run_name}/models/model_{self.global_timestep}.pt",
-                map_location="cpu", weights_only=True,
-            )
-            self.actor.policy_network.load_state_dict(state_dict)
-            print(f"Loaded model from checkpoint {self.run_name}")
-            # TBA: critic checkpoint loading
+            # Functionality deprecated for this learning algorithm
+            pass
 
     def init_hyperparameters(self):
         self.max_timesteps_per_episode = 3200
@@ -216,7 +209,7 @@ class PPOGeneralized:
                     idx_tensor = torch.as_tensor(minibatch_indices, dtype=torch.long, device=self.device)
 
                     mb_entries = [batch_obs[i] for i in minibatch_indices]
-                    mb_obs = self.actor.collate(mb_entries, self.device)
+                    mb_obs = generalized_agent_utils.collate(mb_entries, self.device)
 
                     mb_acts = batch_acts.index_select(0, idx_tensor)
                     mb_old_log_probs = batch_log_probs.index_select(0, idx_tensor)
@@ -330,8 +323,7 @@ class PPOGeneralized:
             for start in range(0, N, CRITIC_CHUNK_SIZE):
                 end = min(start + CRITIC_CHUNK_SIZE, N)
                 chunk_entries = entries[start:end]
-                chunk_acts = acts[start:end]
-                chunk_obs = self.actor.collate(chunk_entries, self.device)
+                chunk_obs = generalized_agent_utils.collate(chunk_entries, self.device)
 
                 V_chunk = self.critic(chunk_obs).squeeze(-1)
                 logits = self.actor.policy_network(chunk_obs)
@@ -441,8 +433,6 @@ class PPOGeneralized:
 
         return batch_obs, batch_acts_t, batch_log_probs_t, batch_advantages, batch_returns
 
-    # "degree of chunking" is limited to accommodate GPU sizes
-    # TODO: consider changing this to be greedier
     def compute_values_batched(self, entries: list[BufferEntry]) -> list[float]:
         values: list[float] = []
         N = len(entries)
@@ -450,7 +440,7 @@ class PPOGeneralized:
             for start in range(0, N, CRITIC_CHUNK_SIZE):
                 end = min(start + CRITIC_CHUNK_SIZE, N)
                 chunk = entries[start:end]
-                obs = self.actor.collate(chunk, self.device)
+                obs = generalized_agent_utils.collate(chunk, self.device)
                 v_chunk = self.critic(obs).squeeze(-1)
                 values.extend(v_chunk.detach().cpu().tolist())
         return values

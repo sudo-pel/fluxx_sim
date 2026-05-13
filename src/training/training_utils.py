@@ -1,5 +1,3 @@
-# TODO: these are taken from HeuristicAgentMKII; consider keeping the functions only in one place
-# Slight difference: optional keepers increase gameplan strength. Disallowed keepers decrease gameplan strength only when in play.
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
@@ -8,7 +6,7 @@ from typing import Optional
 from src.game.FluxxEnums import GameState
 from src.game.cards.card_data import CARD_DATA
 
-
+# Slight difference from HeuristicAgent Gameplan: optional keepers increase gameplan strength. Disallowed keepers decrease gameplan strength only when in play.
 @dataclass
 class GameplanExtended:
     """
@@ -83,8 +81,6 @@ def get_gameplans_from_cards(cards: list[str], game_state: GameState, player_num
 
     Lists of Gameplans (within both return values) are sorted by in ascending order of missing cards (so the gameplans closest to fruition are first)
     """
-
-    # TODO: unique goals like 5 keepers and special keeper requirements like disallowed keepers and optional keepers
     # When a goal is seen: generate a gameplan corresponding to that goal
     # When a keeper is seen: generate a gameplan corresponding to each goal that the keeper is pertinent to
     # Avoid generating duplicate gameplans by hashing via a tuple of the goal and all required keepers (which uniquely identifies a goal)
@@ -135,7 +131,6 @@ def get_gameplans_from_cards(cards: list[str], game_state: GameState, player_num
             disallowed_cards_in_play_count = len(disallowed_cards_in_play)
             missing_optional_subgoal_count = len({1 for s in held_optional_cards if len(s) == 0}) # the subgoal sets are not hashable and not important for counting anyway
 
-            # TODO: add support for goals with optional or disallowed keepers (must enrich Gameplan datatype)
             gameplan = GameplanExtended(
                 goal_name,
                 required_cards_set,

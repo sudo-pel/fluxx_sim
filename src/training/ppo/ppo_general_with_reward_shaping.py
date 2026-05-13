@@ -9,6 +9,7 @@ from torch.optim import Adam
 import numpy as np
 
 from src.agents.Agent import Agent
+from src.agents.utils import generalized_agent_utils
 from src.neural_networks.FluxxActorNetwork import FluxxStateEncoder
 from src.training import training_utils
 from src.training.TrainingEnums import LearningCheckpoint
@@ -74,7 +75,6 @@ class OpponentPool:
             self.pool.popleft()
 
     def add_ppo(self, policy_network: torch.nn.Module):
-        # consider changing type hint to FluxxActorNetwork
         new_agent = PPOAgentGeneralized(self.game_config, self.player_number)
         cpu_copy = copy.deepcopy(policy_network).to("cpu")
         new_agent.policy_network = cpu_copy.to(self.device)
@@ -226,7 +226,7 @@ class PPOGeneralizedRewardShaped:
                     idx_tensor = torch.as_tensor(minibatch_indices, dtype=torch.long, device=self.device)
 
                     mb_entries = [batch_obs[i] for i in minibatch_indices]
-                    mb_obs = self.actor.collate(mb_entries, self.device)
+                    mb_obs = generalized_agent_utils.collate(mb_entries, self.device)
 
                     mb_acts = batch_acts.index_select(0, idx_tensor)
                     mb_old_log_probs = batch_log_probs.index_select(0, idx_tensor)
@@ -340,8 +340,7 @@ class PPOGeneralizedRewardShaped:
             for start in range(0, N, CRITIC_CHUNK_SIZE):
                 end = min(start + CRITIC_CHUNK_SIZE, N)
                 chunk_entries = entries[start:end]
-                chunk_acts = acts[start:end]
-                chunk_obs = self.actor.collate(chunk_entries, self.device)
+                chunk_obs = generalized_agent_utils.collate(chunk_entries, self.device)
 
                 V_chunk = self.critic(chunk_obs).squeeze(-1)
                 logits = self.actor.policy_network(chunk_obs)
@@ -428,7 +427,6 @@ class PPOGeneralizedRewardShaped:
                     phi = self.score_game_state(game_state, 0)
                     if termination:
                         phi = 0
-                    # TODO: phi no longer needs to be global (was originally only going to reset on termination)
                     shaping_term = self.gamma * phi - self.phi_previous
                     reward += shaping_term
 
@@ -528,11 +526,12 @@ class PPOGeneralizedRewardShaped:
         self.tracker.record("rollout/win_rate_vs_pool", wins / games_played)
         self.tracker.flush(self.global_timestep)
 
-        # PBRS metric 1: per-episode total shaping
+        # PBRS metrics
         self.tracker.record("pbrs/episode_shaping_total_mean", np.mean(episode_shaping_totals))
         self.tracker.record("pbrs/episode_shaping_total_std", np.std(episode_shaping_totals))
 
-        # Telescoping residual: should be ~0 if PBRS invariant holds (sum_F + phi_0 = phi_T = 0)
+        # Telescoping residual: should be ~0 if PBRS invariant holds (sum_F + phi_0 = phi_T = 0) (it isn't due to ...
+        #   ... episode truncations)
         if len(episode_phi_initial) == len(episode_shaping_totals):
             telescoping_residual = [
                 s + p for s, p in zip(episode_shaping_totals, episode_phi_initial)
@@ -559,8 +558,6 @@ class PPOGeneralizedRewardShaped:
 
         return batch_obs, batch_acts_t, batch_log_probs_t, batch_advantages, batch_returns
 
-    # "degree of chunking" is limited to accommodate GPU sizes
-    # TODO: consider changing this to be greedier
     def compute_values_batched(self, entries: list[BufferEntry]) -> list[float]:
         values: list[float] = []
         N = len(entries)
@@ -568,7 +565,7 @@ class PPOGeneralizedRewardShaped:
             for start in range(0, N, CRITIC_CHUNK_SIZE):
                 end = min(start + CRITIC_CHUNK_SIZE, N)
                 chunk = entries[start:end]
-                obs = self.actor.collate(chunk, self.device)
+                obs = generalized_agent_utils.collate(chunk, self.device)
                 v_chunk = self.critic(obs).squeeze(-1)
                 values.extend(v_chunk.detach().cpu().tolist())
         return values
