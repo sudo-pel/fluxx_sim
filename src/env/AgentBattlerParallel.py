@@ -58,7 +58,8 @@ def run_game_batch(
         for agent in env.agent_iter():
 
             if timestep >= step_limit or env.game.turn_count >= turn_limit:
-                env.game.logger.game_over(None, env.game.get_game_state())
+                if log_games:
+                    env.game.logger.game_over(None, env.game.get_game_state())
                 break
             timestep += 1
 
