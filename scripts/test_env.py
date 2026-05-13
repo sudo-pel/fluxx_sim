@@ -9,7 +9,6 @@ from src.agents.utils.card_embeddings import generate_embedding_table
 from src.env.FluxxEnv import FluxxEnv
 from src.game.cards import card_lists
 from src.game.Game import Game
-from src.game.game_states import puzzle_d
 
 """
 

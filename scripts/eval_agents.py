@@ -20,7 +20,6 @@ from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgent import PPOAgent
 from src.agents.PPOAgentGeneralized import PPOAgentGeneralized
 from src.agents.RandomAgent import RandomAgent
-from src.agents.utils.card_embeddings import generate_embedding_table, get_embedding_table
 from src.env.AgentBattlerParallel import AgentBattler
 from src.env.FluxxEnv import FluxxEnv
 from src.game.Game import Game
@@ -199,8 +198,6 @@ if __name__ == "__main__":
         print(f"PLAYING WITH: CARD LIST: {card_list_name}")
 
         card_list = CARD_LISTS[card_list_name]
-        generate_embedding_table(card_list)
-        embedding_table = get_embedding_table()
 
         game_config = Game(2, card_list, disable_game_messages=True).game_config
 
@@ -238,7 +235,7 @@ if __name__ == "__main__":
                         agent_factories[agent_name],
                         agent_factories[other_agent_name],
                     ],
-                    embedding_table=embedding_table,
+                    embedding_table_name=card_list_name,
                     log_config=logging_config if args.log_name is not None else None,
                     log_games=args.log_name is not None,
                 )

@@ -8,7 +8,7 @@ import numpy as np
 
 from src.agents.utils import agent_utils
 from src.agents.Agent import Agent
-from src.agents.utils.card_embeddings import set_embedding_table
+from src.agents.utils.card_embeddings import load_embedding_table
 from src.training.TrainingEnums import GameLogConfig
 from src.env.FluxxEnv import FluxxEnv
 from src.env.Logger import GameLogLogger
@@ -25,12 +25,12 @@ def run_game_batch(
     log_games: bool,
     log_name: Optional[str],
     game_offset: int,
-    embedding_table: dict[str, np.ndarray]
+    embedding_table_name: str
 ) -> dict:
     """
     Large amount of non pickleable state means that worker processes have to construct their own agents and environments
     """
-    set_embedding_table(embedding_table)
+    load_embedding_table(embedding_table_name)
     env = env_factory()
     agents = {f"player_{i}": factory() for i, factory in enumerate(agent_factories)}
     for i, agent in enumerate(agents.values()):
@@ -113,7 +113,7 @@ class AgentBattler:
         log_config: Optional[GameLogConfig] = None,
         step_limit: Optional[int] = None,
         n_workers: int = 1,
-        embedding_table: dict[str, np.ndarray] = None,
+        embedding_table_name: str = None,
     ):
         if log_games and log_config is None:
             raise ValueError("log_config must be specified if log_games is True")
@@ -121,7 +121,7 @@ class AgentBattler:
         if step_limit is None:
             step_limit = turn_limit * 10
 
-        if embedding_table is None:
+        if embedding_table_name is None:
             raise Exception("embedding_table must be specified")
 
         player_count = len(agent_factories)
@@ -163,7 +163,7 @@ class AgentBattler:
                     log_games=log_games,
                     log_name=log_name,
                     game_offset=offset,
-                    embedding_table=embedding_table
+                    embedding_table_name=embedding_table_name
                 )
                 for count, offset in batches
             ]

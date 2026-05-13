@@ -86,7 +86,7 @@ EMBEDDING_TABLE: dict[str, np.ndarray] | None = None
 # ------------------
 
 def embedding_table_path(card_list_name: str) -> str:
-    return f"models/embedding_table_{card_list_name}.npy"
+    return f"embedding_tables/embedding_table_{card_list_name}.npy"
 
 def generate_embedding_table(card_list: list[str]) -> None:
     global EMBEDDING_TABLE

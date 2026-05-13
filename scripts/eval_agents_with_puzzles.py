@@ -21,17 +21,16 @@ from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgent import PPOAgent
 from src.agents.PPOAgentGeneralized import PPOAgentGeneralized
 from src.agents.RandomAgent import RandomAgent
-from src.agents.utils.card_embeddings import generate_embedding_table, get_embedding_table
 from src.env.AgentBattlerParallel import AgentBattler
 from src.env.FluxxEnv import FluxxEnv
 from src.game.Game import Game
-from src.game.cards import card_lists as card_list_module
+from src.game.cards import card_lists
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 CARD_LISTS = {
-    "base_deck": card_list_module.base_deck,
-    "expanded_deck": card_list_module.expanded_deck,
+    "base_deck": card_lists.base_deck,
+    "expanded_deck": card_lists.expanded_deck,
 }
 
 AGENT_NAMES = [
@@ -97,32 +96,32 @@ AGENT_REGISTRY = {
 PUZZLES = {
     "puzzle_a": {
         "game_state": puzzle_a,
-        "card_list": card_list_module.base_deck,
+        "card_list": "base_deck",
         "testee_player_number": 0
     },
     "puzzle_a2": {
         "game_state": puzzle_a2,
-        "card_list": card_list_module.expanded_deck,
+        "card_list": "expanded_deck",
         "testee_player_number": 0
     },
     "puzzle_b": {
         "game_state": puzzle_b,
-        "card_list": card_list_module.base_deck,
+        "card_list": "base_deck",
         "testee_player_number": 0
     },
     "puzzle_b2": {
         "game_state": puzzle_b2,
-        "card_list": card_list_module.expanded_deck,
+        "card_list": "expanded_deck",
         "testee_player_number": 0
     },
     "puzzle_c": {
         "game_state": puzzle_c,
-        "card_list": card_list_module.base_deck,
+        "card_list": "base_deck",
         "testee_player_number": 1
     },
     "puzzle_c2": {
         "game_state": puzzle_c2,
-        "card_list": card_list_module.expanded_deck,
+        "card_list": "expanded_deck",
         "testee_player_number": 1
     }
 }
@@ -234,11 +233,9 @@ if __name__ == "__main__":
         print(f"PLAYING PUZZLE: {puzzle}")
 
         puzzle_data = PUZZLES[puzzle]
-        card_list = puzzle_data["card_list"]
+        card_list_name = puzzle_data["card_list"]
+        card_list = CARD_LISTS[card_list_name]
         game_state = puzzle_data["game_state"]
-
-        generate_embedding_table(card_list)
-        embedding_table = get_embedding_table()
 
         game_config = Game(2, card_list, disable_game_messages=True, force_game_state=game_state).game_config
         env_factory = EnvFactory(card_list, force_game_state=game_state)
@@ -282,7 +279,7 @@ if __name__ == "__main__":
                 n_workers=n_workers,
                 env_factory=env_factory,
                 agent_factories=current_agent_factories,
-                embedding_table=embedding_table,
+                embedding_table_name=card_list_name,
                 log_config=logging_config if args.log_name is not None else None,
                 log_games=args.log_name is not None,
             )
