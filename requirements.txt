@@ -1,7 +1,0 @@
-# torch: install matching CUDA build manually if default doesn't work
-# see https://pytorch.org/get-started/locally/
-torch
-pettingzoo>=1.24
-numpy>=1.24,<2.2
-tensorboard>=2.15
-sentence-transformers>=2.7

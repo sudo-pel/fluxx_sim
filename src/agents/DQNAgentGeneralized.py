@@ -9,7 +9,7 @@ from src.agents.utils.agent_utils import (
     decision_context_vectors,
 )
 from src.game.FluxxEnums import GameConfig, GameState
-from src.neural_networks.FluxxActorNetwork import FluxxActorNetworkDQN
+from src.neural_networks.FluxxActorNetwork import FluxxActorNetwork
 from src.agents.utils.generalized_agent_utils import BufferEntry
 
 MAX_HAND_SIZE = 100
@@ -33,7 +33,7 @@ class DQNAgentGeneralized(Agent):
         self.decision_context_vectors = decision_context_vectors
 
         action_dim = len(game_config.card_list) + 1
-        self.q_network = FluxxActorNetworkDQN(
+        self.q_network = FluxxActorNetwork(
             action_dim=action_dim,
             card_list=game_config.card_list,
         )

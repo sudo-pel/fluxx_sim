@@ -14,3 +14,6 @@ from_remote/
 final_experiments/
 transformer_models/
 game_logs/
+
+# pyproject.toml files
+fluxx_rl.egg-info/

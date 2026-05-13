@@ -10,7 +10,6 @@ from src.agents.utils.agent_utils import rule_options, card_type, is_play_rule, 
 from src.agents.utils.generalized_agent_utils import Gameplan
 from src.game.cards.card_data import CARD_DATA
 from src.game.FluxxEnums import GameConfig, GameState, GamePhaseType
-from src.game.utils.general_utils import print_game_state
 
 class GameplanSortingOptions(Enum):
     MISSING_COUNT = 0

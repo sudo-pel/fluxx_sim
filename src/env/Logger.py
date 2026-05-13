@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Optional
 
-from scripts.utils import debug_utils
+from src.env.logger_utils import printout_state
 from src.game.FluxxEnums import GameState
 from abc import ABC, abstractmethod
 
@@ -37,7 +37,7 @@ class GameLogLogger(Logger):
             output = []
             for i in range(game_state.player_count):
                 output.append(f"==========PLAYER_{i} STATE==========\n")
-                output.extend(debug_utils.printout_state(i, game_state))
+                output.extend(printout_state(i, game_state))
             f.write("\n".join(output) + "\n")
 
     def game_over(self, winner: Optional[int], game_state: GameState):
