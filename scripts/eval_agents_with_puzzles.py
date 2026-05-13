@@ -1,7 +1,9 @@
 import argparse
+import copy
 import os
 
 from src.agents.PPOAgentGeneralizedWithHeuristic import PPOAgentGeneralizedWithHeuristic
+from src.game.FluxxEnums import GameConfig
 from src.game.game_states import puzzle_a, puzzle_a2, puzzle_b, puzzle_b2, puzzle_c, puzzle_c2
 from src.training.TrainingEnums import GameLogConfig
 
@@ -13,8 +15,6 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""
 from pathlib import Path
 
 import torch
-torch.manual_seed(0)
-torch.use_deterministic_algorithms(True)
 
 from src.agents.DQNAgent import DQNAgent
 from src.agents.DQNAgentGeneralized import DQNAgentGeneralized
@@ -135,7 +135,9 @@ class EnvFactory:
 
     def __call__(self):
         return FluxxEnv(
-            Game(2, self.card_list, disable_game_messages=True, force_game_state=self.force_game_state), 2, render_mode="human"
+            Game(2, self.card_list, disable_game_messages=True,
+                 force_game_state=copy.deepcopy(self.force_game_state)),
+            2, render_mode="human"
         )
 
 class AgentFactory:
@@ -239,7 +241,9 @@ if __name__ == "__main__":
         card_list = CARD_LISTS[card_list_name]
         game_state = puzzle_data["game_state"]
 
-        game_config = Game(2, card_list, disable_game_messages=True, force_game_state=game_state).game_config
+        game_config = GameConfig(
+            2, card_list,
+        )
         env_factory = EnvFactory(card_list, force_game_state=game_state)
         agent_battler = AgentBattler()
 

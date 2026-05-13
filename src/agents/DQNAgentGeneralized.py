@@ -59,9 +59,6 @@ class DQNAgentGeneralized(Agent):
             q_values = self.q_network(obs_dict)               # (1, action_dim)
             masked_q = q_values.masked_fill(~obs_dict["action_mask"], float("-inf"))
 
-        top2 = torch.topk(masked_q, 2).values[0]
-        print(f"top2 values: {top2.values}")
-        print(f"diff: {(top2[0] - top2[1]).item():.15e}")
 
         if self.rng.random() < epsilon:
             legal = np.flatnonzero(entry.action_mask.astype(bool))
