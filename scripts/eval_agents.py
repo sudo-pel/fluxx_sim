@@ -2,6 +2,7 @@ import argparse
 import os
 
 from src.agents.PPOAgentGeneralizedWithHeuristic import PPOAgentGeneralizedWithHeuristic
+from src.game.FluxxEnums import GameConfig
 from src.training.TrainingEnums import GameLogConfig
 
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
@@ -199,7 +200,7 @@ if __name__ == "__main__":
 
         card_list = CARD_LISTS[card_list_name]
 
-        game_config = Game(2, card_list, disable_game_messages=True).game_config
+        game_config = GameConfig(2, card_list)
 
         agent_battler = AgentBattler()
 

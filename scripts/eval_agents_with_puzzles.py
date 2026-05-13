@@ -15,6 +15,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""
 from pathlib import Path
 
 import torch
+torch.manual_seed(0)
+torch.use_deterministic_algorithms(True)
 
 from src.agents.DQNAgent import DQNAgent
 from src.agents.DQNAgentGeneralized import DQNAgentGeneralized
