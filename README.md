@@ -6,7 +6,11 @@
 
 1. Install PyTorch for your CUDA version: https://pytorch.org/get-started/locally/ (rely on pip at your own peril)
 2. Call `pip install -e .`
-3. You're done!
+3. Install the transformer model used with the following command:
+```
+python -c "from sentence_transformers import SentenceTransformer; m = SentenceTransformer('nomic-ai/nomic-embed-text-v1.5', truncate_dim=64); m.save('transformer_models/nomic-embed')"
+```
+4. You're done!
 
 ### Usage
 
