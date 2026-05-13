@@ -30,7 +30,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.agents.card_embeddings import generate_embedding_table
+from src.agents.utils.card_embeddings import generate_embedding_table
 from src.env.FluxxEnv import FluxxEnv
 from src.game.Game import Game
 from src.game.cards import card_lists

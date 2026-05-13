@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from random import Random
 
+from src.agents.utils import agent_utils
 # avoiding circular import
 from src.game.FluxxEnums import CardType, GamePhase, GamePhaseType
 from src.game.GameSchema import GameSchema
@@ -285,7 +286,7 @@ def activate_pandoras_box(game_state: 'GameSchema', user_number: int, rng: Rando
                 GameMessageType.SPECIAL_EFFECT,
             )
             return
-        if card.card_type == CardType.RULE:
+        if agent_utils.card_type == CardType.RULE:
             game_state.game_message(
                 f"<< Pandora's Box revealed Rule: {card.name} >>",
                 GameMessageType.SPECIAL_EFFECT,
@@ -485,7 +486,7 @@ def activate_close_enough(game_state: 'GameSchema', user_number: int, rng: Rando
 def activate_psychic_paper(game_state: 'GameSchema', user_number: int, rng: Random):
     opponent_number = user_number ^ 1
     opponent = game_state.players[opponent_number]
-    actions_in_hand = [c for c in opponent.hand if c.card_type == CardType.ACTION]
+    actions_in_hand = [c for c in opponent.hand if agent_utils.card_type == CardType.ACTION]
     if len(actions_in_hand) == 0:
         return
     # New phase: SELECT_ACTION_FROM_OPPONENT_HAND — resolver removes the

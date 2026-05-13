@@ -2,7 +2,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from src.agents.card_embeddings import CARD_EMBED_DIM, get_embedding_table
+from src.agents.utils.card_embeddings import CARD_EMBED_DIM, get_embedding_table
 
 class DeepSetsPool(nn.Module):
     def __init__(

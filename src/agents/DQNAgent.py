@@ -2,7 +2,7 @@ import torch
 from gymnasium import spaces
 import numpy as np
 
-from src.agents import agent_utils
+from src.agents.utils import agent_utils
 from src.agents.Agent import Agent
 from src.neural_networks.NormalizedFeedForwardNN import NormalizedFeedForwardNN
 from src.game.FluxxEnums import GameState
@@ -49,22 +49,17 @@ class DQNAgent(Agent):
         except StopIteration:
             return torch.device("cpu")
 
-    def _to_device_tensor(self, arr) -> torch.Tensor:
+    def to_device_tensor(self, arr) -> torch.Tensor:
         if isinstance(arr, torch.Tensor):
             return arr.to(self.device, dtype=torch.float)
         return torch.from_numpy(np.asarray(arr)).float().to(self.device)
 
-    def forward(self, obs):
-        if isinstance(obs, np.ndarray):
-            obs = self._to_device_tensor(obs)
-        return self.q_network.forward(obs)
-
-    def act(self, state, epsilon: float = 0.0):
+    def act(self, state, epsilon: float = 0.0) -> tuple[int, torch.Tensor, dict]:
         obs = self.encode(state)
         observation = obs["observation"]
         action_mask = obs["action_mask"]
 
-        obs_tensor = self._to_device_tensor(observation)
+        obs_tensor = self.to_device_tensor(observation)
         mask_tensor = torch.as_tensor(np.asarray(action_mask), dtype=torch.bool, device=self.device)
 
         with torch.no_grad():
@@ -81,7 +76,7 @@ class DQNAgent(Agent):
 
         return action, selected_q, obs
 
-    def encode(self, state: GameState):
+    def encode(self, state: GameState) -> dict[str, np.ndarray]:
         if state.game_over:
             dummy_obs = np.zeros(self.observation_space["observation"].shape[0], dtype=np.int8)
             dummy_mask = np.zeros(self.action_space.n, dtype=np.int8)

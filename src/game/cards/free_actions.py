@@ -1,6 +1,7 @@
 from random import Random
 from typing import TYPE_CHECKING
 
+from src.agents.utils import agent_utils
 from src.game.game_messages import GameMessageType
 
 # avoiding circular import
@@ -23,7 +24,7 @@ def can_use_swap_plays_for_draws(game_state: 'Game', player_number: int, rng: Ra
 def can_use_goal_mill(game_state: 'Game', player_number: int, rng: Random) -> bool:
     player = game_state.players[player_number]
 
-    goal_cards_in_hand = [card for card in player.hand if card.card_type == CardType.GOAL]
+    goal_cards_in_hand = [card for card in player.hand if agent_utils.card_type == CardType.GOAL]
     return "goal_mill" not in game_state.played_free_actions and len(goal_cards_in_hand) > 0
 
 def can_use_get_on_with_it(game_state: 'Game', player_number: int, rng: Random) -> bool:

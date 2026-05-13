@@ -3,123 +3,22 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional
 
-from src.agents import agent_utils
+from src.agents.utils import agent_utils
 from src.agents.Agent import Agent
 from src.agents.HeuristicAgentMKII import GameplanSortingOptions
+from src.agents.utils.agent_utils import rule_options, card_type, is_play_rule, is_draw_rule, is_hand_limit_rule, is_keeper_limit_rule
+from src.agents.utils.generalized_agent_utils import Gameplan
 from src.game.cards.card_data import CARD_DATA
 from src.game.FluxxEnums import GameConfig, GameState, GamePhaseType
 from src.game.utils.general_utils import print_game_state
-
-"""
-
-Implementation plan
-
-- Function for checking whether a rule is a draw rule
-- Function for checking whether a rule is a play rule
-
-
-PLAY:
-- Create a Gameplan object storing possible routes to victory. If any of the gameplans are "possible", promote that set of cards to the maximum, ensuring they come as a "set"
-- Store a list of "asymmetric turn extender" cards
-- Store a list of "symmetric turn extender" cards
-- "Incomplete" gameplans should be discredited. 
-- Calculate a list of goals that will cause your opponent to win the game and NEVER play them
-- Similar logic for goals for which opponent has at least one keeper
-
-DISCARD:
-- Check what Gameplan the keeper/goal is a part of
-    - If the gameplan has cards in the discard pile then increase the priority
-    - If the gameplan has no cards in the discard pile then decrease the priority based on the number of gameplan cards missing (fewer missing = LOWER priority)
-    
-DISCARD RULE IN PLAY:
-- Check whether rule is a "play", "draw", or "limit" rule and act accordingly
-
-ADD CARD IN PLAY TO HAND:
-- Map goals in play to gameplans and check whether the gameplan can be achieved this turn. If so, do NOT add the card in play to the hand
-- ..If not, increase the priority inversely proportional to number of gameplan cards missing
-- Also give priority to "limit" cards when you are over the limit
-
-SHARE CARDS FROM LATENT SPACE:
-- Map cards to gameplans and decrease priority based on number of gameplan cards missing
-- Do the same for opponent, but with slightly smaller values
-- Also prioritise asymmetric turn extender action cards, since they are good
-
-STEAL CARD FROM OPPONENT:
-- Map cards to gameplans and decrease priority based on number of gameplan cards missing
-- Do the same for opponent, but with slightly smaller values
-
-GIVE CARD TO OPPONENT:
-- Inverse analysis to above
-
-"""
-
-@dataclass
-class Gameplan:
-    """
-    goal: goal pertinent to gameplan
-
-    required_cards: set of cards (including goal) required to win via gameplan
-    held_cards: set of cards currently held by player, in hand or in play (relevant to goal)
-    missing_cards: set of cards required to play goal but not currently held by player
-    cards_in_hand: subset of held_cards that are in hand
-    cards_in_play: subset of held_cards that are in play
-
-    held_count, missing_count, in_hand_count, in_play_count: all self-explanatory
-    goal_in_play: whether goal is in play
-    """
-    goal: str
-    required_cards: set[str]
-    held_cards: set[str]
-    missing_cards: set[str]
-    cards_in_hand: set[str]
-    cards_in_play: set[str]
-    cards_in_discard: set[str]
-    held_count: int
-    missing_count: int
-    in_hand_count: int
-    in_play_count: int
-    in_discard_count: int
-    goal_in_play: bool
 
 ASYMMETRIC_TURN_EXTENDERS = {
     "draw_2_and_use_em",
     "draw_3_play_2_of_them",
     "take_another_turn",
     "todays_special",
-    "lets_do_that_again" # TODO: note that this is not actually an asymmetric turn extender but may recur one
+    "lets_do_that_again"
 }
-
-
-def rule_options(card_name: str) -> dict:
-    """
-    Return the RulesOptions dict for a rule card, or empty dict.
-    """
-    return CARD_DATA[card_name].get("RulesOptions", {})
-
-def card_type(card_name: str) -> str:
-    """
-    Return the card_type string ('KEEPER', 'GOAL', 'RULE', 'ACTION').
-    """
-    return CARD_DATA[card_name]["card_type"]
-
-def is_play_rule(card_name: str) -> bool:
-    return card_type(card_name) == "RULE" and rule_options(card_name).get("play") is not None
-
-
-def is_draw_rule(card_name: str) -> bool:
-    return card_type(card_name) == "RULE" and rule_options(card_name).get("draw") is not None
-
-
-def is_hand_limit_rule(card_name: str) -> bool:
-    return card_type(card_name) == "RULE" and rule_options(card_name).get("hand_limit") is not None
-
-
-def is_keeper_limit_rule(card_name: str) -> bool:
-    return card_type(card_name) == "RULE" and rule_options(card_name).get("keeper_limit") is not None
-
-
-def is_limit_rule(card_name: str) -> bool:
-    return is_hand_limit_rule(card_name) or is_keeper_limit_rule(card_name)
 
 class HeuristicAgentMKI(Agent):
     keeper_to_goal: dict[str, list[str]] = defaultdict(list[str])
@@ -128,8 +27,6 @@ class HeuristicAgentMKI(Agent):
             for keeper in CARD_DATA[card]["required_keepers"]:
                 keeper_to_goal[keeper].append(card)
 
-    # TODO: augment this function to take an argument of "additional cards", so that, for example, it can take into account that the card may be being ..
-    # TODO: .. played from latent space (currently, card would not be in hand and so gameplan would appear incomplete even if every other card is in hand)
     def eval_play(self, state: GameState, cards_to_eval: list[str]) -> dict[int, set[str]]:
         gameplans, card_to_gameplan = HeuristicAgentMKI.get_gameplans_from_cards(cards_to_eval, state, self.player_number)
         opponent_gameplans, card_to_opponent_gameplan = HeuristicAgentMKI.get_gameplans_from_cards(state.hands[1 - self.player_number], state, 1 - self.player_number, hand_visible=False)
@@ -243,7 +140,6 @@ class HeuristicAgentMKI(Agent):
         opponent_gameplans, card_to_opponent_gameplan = HeuristicAgentMKI.get_gameplans_from_cards(cards_to_eval, state, 1 - self.player_number, hand_visible=False)
         priorities: dict[int, set[str]] = defaultdict(set[str])
 
-        # TODO: Prioritize specific gameplans by completion rate
         for card in cards_to_eval:
             if card in card_to_gameplan:
                 priorities[5].add(card)
@@ -260,7 +156,6 @@ class HeuristicAgentMKI(Agent):
         priorities: dict[int, set[str]] = defaultdict(set[str])
 
         for card in cards_to_eval:
-            # TODO: (de-)prioritize specific gameplans by completion rate
             if card in card_to_gameplan:
                 priorities[-5].add(card)
             elif card in card_to_opponent_gameplan:
@@ -270,7 +165,6 @@ class HeuristicAgentMKI(Agent):
 
         return priorities
 
-    # TODO: add support for "use free action" (may just leave without though)
     game_phase_to_eval_function = {
         GamePhaseType.PLAY_CARD_FOR_TURN: eval_play,
         GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE: eval_play,
@@ -306,14 +200,15 @@ class HeuristicAgentMKI(Agent):
     @staticmethod
     def get_gameplans_from_cards(cards: list[str], game_state: GameState, player_number: int, hand_visible: bool = True, sort_by: Optional[GameplanSortingOptions] = None, reverse: bool = False) -> tuple[list[Gameplan], dict[str, list[Gameplan]]]:
         """
-        Takes a list of cards (strings) and returns:
-        - list of Gameplans that can be achieved with any subset of those cards
-        - dict mapping each card to a list of Gameplans that can be achieved with that card
+        Takes a list of cards (strings)
+
+        Returns:
+            list of Gameplans that can be achieved with any subset of those cards
+            dict mapping each card to a list of Gameplans that can be achieved with that card
 
         Lists of Gameplans (within both return values) are sorted by in ascending order of missing cards (so the gameplans closest to fruition are first)
         """
 
-        # TODO: unique goals like 5 keepers and special keeper requirements like disallowed keepers and optional keepers
         # When a goal is seen: generate a gameplan corresponding to that goal
         # When a keeper is seen: generate a gameplan corresponding to each goal that the keeper is pertinent to
         # Avoid generating duplicate gameplans by hashing via a tuple of the goal and all required keepers (which uniquely identifies a goal)
@@ -348,7 +243,6 @@ class HeuristicAgentMKI(Agent):
                 cards_in_discard = {card for card in game_state.discard_pile if (card in required_cards_set)}
                 in_discard_count = len(cards_in_discard)
 
-                # TODO: add support for goals with optional or disallowed keepers (must enrich Gameplan datatype)
                 gameplan = Gameplan(
                     goal_name,
                     required_cards_set,
@@ -399,7 +293,6 @@ class HeuristicAgentMKI(Agent):
         action_mask = agent_utils.observe_hot_encoded(self, state, self.game_config)["action_mask"]
         cards_to_choose_from = [self.game_config.card_list[i] for i in range(len(self.game_config.card_list)) if action_mask[i] == 1]
 
-        # new phases not taken into account
         if current_phase.type not in HeuristicAgentMKI.game_phase_to_eval_function:
             priorities: dict[int, set[str]] = {0: {c for c in cards_to_choose_from}}
         else:

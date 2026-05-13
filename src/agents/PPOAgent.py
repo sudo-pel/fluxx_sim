@@ -2,7 +2,7 @@ import torch
 from gymnasium import spaces
 import numpy as np
 
-from src.agents import agent_utils
+from src.agents.utils import agent_utils
 from src.agents.Agent import Agent
 from src.neural_networks.FeedForwardNN import FeedForwardNN
 from src.game.FluxxEnums import GameState
@@ -44,7 +44,7 @@ class PPOAgent(Agent):
         except StopIteration:
             return torch.device("cpu")
 
-    def _to_device_tensor(self, arr) -> torch.Tensor:
+    def to_device_tensor(self, arr) -> torch.Tensor:
         """
         Convert a numpy array (or tensor) observation to a float tensor on the
         policy network's device.
@@ -53,20 +53,14 @@ class PPOAgent(Agent):
             return arr.to(self.device, dtype=torch.float)
         return torch.from_numpy(np.asarray(arr)).float().to(self.device)
 
-    def forward(self, obs):
-        # Convert observation to tensor if given as a numpy array
-        if isinstance(obs, np.ndarray):
-            obs = self._to_device_tensor(obs)
-        return self.policy_network.forward(obs)
-
-    def act(self, state):
+    def act(self, state) -> tuple[int, torch.Tensor, dict]:
         obs = self.encode(state)
 
         observation = obs["observation"]
         action_mask = obs["action_mask"]
 
         # Move observation + mask onto the network's device for the forward pass.
-        obs_tensor = self._to_device_tensor(observation)
+        obs_tensor = self.to_device_tensor(observation)
         mask_tensor = torch.as_tensor(np.asarray(action_mask), dtype=torch.bool, device=self.device)
 
         with torch.no_grad():
@@ -78,13 +72,9 @@ class PPOAgent(Agent):
             action = distribution.sample()
             log_probs = distribution.log_prob(action)
 
-        # Return a python int for the action (env.step expects a plain int) and a
-        # detached CPU scalar tensor for log_probs so the training loop can stack
-        # them without device-mismatch issues. `obs` is kept as numpy (unchanged
-        # contract) — the training loop is responsible for batching it.
         return action.item(), log_probs.detach().cpu(), obs
 
-    def encode(self, state: GameState):
+    def encode(self, state: GameState) -> dict[str, np.ndarray]:
         if state.game_over:
             dummy_obs = np.zeros(self.observation_space["observation"].shape[0], dtype=np.int8)
             dummy_mask = np.zeros(self.action_space.n, dtype=np.int8)

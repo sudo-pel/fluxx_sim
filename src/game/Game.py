@@ -3,6 +3,7 @@ from collections import Counter
 
 import numpy as np
 
+from src.agents.utils import agent_utils
 from src.env.Logger import Logger
 from src.game.cards.Card import Card, Rule, Goal, Keeper, Action
 from src.game.FluxxEnums import CardType, GamePhase, GamePhaseType, GameState, CardZone, GamePhaseHistory

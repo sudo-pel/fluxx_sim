@@ -34,12 +34,9 @@ assert CARD_EMBED_DIM == 340
 def convert_card_name(card_name: str) -> str:
     return card_name.replace(" ", "_")
 
-def build_card_embedding(
-    card_name: str,
-    model
-) -> np.ndarray:
+def build_card_embedding(card_name: str, model) -> np.ndarray:
     """
-    Build the 3860-dim embedding for a single card. Slots that don't apply for the card's type are zeroed.
+    Build the 340-dim embedding for a single card. Slots that don't apply for the card's type are zeroed.
     """
     # Placed here so that the model is only loaded when this function is called
     def model_encode(text: str) -> np.ndarray:
@@ -82,33 +79,22 @@ def build_card_embedding(
     assert offset == CARD_EMBED_DIM
     return embedding
 
-
-def build_card_embedding_table(
-    card_list: list[str],
-) -> dict[str, np.ndarray]:
-    return {
-        name: build_card_embedding(
-            name,
-        )
-        for name in card_list
-    }
-
-_EMBEDDING_TABLE: dict[str, np.ndarray] | None = None
+EMBEDDING_TABLE: dict[str, np.ndarray] | None = None
 
 def generate_embedding_table(card_list: list[str]) -> None:
-    global _EMBEDDING_TABLE
+    global EMBEDDING_TABLE
     model = SentenceTransformer('transformer_models/nomic-embed', truncate_dim=64)
-    _EMBEDDING_TABLE = {card: build_card_embedding(card, model) for card in card_list}
+    EMBEDDING_TABLE = {card: build_card_embedding(card, model) for card in card_list}
 
 # For worker threads being passed the embedding table
 def set_embedding_table(table: dict[str, np.ndarray]) -> None:
-    global _EMBEDDING_TABLE
-    _EMBEDDING_TABLE = table
+    global EMBEDDING_TABLE
+    EMBEDDING_TABLE = table
 
 def get_embedding_table() -> dict[str, np.ndarray]:
-    if _EMBEDDING_TABLE is None:
+    if EMBEDDING_TABLE is None:
         raise RuntimeError(
             "Embedding table not loaded. Call load_embedding_table(path) "
             "or set_embedding_table(table) before constructing agents."
         )
-    return _EMBEDDING_TABLE
+    return EMBEDDING_TABLE

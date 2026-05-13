@@ -10,7 +10,6 @@ def populate_card_vector(card_list: list[str], to_populate: list[str]) -> npt.ND
 
     card_to_index = {card:i for i, card in enumerate(card_list)}
 
-    # TODO: vectorise this
     for card in to_populate:
         vector[card_to_index[card]] = 1
     return vector
@@ -36,37 +35,23 @@ def convert_decision_encoding(decision_encoding: list[DecisionEncodingType], dec
     return decision_context_vector
 
 decision_context_vectors: dict[GamePhaseType, list[DecisionEncodingType]] = {
-        GamePhaseType.DISCARD_CARD_FROM_HAND: [DecisionEncodingType.PLACE_DISCARD_PILE,
-                                               DecisionEncodingType.REMAIN_PLAYER_HAND],
+        GamePhaseType.DISCARD_CARD_FROM_HAND: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_PLAYER_HAND],
         GamePhaseType.PLAY_CARD_FOR_TURN: [DecisionEncodingType.PLAY, DecisionEncodingType.REMAIN_PLAYER_HAND],
-        GamePhaseType.DISCARD_KEEPER: [DecisionEncodingType.PLACE_DISCARD_PILE,
-                                       DecisionEncodingType.REMAIN_PLAYER_KEEPERS],
-        GamePhaseType.DISCARD_RULE_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE,
-                                             DecisionEncodingType.REMAIN_IN_PLAY],
+        GamePhaseType.DISCARD_KEEPER: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_PLAYER_KEEPERS],
+        GamePhaseType.DISCARD_RULE_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_IN_PLAY],
         GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE: [DecisionEncodingType.PLAY, DecisionEncodingType.PLACE_DISCARD_PILE],
-        GamePhaseType.ADD_CARD_IN_PLAY_TO_HAND: [DecisionEncodingType.PLACE_PLAYER_HAND,
-                                                 DecisionEncodingType.REMAIN_IN_PLAY],
-        GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND: [DecisionEncodingType.PLACE_PLAYER_HAND,
-                                                                DecisionEncodingType.REMAIN_OPPONENT_HAND],
-        GamePhaseType.PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE: [DecisionEncodingType.PLAY,
-                                                              DecisionEncodingType.REMAIN_DISCARD_PILE],
-        GamePhaseType.DISCARD_KEEPER_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE,
-                                               DecisionEncodingType.REMAIN_IN_PLAY],
-        GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT: [DecisionEncodingType.PLAY,
-                                                                             DecisionEncodingType.PLAY_FOR_OPPONENT],
-        GamePhaseType.SELECT_KEEPER_TO_STEAL: [DecisionEncodingType.PLACE_PLAYER_KEEPERS,
-                                               DecisionEncodingType.REMAIN_OPPONENT_KEEPERS],
-        GamePhaseType.SELECT_OPPONENT_KEEPER_FOR_EXCHANGE: [DecisionEncodingType.PLACE_PLAYER_KEEPERS,
-                                                            DecisionEncodingType.REMAIN_OPPONENT_KEEPERS],
-        GamePhaseType.SELECT_PLAYER_KEEPER_FOR_EXCHANGE: [DecisionEncodingType.PLACE_OPPONENT_KEEPERS,
-                                                          DecisionEncodingType.REMAIN_PLAYER_KEEPERS],
+        GamePhaseType.ADD_CARD_IN_PLAY_TO_HAND: [DecisionEncodingType.PLACE_PLAYER_HAND, DecisionEncodingType.REMAIN_IN_PLAY],
+        GamePhaseType.SHARE_CARDS_FROM_LATENT_SPACE_INTO_HAND: [DecisionEncodingType.PLACE_PLAYER_HAND, DecisionEncodingType.REMAIN_OPPONENT_HAND],
+        GamePhaseType.PLAY_ACTION_OR_RULE_FROM_DISCARD_PILE: [DecisionEncodingType.PLAY, DecisionEncodingType.REMAIN_DISCARD_PILE],
+        GamePhaseType.DISCARD_KEEPER_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_IN_PLAY],
+        GamePhaseType.PLAY_CARD_FROM_LATENT_SPACE_OTHERS_PLAY_FOR_OPPONENT: [DecisionEncodingType.PLAY, DecisionEncodingType.PLAY_FOR_OPPONENT],
+        GamePhaseType.SELECT_KEEPER_TO_STEAL: [DecisionEncodingType.PLACE_PLAYER_KEEPERS, DecisionEncodingType.REMAIN_OPPONENT_KEEPERS],
+        GamePhaseType.SELECT_OPPONENT_KEEPER_FOR_EXCHANGE: [DecisionEncodingType.PLACE_PLAYER_KEEPERS, DecisionEncodingType.REMAIN_OPPONENT_KEEPERS],
+        GamePhaseType.SELECT_PLAYER_KEEPER_FOR_EXCHANGE: [DecisionEncodingType.PLACE_OPPONENT_KEEPERS, DecisionEncodingType.REMAIN_PLAYER_KEEPERS],
         GamePhaseType.ACTIVATE_FREE_ACTION: [DecisionEncodingType.PLAY, DecisionEncodingType.REMAIN_IN_PLAY],
-        GamePhaseType.DISCARD_OWN_KEEPER_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE,
-                                                   DecisionEncodingType.REMAIN_IN_PLAY],
-        GamePhaseType.DISCARD_VARIABLE_CARDS_FROM_HAND: [DecisionEncodingType.PLACE_DISCARD_PILE,
-                                                         DecisionEncodingType.REMAIN_PLAYER_HAND],
-        GamePhaseType.DISCARD_GOAL_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE,
-                                             DecisionEncodingType.REMAIN_IN_PLAY],
+        GamePhaseType.DISCARD_OWN_KEEPER_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_IN_PLAY],
+        GamePhaseType.DISCARD_VARIABLE_CARDS_FROM_HAND: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_PLAYER_HAND],
+        GamePhaseType.DISCARD_GOAL_IN_PLAY: [DecisionEncodingType.PLACE_DISCARD_PILE, DecisionEncodingType.REMAIN_IN_PLAY],
         GamePhaseType.GAME_OVER: [],
         GamePhaseType.PLAY_GOAL_FROM_DISCARD_PILE: [DecisionEncodingType.PLAY, DecisionEncodingType.REMAIN_DISCARD_PILE],
         GamePhaseType.GIVE_KEEPER_TO_OPPONENT: [DecisionEncodingType.PLACE_OPPONENT_KEEPERS, DecisionEncodingType.REMAIN_PLAYER_KEEPERS],
@@ -82,16 +67,17 @@ def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):
 
     decisions_left = current_phase.decisions_left
 
-    decision_context_vector = convert_decision_encoding(decision_context_vectors[current_phase.type],
-                                                        decisions_left, current_phase.counter,
-                                                        current_phase.on_complete)
+    decision_context_vector = convert_decision_encoding(
+        decision_context_vectors[current_phase.type],
+        decisions_left, current_phase.counter,
+        current_phase.on_complete
+    )
 
     # Get all keepers in play
     keepers_in_play = game_state.keepers
     keeper_vectors = [populate_card_vector(game_config.card_list, keeper_list) for keeper_list in keepers_in_play]
     agent_keeper_vector = keeper_vectors[agent.player_number]
-    other_keeper_vectors = keeper_vectors[:agent.player_number] + keeper_vectors[
-        agent.player_number + 1:]
+    other_keeper_vectors = keeper_vectors[:agent.player_number] + keeper_vectors[agent.player_number + 1:]
 
     # Get cards in hand
     cards_in_hand = game_state.hands[agent.player_number]
@@ -113,7 +99,6 @@ def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):
     draw_pile_size = [len(game_state.draw_pile)]
 
     # Get opponent hand size
-    # TODO: how to encode for variable opponent count? Is this worth doing?
     opponent_hand_sizes = []
     for i in range(game_config.player_count):
         if i != agent.player_number:
@@ -122,11 +107,6 @@ def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):
     observation = np.concatenate(
         (decision_context_vector, cards_in_hand_vector, agent_keeper_vector, *other_keeper_vectors,
          goals_in_play_vector, rules_in_play_vector, discard_pile_vector, draw_pile_size, opponent_hand_sizes))
-
-    """
-    assert len(observation) == agent.observation_space["observation"].shape[0], \
-        f"Observation size mismatch: built {len(observation)}, expected {agent.observation_space['observation'].shape[0]}"
-    """
 
     # ----
     # ACTION MASK
@@ -137,7 +117,6 @@ def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):
 
     no_free_action_legal = False
 
-    # TODO: Mask *in* legal plays (cards in hand, keepers owned) and then return the concatenation of all
     if current_phase.type == GamePhaseType.PLAY_CARD_FOR_TURN:
         action_mask = cards_in_hand_vector
     elif current_phase.type == GamePhaseType.DISCARD_CARD_FROM_HAND:
@@ -209,3 +188,24 @@ def observe_hot_encoded(agent, game_state: GameState, game_config: GameConfig):
         "observation": observation,
         "action_mask": action_mask
     }
+
+def rule_options(card_name: str) -> dict:
+    return CARD_DATA[card_name].get("RulesOptions", {})
+
+def card_type(card_name: str) -> str:
+    return CARD_DATA[card_name]["card_type"]
+
+def is_play_rule(card_name: str) -> bool:
+    return card_type(card_name) == "RULE" and rule_options(card_name).get("play") is not None
+
+def is_draw_rule(card_name: str) -> bool:
+    return card_type(card_name) == "RULE" and rule_options(card_name).get("draw") is not None
+
+def is_hand_limit_rule(card_name: str) -> bool:
+    return card_type(card_name) == "RULE" and rule_options(card_name).get("hand_limit") is not None
+
+def is_keeper_limit_rule(card_name: str) -> bool:
+    return card_type(card_name) == "RULE" and rule_options(card_name).get("keeper_limit") is not None
+
+def is_limit_rule(card_name: str) -> bool:
+    return is_hand_limit_rule(card_name) or is_keeper_limit_rule(card_name)

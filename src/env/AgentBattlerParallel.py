@@ -6,9 +6,9 @@ from typing import Optional, Callable
 
 import numpy as np
 
-from src.agents import agent_utils
+from src.agents.utils import agent_utils
 from src.agents.Agent import Agent
-from src.agents.card_embeddings import set_embedding_table
+from src.agents.utils.card_embeddings import set_embedding_table
 from src.training.TrainingEnums import GameLogConfig
 from src.env.FluxxEnv import FluxxEnv
 from src.env.Logger import GameLogLogger

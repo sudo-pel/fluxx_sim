@@ -1,6 +1,6 @@
 from gymnasium import spaces
 
-from src.agents import agent_utils
+from src.agents.utils import agent_utils
 from src.agents.Agent import Agent
 import numpy as np
 
@@ -34,7 +34,7 @@ class RandomAgent(Agent):
         possible_actions = obs["action_mask"]
         return np.random.choice(np.flatnonzero(possible_actions)), [], obs
 
-    def encode(self, state: GameState):
+    def encode(self, state: GameState) -> dict[str, np.ndarray]:
         if state.game_over:
             dummy_obs = np.zeros(self.observation_space["observation"].shape[0], dtype=np.int8)
             dummy_mask = np.zeros(self.action_space.n, dtype=np.int8)

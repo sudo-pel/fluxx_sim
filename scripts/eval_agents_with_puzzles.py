@@ -14,7 +14,6 @@ from pathlib import Path
 
 import torch
 
-from src.agents.Agent import Agent
 from src.agents.DQNAgent import DQNAgent
 from src.agents.DQNAgentGeneralized import DQNAgentGeneralized
 from src.agents.HeuristicAgentMKI import HeuristicAgentMKI
@@ -22,7 +21,7 @@ from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgent import PPOAgent
 from src.agents.PPOAgentGeneralized import PPOAgentGeneralized
 from src.agents.RandomAgent import RandomAgent
-from src.agents.card_embeddings import generate_embedding_table, get_embedding_table
+from src.agents.utils.card_embeddings import generate_embedding_table, get_embedding_table
 from src.env.AgentBattlerParallel import AgentBattler
 from src.env.FluxxEnv import FluxxEnv
 from src.game.Game import Game

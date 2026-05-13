@@ -1,5 +1,6 @@
 from typing import Optional
 
+from src.agents.utils import agent_utils
 from src.game import game_messages, GameSchema
 from src.game.FluxxEnums import CardType, CardZone, ExtendedCardZone, AnyCardZone, GamePhase, GamePhaseType
 from dataclasses import dataclass
@@ -132,7 +133,7 @@ def select_card(game: GameSchema, user_number: int, select_from: list[AnyCardZon
 
     if CardZone.DISCARD_PILE in select_from:
         for i, card in enumerate(game.discard_pile):
-            if card.card_type.name not in exclude_types:
+            if agent_utils.card_type.name not in exclude_types:
                 card_selection.append(card.name)
                 card_location[card.name] = CardLocation(CardZone.DISCARD_PILE, i)
 
@@ -143,7 +144,7 @@ def select_card(game: GameSchema, user_number: int, select_from: list[AnyCardZon
 
     if CardZone.HAND in select_from:
         for i, card in enumerate(game.players[user_number].hand):
-            if card.card_type.name not in exclude_types:
+            if agent_utils.card_type.name not in exclude_types:
                 card_selection.append(card.name)
                 card_location[card.name] = CardLocation(CardZone.HAND, i, user_number)
 

@@ -17,7 +17,7 @@ from src.agents.RandomAgent import RandomAgent
 from src.env.AgentBattler import AgentBattler
 from src.env.MetricsTracker import MetricsTracker
 from src.game.FluxxEnums import GameConfig
-from src.training.TrainingEnums import BufferEntry
+from src.agents.utils.generalized_agent_utils import BufferEntry
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
