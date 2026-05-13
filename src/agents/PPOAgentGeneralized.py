@@ -6,7 +6,7 @@ from torch.distributions import Categorical
 from src.agents.Agent import Agent
 from src.agents.utils import generalized_agent_utils
 from src.agents.utils.generalized_agent_utils import BufferEntry
-from src.neural_networks.FluxxActorNetworkPPO import FluxxActorNetwork
+from src.neural_networks.FluxxActorNetwork import FluxxActorNetwork
 
 from src.agents.utils.agent_utils import decision_context_vectors
 from src.game.FluxxEnums import GameState

@@ -9,7 +9,7 @@ from src.agents.utils.agent_utils import (
     decision_context_vectors,
 )
 from src.game.FluxxEnums import GameConfig, GameState
-from src.neural_networks.FluxxActorNetworkDQN import FluxxActorNetworkDQN
+from src.neural_networks.FluxxActorNetwork import FluxxActorNetworkDQN
 from src.agents.utils.generalized_agent_utils import BufferEntry
 
 MAX_HAND_SIZE = 100

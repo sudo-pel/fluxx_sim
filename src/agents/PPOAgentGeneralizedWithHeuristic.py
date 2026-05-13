@@ -13,7 +13,7 @@ from src.agents.Agent import Agent
 from src.agents.HeuristicAgentMKII import GameplanSortingOptions
 from src.agents.utils.generalized_agent_utils import BufferEntry, Gameplan
 from src.agents.utils.card_embeddings import CARD_EMBED_DIM, get_embedding_table
-from src.neural_networks.FluxxActorNetworkPPO import FluxxActorNetwork
+from src.neural_networks.FluxxActorNetwork import FluxxActorNetwork
 
 from src.agents.utils.agent_utils import convert_decision_encoding, decision_context_vectors, populate_card_vector
 from src.game.FluxxEnums import GameState

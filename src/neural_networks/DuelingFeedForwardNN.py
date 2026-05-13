@@ -1,5 +1,3 @@
-# src/neural_networks/DuelingFeedForwardNN.py
-
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -33,7 +31,7 @@ class DuelingFeedForwardNN(nn.Module):
         a = self.advantage_head(a)  # (..., out_dim)
 
         if action_mask is not None:
-            # Accept numpy masks too, for symmetry with obs handling
+            # Accept numpy masks too
             if isinstance(action_mask, np.ndarray):
                 action_mask = torch.tensor(action_mask, dtype=torch.bool, device=a.device)
             legal = action_mask.to(dtype=a.dtype)
