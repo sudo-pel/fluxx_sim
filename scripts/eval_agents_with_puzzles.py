@@ -206,7 +206,7 @@ def parse_args():
         "-w",
         "--workers",
         type=str,
-        default=1,
+        default="1",
         help="Number of workers to use for running parallel games. Default is 1. Set to 'max' to use all available cores.",
     )
     return parser.parse_args()

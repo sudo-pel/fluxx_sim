@@ -81,10 +81,26 @@ def build_card_embedding(card_name: str, model) -> np.ndarray:
 
 EMBEDDING_TABLE: dict[str, np.ndarray] | None = None
 
+# ------------------
+# Embedding table generation is nondeterministic: for reproducibility, load the same one every time.
+# ------------------
+
+def embedding_table_path(card_list_name: str) -> str:
+    return f"models/embedding_table_{card_list_name}.npy"
+
 def generate_embedding_table(card_list: list[str]) -> None:
     global EMBEDDING_TABLE
     model = SentenceTransformer('transformer_models/nomic-embed', truncate_dim=64)
     EMBEDDING_TABLE = {card: build_card_embedding(card, model) for card in card_list}
+
+def generate_and_save_embedding_table(card_list, card_list_name: str):
+    generate_embedding_table(card_list)
+    table = get_embedding_table()
+    np.save(embedding_table_path(card_list_name), table)
+
+def load_embedding_table(card_list_name: str):
+    table = np.load(embedding_table_path(card_list_name), allow_pickle=True).item()
+    set_embedding_table(table)
 
 # For worker threads being passed the embedding table
 def set_embedding_table(table: dict[str, np.ndarray]) -> None:
