@@ -1,16 +1,6 @@
-# self-note: maybe worth adding something extra for Goals here
 from src.game.cards.card_data import CARD_DATA
 from src.game.FluxxEnums import CardType, Card
 
-"""
-List of possible rules
-draw x (int)
-play x (int or all-1)
-keeper_limit x (int)
-hand_limit x (int)
-special? (bool)
-    For Rule cards with complex text.
-"""
 class RulesOptions:
     def __init__(self, draw=None, play=None, keeper_limit=None, hand_limit=None, free_action=False):
         self.draw = draw

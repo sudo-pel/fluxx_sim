@@ -112,7 +112,9 @@ puzzle_b2 = GameState(
 """
 TESTEE IS PLAYER 1
 
-p0 plays "hand_limit_3". p1 must keep "the_sun", "dreams" and "day_dreams", a set of coherent Goals and Keepers.
+[[ THIS PUZZLE ONLY WORKS WITH A TURN LIMIT (-t 2) ]]
+
+p0 plays "hand_limit_2". p1 must keep "the_brain_no_tv" and "the_brain", a set of coherent Goals and Keepers.
 p1 must discard "5_keepers" using "goal_mill". Then, they must play the drawn "play_3" rule card and play the aforementioned winning gameplan.
 
 If they don't the battle handler will truncate the game state, resulting in a draw.
@@ -144,8 +146,10 @@ puzzle_c = GameState(
 """
 TESTEE IS PLAYER 1
 
-p0 plays "hand_limit_3". p1 must keep "sheepdog", "sheep" and "dog", a set of coherent Goals and Keepers.
-p1 must play "space_jackpot", drawing "play_3", "sunshine" and "fire". Then, they must play "play_4", "sheep", "dog" and "sheepdog" in order to win the game.
+[[ THIS PUZZLE ONLY WORKS WITH A TURN LIMIT (-t 2) ]]
+
+p0 plays "hand_limit_2". p1 must keep "sword_in_the_stone" and "excalibur", a set of coherent Goals and Keepers.
+p1 must discard "5_keepers" using "card_transfusion". Then, they must play the drawn "play_3" rule card and play the aforementioned winning gameplan.
 
 If they don't the battle handler will truncate the game state, resulting in a draw.
 """
@@ -164,33 +168,6 @@ puzzle_c2 = GameState(
     discard_pile=[],
     draw_pile=["key", "air", "fire", "play_3", "5_keepers"],
     rules=["card_transfusion"],
-    stack=[
-        GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, 0, decisions_left=1),
-        GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, 0, decisions_left=1),
-    ],
-    starting_player=0,
-    cards_drawn=[1, 0],
-)
-
-"""
-for testing goal/keeper prioritisation
-"""
-# PUZZLE D: p0 must play "the_sun" to win via "day dreams", or else the opponent will play "time" and win via "time_is_money".
-puzzle_d = GameState(
-    turn_count=0,
-    player_count=2,
-    hands=[
-        ["the_sun", "the_party", "the_brain", "chocolate"],
-        ["time_is_money"]
-    ],
-    keepers=[
-        ["dreams"],
-        ["money", "time"]
-    ],
-    goals=["day_dreams"],
-    discard_pile=[],
-    draw_pile=[],
-    rules=[],
     stack=[
         GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, 0, decisions_left=1),
         GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, 0, decisions_left=1),

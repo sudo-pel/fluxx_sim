@@ -14,8 +14,6 @@ if TYPE_CHECKING:
 
 
 def activate_use_what_you_take(game_state: 'GameSchema', user_number: int, rng: Random):
-    # TODO: may need multiplayer refactoring
-
     other_player_number = user_number ^ 1
     other_player = game_state.players[other_player_number]
 
@@ -51,7 +49,6 @@ def activate_trash_a_keeper(game_state: 'GameSchema', user_number: int, rng: Ran
 
 
 def activate_trade_hands(game_state: 'GameSchema', user_number: int, rng: Random):
-    # TODO: if multiplayer implemented, need player selection here
     user_player = game_state.players[user_number]
 
     temp = game_state.players[user_number ^ 1].hand
@@ -227,7 +224,6 @@ def activate_discard_and_draw(game_state: 'GameSchema', user_number: int, rng: R
         game_state.draw(user_player)
 
 def activate_everybody_gets_1(game_state: 'GameSchema', user_number: int, rng: Random):
-    # TODO: Will need to refactor this for multiplayer if project reaches that point
     latent_space = [game_state.get_card_from_draw_pile() for i in range((1+game_state.inflation()) * len(game_state.players))]
     latent_space = [l for l in latent_space if l is not None]
     if len(latent_space) == 0:
@@ -247,7 +243,6 @@ def activate_take_another_turn(game_state: 'GameSchema', user_number: int, rng: 
 
 
 def activate_rotate_hands(game_state: 'GameSchema', user_number: int, rng: Random):
-    # TODO: choice of rotation direction matters if multiple players are ever added
     rotation_direction = 1
     n = len(game_state.players)
 

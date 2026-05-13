@@ -454,7 +454,6 @@ class HeuristicAgentMKII(Agent):
             priorities[0].add("no_free_action")
 
         if len(priorities) == 0:
-            print_game_state(state)
             raise Exception("No cards to choose from")
 
         max_priority = max(priorities.keys())

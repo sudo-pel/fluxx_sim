@@ -3,10 +3,9 @@ from collections import Counter
 
 import numpy as np
 
-from src.agents.utils import agent_utils
 from src.env.Logger import Logger
 from src.game.cards.Card import Card, Rule, Goal, Keeper, Action
-from src.game.FluxxEnums import CardType, GamePhase, GamePhaseType, GameState, CardZone, GamePhaseHistory
+from src.game.FluxxEnums import CardType, GamePhase, GamePhaseType, GameState, CardZone
 
 from src.game.Player import Player
 from src.game import game_messages
@@ -23,7 +22,6 @@ class Game(GameSchema):
     def __init__(self, player_count: int, card_list: list[str], disable_game_messages: bool = False, force_game_state: Optional[GameState] = None, logger: Optional[Logger] = None, seed: Optional[np.random.SeedSequence] = None, step_limit: Optional[int] = 100000):
         GameSchema.__init__(self, player_count, card_list, disable_game_messages, force_game_state, logger, seed)
 
-    # there is a class for game state although it is not currently used.
     def get_game_state(self) -> GameState:
         return GameState(
             self.turn_count,
@@ -194,38 +192,6 @@ class Game(GameSchema):
             if index_of_card(phase.latent_space, card_name) == -1: return False, "Card to be played not in latent space"
 
         return True, None
-
-    def assert_card_conservation(self):
-        total = (
-                len(self.draw_pile)
-                + len(self.discard_pile)
-                + sum(len(p.hand) for p in self.players)
-                + sum(len(p.keepers) for p in self.players)
-                + len(self.goals)
-                + len(self.rules)
-                + sum(
-            len(phase.latent_space)
-            for phase in self.stack
-            if hasattr(phase, 'latent_space') and phase.latent_space is not None
-        )
-                + sum(
-            1 for phase in self.stack
-            if hasattr(phase, 'card') and phase.card is not None
-        )
-        )
-        """
-        assert total == len(self.deck), (
-            f"Card conservation violated: expected {len(self.deck)}, found {total}. "
-            f"Draw: {len(self.draw_pile)}, "
-            f"Discard: {len(self.discard_pile)}, "
-            f"Hands: {[len(p.hand) for p in self.players]}, "
-            f"Keepers: {[len(p.keepers) for p in self.players]}, "
-            f"Goals: {len(self.goals)}, "
-            f"Rules: {len(self.rules)}, "
-            f"Stack latent: {sum(len(ph.latent_space) for ph in self.stack if hasattr(ph, 'latent_space') and ph.latent_space is not None)}, "
-            f"Stack cards: {sum(1 for ph in self.stack if hasattr(ph, 'card') and ph.card is not None)}"
-        )
-        """
 
     # We note that the simulator will receive an integer and then decode it into something more complex for the game simulator to consume
     def step(self, card_name: str):
@@ -420,9 +386,6 @@ class Game(GameSchema):
         # ---
         # CORRECTNESS ASSERTION
         # ---
-        # After each step, the total number of cards in all zones should be constant
-        self.assert_card_conservation()
-
         next_phase = self.check_current_phase()
         if next_phase.type == GamePhaseType.PLAY_CARD_FOR_TURN:
             player = self.players[next_phase.acting_player]
@@ -687,10 +650,6 @@ class Game(GameSchema):
         cards_in_play.extend(self.rules)
         return [card.name for card in cards_in_play]
 
-    # -----------------------------------------------------------
-    # PRE REFACTOR CODE
-    # -----------------------------------------------------------
-
     def get_draw_rules(self, player_number):
         """Calculate, based on cards in play, how many cards should be drawn by a player."""
         player = self.players[player_number]
@@ -743,21 +702,6 @@ class Game(GameSchema):
 
         return play
 
-    def can_play_card(self, player_number: int, i: int) -> bool:
-        """
-        Check whether a player can play a given card in their hand.
-
-        Does not include input validation (checking whether 'i' is in range of hand array)
-        """
-        player = self.players[player_number]
-
-        if player.cards_played >= self.get_play_rules(player_number):
-            return False
-
-        card_to_play = player.hand[i]
-
-        return True
-
     def play_rule(self, player_number: int, card_played: Rule):
         player = self.players[player_number]
 
@@ -792,8 +736,6 @@ class Game(GameSchema):
 
             self.limit_check_player(i)
 
-        # TODO: Rule special effects
-
     def check_for_winners(self):
         """Check whether any players have won the game. If so, change 'winner' member variable"""
         if not self.goals:
@@ -805,7 +747,6 @@ class Game(GameSchema):
         winners = []
 
         for current_goal in self.goals:
-            # TODO: special goal cards (cards in hand, etc)
             if current_goal.name == "5_keepers":
                 keeper_counts = [len(p.keepers) for p in self.players]
                 for i, player in enumerate(self.players):
