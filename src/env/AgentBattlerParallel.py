@@ -15,7 +15,6 @@ from src.env.Logger import GameLogLogger
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
-
 def _run_game_batch(
     game_count: int,
     turn_limit: int,
@@ -58,7 +57,8 @@ def _run_game_batch(
 
         for agent in env.agent_iter():
 
-            if timestep >= step_limit:
+            if timestep >= step_limit or env.game.turn_count >= turn_limit:
+                env.game.logger.game_over(None, env.game.get_game_state())
                 break
             timestep += 1
 
@@ -80,9 +80,6 @@ def _run_game_batch(
                 env.step(action)
             except Exception:
                 error_occurred = True
-                break
-
-            if env.game.turn_count >= turn_limit:
                 break
 
         if error_occurred:
@@ -116,7 +113,7 @@ class AgentBattler:
         log_config: Optional[GameLogConfig] = None,
         step_limit: Optional[int] = None,
         n_workers: int = 1,
-        embedding_table: dict[str, np.ndarray] = None
+        embedding_table: dict[str, np.ndarray] = None,
     ):
         if log_games and log_config is None:
             raise ValueError("log_config must be specified if log_games is True")

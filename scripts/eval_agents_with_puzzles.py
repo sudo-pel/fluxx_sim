@@ -3,6 +3,7 @@ import os
 
 from src.agents.PPOAgentGeneralizedWithHeuristic import PPOAgentGeneralizedWithHeuristic
 from src.game.game_states import puzzle_a, puzzle_a2, puzzle_b, puzzle_b2, puzzle_c, puzzle_c2
+from src.training.TrainingEnums import GameLogConfig
 
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
@@ -30,7 +31,6 @@ from src.game.cards import card_lists as card_list_module
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 CARD_LISTS = {
-    "simple_fluxx_deck": card_list_module.simple_fluxx_deck,
     "base_deck": card_list_module.base_deck,
     "expanded_deck": card_list_module.expanded_deck,
 }
@@ -58,13 +58,11 @@ AGENT_REGISTRY = {
         "class": PPOAgentGeneralized,
         "network_attr": "policy_network",
         "state_dict": "final_experiments/ppo_general_2026-05-02_09-11-14/final/final_model_50006336.pt",
-        "strict": False,
     },
     "ppo_general_with_heuristic": {
         "class": PPOAgentGeneralizedWithHeuristic,
         "network_attr": "policy_network",
         "state_dict": "final_experiments/ppo_general_2026-05-02_09-11-14/final/final_model_50006336.pt",
-        "strict": False,
     },
     "dqn": {
         "class": DQNAgent,
@@ -140,7 +138,6 @@ class EnvFactory:
             Game(2, self.card_list, disable_game_messages=True, force_game_state=self.force_game_state), 2, render_mode="human"
         )
 
-
 class AgentFactory:
     def __init__(self, agent_entry, game_config):
         self.agent_entry = agent_entry
@@ -158,7 +155,7 @@ class AgentFactory:
             network = getattr(agent, self.agent_entry["network_attr"])
             network.load_state_dict(
                 torch.load(f"{PROJECT_ROOT}/{self.agent_entry['state_dict']}", map_location="cpu"),
-                strict=self.agent_entry.get("strict", True),
+                strict=False
             )
             network.eval()
 
@@ -170,20 +167,48 @@ def parse_args():
         description="Evaluate agents by pitting them against each other.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("games", type=int, help="Number of games to run")
-    parser.add_argument("-t", "--turn-limit", type=int, default=1000,
-                        help="Maximum number of turns per game")
-    parser.add_argument("-cls", "--card-lists", nargs="+", type=str,
-                        default=["base_deck"],
-                        choices=["base_deck", "expanded_deck", "simple_fluxx_deck"])
     parser.add_argument(
-        "-es",
-        "--evaluate-specific",
+        "games",
+        type=int,
+        help="Number of games to run"
+    )
+    parser.add_argument(
+        "-t",
+        "--turn-limit",
+        type=int,
+        default=1000,
+        help="Maximum number of turns per game."
+    )
+    parser.add_argument(
+        "-a",
+        "--agents",
         nargs="*",
         type=str,
         default=[],
         choices=AGENT_NAMES,
-        help="Agents to evaluate games against. When specified, only matchups containing agents in this list will be run.",
+        help="Agents to evaluate puzzles against. When specified, only matchups containing agents in this list will be run.",
+    )
+    parser.add_argument(
+        "-l",
+        "--log-name",
+        type=str,
+        default=None,
+        help="Name of log file to write to. If not specified, no log file will be written.",
+    )
+    parser.add_argument(
+        "-p",
+        "--puzzles",
+        nargs="*",
+        type=str,
+        default=[p for p in PUZZLES.keys()],
+        help="Puzzles to attempt. If not specifies, all puzzles will be attempted.",
+    )
+    parser.add_argument(
+        "-w",
+        "--workers",
+        type=str,
+        default=1,
+        help="Number of workers to use for running parallel games. Default is 1. Set to 'max' to use all available cores.",
     )
     return parser.parse_args()
 
@@ -192,17 +217,21 @@ if __name__ == "__main__":
     multiprocessing.set_start_method("spawn", force=True)
 
     args = parse_args()
-    results: dict[str, dict] = {}
+    results: dict[tuple[str, str], dict] = {}
 
-    try:
-        n_workers = max(1, len(os.sched_getaffinity(0)) - 1)
-    except AttributeError:
-        n_workers = max(1, os.cpu_count() - 1)
-    n_workers = min(args.games, n_workers)
+    if args.workers == "max":
+        try:
+            n_workers = max(1, len(os.sched_getaffinity(0)) - 1)
+        except AttributeError:
+            n_workers = max(1, os.cpu_count() - 1)
+        n_workers = min(args.games, n_workers)
+    elif args.workers.isdigit() and int(args.workers) > 0:
+        n_workers = int(args.workers)
+    else:
+        raise ValueError(f"Invalid value for --workers: {args.workers}. Must be 'max' or a positive integer.")
 
     print(f"RUNNING {args.games} GAMES WITH {n_workers} WORKERS")
-    puzzles = [p for p in PUZZLES.keys()]
-    for puzzle in puzzles:
+    for puzzle in args.puzzles:
         print(f"PLAYING PUZZLE: {puzzle}")
 
         puzzle_data = PUZZLES[puzzle]
@@ -223,19 +252,29 @@ if __name__ == "__main__":
 
         seen_matchups: set[tuple[str, str]] = set()
         for agent_name in AGENT_NAMES:
-            if args.evaluate_specific and agent_name not in args.evaluate_specific:
+            if args.agents and agent_name not in args.agents:
                 continue
+
+            if args.log_name is not None:
+                logging_config = GameLogConfig(
+                    f"{args.log_name}_{agent_name}_{puzzle}",
+                   [],
+                )
 
             if puzzle_data["testee_player_number"] == 0:
                 current_agent_factories=[
                     agent_factories[agent_name],
                     agent_factories["random"],
                 ]
+                if args.log_name is not None:
+                    logging_config.agent_names = [agent_name, "random"]
             else:
                 current_agent_factories=[
                     agent_factories["random"],
                     agent_factories[agent_name],
                 ]
+                if args.log_name is not None:
+                    logging_config.agent_names = ["random", agent_name]
 
             print(f"RUNNING {agent_name}")
             result = agent_battler.run_games(
@@ -244,8 +283,10 @@ if __name__ == "__main__":
                 n_workers=n_workers,
                 env_factory=env_factory,
                 agent_factories=current_agent_factories,
-                embedding_table=embedding_table
+                embedding_table=embedding_table,
+                log_config=logging_config if args.log_name is not None else None,
+                log_games=args.log_name is not None,
             )
-            results[agent_name] = result
+            results[(puzzle, agent_name)] = result
             print(f"RESULTS: {result}")
     print(results)

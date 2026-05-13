@@ -1,4 +1,14 @@
 import argparse
+import os
+
+from src.agents.PPOAgentGeneralizedWithHeuristic import PPOAgentGeneralizedWithHeuristic
+from src.training.TrainingEnums import GameLogConfig
+
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 from pathlib import Path
 
 import torch
@@ -10,31 +20,111 @@ from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgent import PPOAgent
 from src.agents.PPOAgentGeneralized import PPOAgentGeneralized
 from src.agents.RandomAgent import RandomAgent
-from src.agents.card_embeddings import generate_embedding_table
-from src.training.TrainingEnums import GameLogConfig
-from src.env.AgentBattler import AgentBattler
+from src.agents.card_embeddings import generate_embedding_table, get_embedding_table
+from src.env.AgentBattlerParallel import AgentBattler
 from src.env.FluxxEnv import FluxxEnv
 from src.game.Game import Game
-from src.game.cards import card_lists
+from src.game.cards import card_lists as card_list_module
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# Card lists
-card_lists = {
-    "simple_fluxx_deck": card_lists.simple_fluxx_deck,
-    "base_deck": card_lists.base_deck,
-    "expanded_deck": card_lists.expanded_deck
+CARD_LISTS = {
+    "base_deck": card_list_module.base_deck,
+    "expanded_deck": card_list_module.expanded_deck,
 }
 
-# (Temporary) filter out uninitialized agents
-agent_names = [
+AGENT_NAMES = [
     "ppo",
     "ppo_general",
+    "ppo_general_with_heuristic",
     "ppo_general_with_reward_shaping",
+    "ppo_general_with_reward_shaping_and_heuristic",
+    "dqn_general",
     "dqn",
     "random",
     "heuristic_agent_mki",
     "heuristic_agent_mkii",
 ]
+
+AGENT_REGISTRY = {
+    "ppo": {
+        "class": PPOAgent,
+        "network_attr": "policy_network",
+        "state_dict": "final_experiments/ppo_2026-04-28_17-11-02/final/final_model_50004751.pt",
+    },
+    "ppo_general": {
+        "class": PPOAgentGeneralized,
+        "network_attr": "policy_network",
+        "state_dict": "final_experiments/ppo_general_2026-05-02_09-11-14/final/final_model_50006336.pt",
+    },
+    "ppo_general_with_heuristic": {
+        "class": PPOAgentGeneralizedWithHeuristic,
+        "network_attr": "policy_network",
+        "state_dict": "final_experiments/ppo_general_2026-05-02_09-11-14/final/final_model_50006336.pt",
+    },
+    "dqn": {
+        "class": DQNAgent,
+        "network_attr": "q_network",
+        "state_dict": "final_experiments/dqn_2026-04-29_08-06-30/final/final_model_50000050.pt",
+    },
+    "dqn_general": {
+        "class": DQNAgentGeneralized,
+        "network_attr": "q_network",
+        "state_dict": "final_experiments/dqn_general_2026-05-02_21-23-41/models/model_20000002.pt",
+    },
+    "ppo_general_with_reward_shaping": {
+        "class": PPOAgentGeneralized,
+        "network_attr": "policy_network",
+        "state_dict": "final_experiments/ppo_general_with_reward_shaping_2026-05-07_20-52-04/final/final_model_50003737.pt",
+    },
+    "ppo_general_with_reward_shaping_and_heuristic": {
+        "class": PPOAgentGeneralizedWithHeuristic,
+        "network_attr": "policy_network",
+        "state_dict": "final_experiments/ppo_general_with_reward_shaping_2026-05-07_20-52-04/final/final_model_50003737.pt",
+    },
+    "random": {
+        "class": RandomAgent,
+    },
+    "heuristic_agent_mki": {
+        "class": HeuristicAgentMKI,
+    },
+    "heuristic_agent_mkii": {
+        "class": HeuristicAgentMKII,
+    },
+}
+
+# Pickleable method of transmitting environment/factory data to worker processes
+class EnvFactory:
+    def __init__(self, card_list):
+        self.card_list = card_list
+
+    def __call__(self):
+        return FluxxEnv(
+            Game(2, self.card_list, disable_game_messages=True), 2, render_mode="human"
+        )
+
+class AgentFactory:
+    def __init__(self, agent_entry, game_config):
+        self.agent_entry = agent_entry
+        self.game_config = game_config
+
+        if "state_dict" in agent_entry:
+            path = f"{PROJECT_ROOT}/{agent_entry['state_dict']}"
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"Checkpoint not found: {path}")
+
+    def __call__(self):
+        agent = self.agent_entry["class"](self.game_config, 0)
+
+        if "state_dict" in self.agent_entry:
+            network = getattr(agent, self.agent_entry["network_attr"])
+            network.load_state_dict(
+                torch.load(f"{PROJECT_ROOT}/{self.agent_entry['state_dict']}", map_location="cpu"),
+                strict=False
+            )
+            network.eval()
+
+        return agent
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -44,81 +134,114 @@ def parse_args():
     parser.add_argument(
         "games",
         type=int,
-        help="Number of games to run",
+        help="Number of games to run"
     )
     parser.add_argument(
-        "-t", "--turn-limit",
+        "-t",
+        "--turn-limit",
         type=int,
         default=1000,
-        help="Maximum number of turns per game"
+        help="Maximum number of turns per game."
     )
     parser.add_argument(
-        "-cls", "--card-lists",
+        "-cls",
+        "--card-lists",
         nargs="+",
         type=str,
         default=["base_deck"],
-        choices=["base_deck", "expanded_deck", "simple_fluxx_deck"]
+        choices=["base_deck", "expanded_deck"]
+    )
+    parser.add_argument(
+        "-a",
+        "--agents",
+        nargs="*",
+        type=str,
+        default=[],
+        choices=AGENT_NAMES,
+        help="Agents to evaluate games against. When specified, only matchups containing agents in this list will be run.",
+    )
+    parser.add_argument(
+        "-l",
+        "--log-name",
+        type=str,
+        default=None,
+        help="Name of log file to write to. If not specified, no log file will be written.",
+    )
+    parser.add_argument(
+        "-w",
+        "--workers",
+        type=str,
+        default=1,
+        help="Number of workers to use for running parallel games. Default is 1. Set to 'max' to use all available cores.",
     )
     return parser.parse_args()
 
-args = parse_args()
-results: dict[tuple[str, str], dict[str, float]] = {}
+if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.set_start_method("spawn", force=True)
 
-for card_list in args.card_lists:
-    print(f"PLAYING WITH: CARD LIST: {card_list}")
+    args = parse_args()
+    results: dict[tuple[str, str], dict] = {}
 
-    card_list = card_lists[card_list]
-    generate_embedding_table(card_list)
-    two_player_fluxx = Game(2, card_list, disable_game_messages=True, logger=None)
-    env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
-    agent_battler = AgentBattler(env)
+    if args.workers == "max":
+        try:
+            n_workers = max(1, len(os.sched_getaffinity(0)) - 1)
+        except AttributeError:
+            n_workers = max(1, os.cpu_count() - 1)
+        n_workers = min(args.games, n_workers)
+    elif args.workers.isdigit() and int(args.workers) > 0:
+        n_workers = int(args.workers)
+    else:
+        raise ValueError(f"Invalid value for --workers: {args.workers}. Must be 'max' or a positive integer.")
 
-    # Prepare the agents.
-    agents = {
-        "ppo": PPOAgent(env.game.game_config, 0),
-        "ppo_general": PPOAgentGeneralized(env.game.game_config, 0),
-        "dqn": DQNAgent(env.game.game_config, 0),
-        "dqn_general": DQNAgentGeneralized(env.game.game_config, 0),
-        "ppo_general_with_reward_shaping": PPOAgentGeneralized(env.game.game_config, 0),
-        "random": RandomAgent(env.game.game_config, 0),
-        "heuristic_agent_mki": HeuristicAgentMKI(env.game.game_config, 0),
-        "heuristic_agent_mkii": HeuristicAgentMKII(env.game.game_config, 0),
-    }
+    print(f"RUNNING {args.games} GAMES WITH {n_workers} WORKERS")
+    for card_list_name in args.card_lists:
+        print(f"PLAYING WITH: CARD LIST: {card_list_name}")
 
-    # Load the trained state dicts.
-    agents["ppo"].policy_network.load_state_dict(
-        torch.load(f"{PROJECT_ROOT}/final_experiments/ppo_2026-04-28_17-11-02/final/final_model_50004751.pt"))
-    agents["ppo"].policy_network.eval()
+        card_list = CARD_LISTS[card_list_name]
+        generate_embedding_table(card_list)
+        embedding_table = get_embedding_table()
 
-    # strict=False because card embeds was a part of state_dict when this code was run
-    agents["ppo_general"].policy_network.load_state_dict(
-        torch.load(f"{PROJECT_ROOT}/final_experiments/ppo_general_2026-05-02_09-11-14/final/final_model_50006336.pt"),
-        strict=False)
-    agents["ppo_general"].policy_network.eval()
+        game_config = Game(2, card_list, disable_game_messages=True).game_config
 
-    agents["dqn"].q_network.load_state_dict(
-        torch.load(f"{PROJECT_ROOT}/final_experiments/dqn_2026-04-29_08-06-30/final/final_model_50000050.pt"))
-    agents["dqn"].q_network.eval()
+        agent_battler = AgentBattler()
 
-    agents["dqn_general"].q_network.load_state_dict(
-        torch.load(f"{PROJECT_ROOT}/final_experiments/dqn_general_2026-05-02_21-23-41/models/model_20000002.pt"))
-    agents["dqn_general"].q_network.eval()
+        env_factory = EnvFactory(card_list)
+        agent_factories = {
+            name: AgentFactory(AGENT_REGISTRY[name], game_config)
+            for name in AGENT_NAMES
+        }
 
-    agents["ppo_general_with_reward_shaping"].policy_network.load_state_dict(
-        torch.load(f"{PROJECT_ROOT}/final_experiments/ppo_general_with_reward_shaping_2026-05-07_20-52-04/final/final_model_50003737.pt"))
-    agents["ppo_general_with_reward_shaping"].policy_network.eval()
+        seen_matchups: set[tuple[str, str]] = set()
 
-    seen_matchups: set[tuple[str, str]] = set()
-    for agent_name in agent_names:
-        for other_agent_name in agent_names:
-            if agent_name == other_agent_name or (other_agent_name, agent_name) in seen_matchups: continue
-            seen_matchups.add((agent_name, other_agent_name))
+        for agent_name in AGENT_NAMES:
+            for other_agent_name in AGENT_NAMES:
+                if agent_name == other_agent_name or (other_agent_name, agent_name) in seen_matchups:
+                    continue
+                if args.agents and (agent_name not in args.agents and other_agent_name not in args.agents):
+                    continue
+                seen_matchups.add((agent_name, other_agent_name))
 
-            agent = agents[agent_name]
-            other_agent = agents[other_agent_name]
-            print(f"RUNNING {agent_name} vs {other_agent_name}")
-            agent.player_number = 0
-            other_agent.player_number = 1
-            results[(agent_name, other_agent_name)] = agent_battler.run_games([agent, other_agent], args.games, args.turn_limit, log_games=False, step_limit=args.turn_limit * 10)
-            print(f"RESULTS: {results[(agent_name, other_agent_name)]}")
+                if args.log_name is not None:
+                    logging_config = GameLogConfig(
+                        f"{args.log_name}_{agent_name}_vs_{other_agent_name}_CARD_LIST={card_list_name}",
+                        [agent_name, other_agent_name],
+                    )
+
+                print(f"RUNNING {agent_name} vs {other_agent_name}")
+                result = agent_battler.run_games(
+                    game_count=args.games,
+                    turn_limit=args.turn_limit,
+                    n_workers=n_workers,
+                    env_factory=env_factory,
+                    agent_factories=[
+                        agent_factories[agent_name],
+                        agent_factories[other_agent_name],
+                    ],
+                    embedding_table=embedding_table,
+                    log_config=logging_config if args.log_name is not None else None,
+                    log_games=args.log_name is not None,
+                )
+                results[(agent_name, other_agent_name)] = result
+                print(f"RESULTS: {result}")
     print(results)

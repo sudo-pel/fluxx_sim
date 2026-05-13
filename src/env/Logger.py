@@ -1,8 +1,7 @@
-# TODO: make this an abstract class
-import os
 from pathlib import Path
+from typing import Optional
 
-from scripts import debug_utils
+from scripts.utils import debug_utils
 from src.game.FluxxEnums import GameState
 from abc import ABC, abstractmethod
 
@@ -17,6 +16,10 @@ class Logger(ABC):
 
     @abstractmethod
     def game_stepped(self, game_state: GameState):
+        raise NotImplementedError
+
+    @abstractmethod
+    def game_over(self, winner: Optional[int], game_state: GameState):
         raise NotImplementedError
 
 class GameLogLogger(Logger):
@@ -37,7 +40,7 @@ class GameLogLogger(Logger):
                 output.extend(debug_utils.printout_state(i, game_state))
             f.write("\n".join(output) + "\n")
 
-    def game_over(self, winner: int, game_state: GameState):
+    def game_over(self, winner: Optional[int], game_state: GameState):
         with open(self.filepath, "r") as f:
             current_file = f.read()
         with open(self.filepath, "w+") as f:

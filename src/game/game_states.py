@@ -162,8 +162,8 @@ puzzle_c2 = GameState(
     ],
     goals=[],
     discard_pile=[],
-    draw_pile=["key", "air", "fire", "sunshine", "play_4", "space_jackpot"],
-    rules=[],
+    draw_pile=["key", "air", "fire", "play_3", "5_keepers"],
+    rules=["card_transfusion"],
     stack=[
         GamePhase(GamePhaseType.POST_PLAY_CARD_FOR_TURN, 0, decisions_left=1),
         GamePhase(GamePhaseType.PLAY_CARD_FOR_TURN, 0, decisions_left=1),

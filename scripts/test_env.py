@@ -2,36 +2,25 @@ from pathlib import Path
 
 import torch
 
-from scripts.debug_utils import printout_state
-from src.agents.DQNAgent import DQNAgent
-from src.agents.HeuristicAgentMKI import HeuristicAgentMKI
-from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
-from src.agents.PPOAgent import PPOAgent
 from src.agents.PPOAgentGeneralized import PPOAgentGeneralized
 from src.agents.RandomAgent import RandomAgent
 from src.agents.card_embeddings import generate_embedding_table
 from src.env.FluxxEnv import FluxxEnv
 from src.game.cards import card_lists
 from src.game.Game import Game
-from src.game.game_states import puzzle_a, puzzle_b, puzzle_c, puzzle_d
+from src.game.game_states import puzzle_d
+
+"""
+
+A quickly modifiable script for running random tests.
+
+"""
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 def main(one_turn_win_simple_fluxx=None):
     two_player_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True, force_game_state=puzzle_d)
-    two_player_simple_fluxx = Game(2, card_lists.simple_fluxx_deck, disable_game_messages=True)
-
     env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
-
-    """
-    actor = PPOAgent(env.game.game_config, 0)  # same architecture
-    actor.policy_network.load_state_dict(torch.load("../from_remote/ppo_2026-04-23_12-33-19_final.pt"))
-    actor.policy_network.eval()
-
-    actor2 = DQNAgent(env.game.game_config, 1)
-    actor2.q_network.load_state_dict(torch.load("../from_remote/dqn-normalized_nn_2026-04-23_02-45-56_final.pt"))
-    actor2.q_network.eval()
-    """
 
     generate_embedding_table(card_lists.base_deck)
 

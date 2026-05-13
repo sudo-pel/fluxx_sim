@@ -1,16 +1,4 @@
 """
-Universal training script. Arguments:
-
-- training script to run
-- number of timesteps
-- (optional) run name
-- (optional) seed
-- (optional) CUDA device
-
-- TO ADD LATER (potentially)
-- card list
-
-
 Results:
 - run the training obviously
 - create a log in experiments. Structure:
@@ -18,17 +6,15 @@ Results:
 experiments/
 └── (SCRIPT-NAME)_(RUN-NAME)_(TIMESTAMP)/
     ├── logs/
-    │   └── (tensorboard logfile)
+    │   └── (tensorboard logfiles)
     ├── models/
-    │   └── (state_dicts of all models (including e.g optimizer) during training)
+    │   └── (state_dicts of models generated during training)
     ├── final/
     │   └── (stat_dicts of final models)
     └── run_metadata.json
 
 run_metadata.txt: contains all arguments, seed used (even if not specified), git commit hash
     Python version, PyTorch version, NumPy version, CUDA version, cuDNN version
-
-Resumability is limited: RNG states are not checkpointed. Could be extended to include this in the future
 """
 
 import argparse
