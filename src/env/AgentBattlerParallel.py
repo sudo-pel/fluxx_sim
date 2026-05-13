@@ -15,7 +15,7 @@ from src.env.Logger import GameLogLogger
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
-def _run_game_batch(
+def run_game_batch(
     game_count: int,
     turn_limit: int,
     step_limit: int,
@@ -68,7 +68,6 @@ def _run_game_batch(
                 action_mask = agent_utils.observe_hot_encoded(agents[agent], observation, agents[agent].game_config)["action_mask"]
                 action_mask_nonzeroes.append(np.count_nonzero(action_mask))
                 last_to_moves.append(agent)
-
 
             if termination or truncation or env.game.winner is not None:
                 action = None
@@ -153,7 +152,7 @@ class AgentBattler:
         with ProcessPoolExecutor(max_workers=n_workers) as pool:
             futures = [
                 pool.submit(
-                    _run_game_batch,
+                    run_game_batch,
                     game_count=count,
                     turn_limit=turn_limit,
                     step_limit=step_limit,
