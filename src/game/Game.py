@@ -489,7 +489,7 @@ class Game(GameSchema):
                 self.stack.append(GamePhase(GamePhaseType.DISCARD_GOAL_IN_PLAY, player_number, decisions_left=1))
             else:
                 self.goals.append(goal)
-        if self.rule_in_play("double_agenda"):
+        elif self.rule_in_play("double_agenda"):
             if len(self.goals) == 2:
                 self.stack.append(GamePhase(GamePhaseType.DEFERRED_PLAY_GOAL, player_number, decisions_left=1, card=goal))
                 self.stack.append(GamePhase(GamePhaseType.DISCARD_GOAL_IN_PLAY, player_number, decisions_left=1))
