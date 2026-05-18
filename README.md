@@ -2,6 +2,10 @@
 
 ---
 
+### Important
+
+This repository is associated with the dissertation of a university student ("Fluxx in Reinforcement Learning"). This README is currently written with examiners in mind, who have access to the associated report. Eventually, the report will likely be made public - when that happens, this README will be updated with further details.
+
 ### Setup
 
 1. Install PyTorch for your CUDA version: https://pytorch.org/get-started/locally/ (rely on pip at your own peril)
@@ -20,3 +24,10 @@ To get started with scripts, call one of the following:
 - `eval_agents.py -h`
 - `eval_agents_with_puzzles.py -h`
 - `train.py -h`
+
+### Extra notes
+
+- Clone the git repo (`git clone https://github.com/sudo-pel/fluxx_sim`) to access the final experiment results, which will allow you to run the `eval_agents` scripts without training your own models
+  - The experiments files are large and are stored using `git-lfs`. Ensure `git-lfs` is installed when cloning.
+- Call `tensorboard --logdir=[DIRNAME]` to look at run results
+  - `DIRNAME` likely `experiments` or `final_experiments`
