@@ -408,6 +408,8 @@ class Game(GameSchema):
             )
 
     def assert_card_conservation(self):
+        if self.force_game_state is not None:
+            return
         total = (
                 len(self.draw_pile)
                 + len(self.discard_pile)

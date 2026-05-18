@@ -5,10 +5,11 @@ import torch
 from src.agents.PPOAgentGeneralised import PPOAgentGeneralized
 from src.agents.PPOAgentGeneralizedWithHeuristic import PPOAgentGeneralizedWithHeuristic
 from src.agents.RandomAgent import RandomAgent
-from src.agents.utils.card_embeddings import generate_embedding_table
+from src.agents.utils.card_embeddings import generate_embedding_table, load_embedding_table
 from src.env.FluxxEnv import FluxxEnv
 from src.game.cards import card_lists
 from src.game.Game import Game
+from src.game.game_states import puzzle_a2
 
 """
 
@@ -19,10 +20,10 @@ A quickly modifiable script for running random tests.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 def main():
-    two_player_fluxx = Game(2, card_lists.base_deck, disable_game_messages=True, force_game_state=puzzle_d)
+    two_player_fluxx = Game(2, card_lists.expanded_deck, disable_game_messages=True, force_game_state=puzzle_a2)
     env = FluxxEnv(two_player_fluxx, 2, render_mode="human")
 
-    generate_embedding_table(card_lists.base_deck)
+    load_embedding_table("expanded_deck")
 
     agents = {
         "player_0": RandomAgent(env.game.game_config, 0),
