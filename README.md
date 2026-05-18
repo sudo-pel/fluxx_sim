@@ -27,7 +27,7 @@ To get started with scripts, call one of the following:
 
 ### Extra notes
 
-- Clone the git repo (`git clone https://github.com/sudo-pel/fluxx_sim`) to access the final experiment results, which will allow you to run the `eval_agents` scripts without training your own models
+- The experiment results were too large to store in the zip. Clone the git repo (`git clone https://github.com/sudo-pel/fluxx_sim`) to access the final experiment results, which will allow you to run the `eval_agents` scripts without training your own models.
   - The experiments files are large and are stored using `git-lfs`. Ensure `git-lfs` is installed when cloning.
-- Call `tensorboard --logdir=[DIRNAME]` to look at run results
-  - `DIRNAME` likely `experiments` or `final_experiments`
+- Call `tensorboard --logdir=[DIRNAME]` to look at run results.
+  - `DIRNAME` likely `experiments` or `final_experiments`.
