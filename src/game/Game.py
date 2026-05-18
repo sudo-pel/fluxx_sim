@@ -386,6 +386,8 @@ class Game(GameSchema):
         # ---
         # CORRECTNESS ASSERTION
         # ---
+        self.assert_card_conservation()
+
         next_phase = self.check_current_phase()
         if next_phase.type == GamePhaseType.PLAY_CARD_FOR_TURN:
             player = self.players[next_phase.acting_player]
@@ -404,6 +406,36 @@ class Game(GameSchema):
                 f"rules: {self.get_rules_in_play_by_name()}, "
                 f"free_actions_played: {self.played_free_actions}"
             )
+
+    def assert_card_conservation(self):
+        total = (
+                len(self.draw_pile)
+                + len(self.discard_pile)
+                + sum(len(p.hand) for p in self.players)
+                + sum(len(p.keepers) for p in self.players)
+                + len(self.goals)
+                + len(self.rules)
+                + sum(
+                    len(phase.latent_space)
+                    for phase in self.stack
+                    if hasattr(phase, 'latent_space') and phase.latent_space is not None
+                )
+                + sum(
+                    1 for phase in self.stack
+                    if hasattr(phase, 'card') and phase.card is not None
+                )
+        )
+        assert total == len(self.deck), (
+            f"Card conservation violated: expected {len(self.deck)}, found {total}. "
+            f"Draw: {len(self.draw_pile)}, "
+            f"Discard: {len(self.discard_pile)}, "
+            f"Hands: {[len(p.hand) for p in self.players]}, "
+            f"Keepers: {[len(p.keepers) for p in self.players]}, "
+            f"Goals: {len(self.goals)}, "
+            f"Rules: {len(self.rules)}, "
+            f"Stack latent: {sum(len(phase.latent_space) for phase in self.stack if hasattr(phase, 'latent_space') and phase.latent_space is not None)}, "
+            f"Stack cards: {sum(1 for phase in self.stack if hasattr(phase, 'card') and phase.card is not None)}"
+        )
 
     def handle_turn_over(self):
         """

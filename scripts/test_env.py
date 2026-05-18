@@ -2,7 +2,7 @@ from pathlib import Path
 
 import torch
 
-from src.agents.PPOAgentGeneralized import PPOAgentGeneralized
+from src.agents.PPOAgentGeneralised import PPOAgentGeneralized
 from src.agents.PPOAgentGeneralizedWithHeuristic import PPOAgentGeneralizedWithHeuristic
 from src.agents.RandomAgent import RandomAgent
 from src.agents.utils.card_embeddings import generate_embedding_table

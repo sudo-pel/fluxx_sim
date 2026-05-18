@@ -13,7 +13,7 @@ from src.agents.utils import generalized_agent_utils
 from src.neural_networks.FluxxActorNetwork import FluxxStateEncoder
 from src.training.TrainingEnums import LearningCheckpoint
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
-from src.agents.PPOAgentGeneralized import PPOAgentGeneralized
+from src.agents.PPOAgentGeneralised import PPOAgentGeneralized
 from src.agents.RandomAgent import RandomAgent
 from src.env.AgentBattler import AgentBattler
 from src.env.MetricsTracker import MetricsTracker

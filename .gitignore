@@ -11,7 +11,6 @@ __pychache__/
 # misc
 experiments/
 from_remote/
-final_experiments/
 transformer_models/
 game_logs/
 

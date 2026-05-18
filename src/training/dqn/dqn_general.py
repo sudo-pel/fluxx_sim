@@ -10,7 +10,7 @@ from numpy.random import SeedSequence
 from torch.optim import Adam
 
 from src.agents.Agent import Agent
-from src.agents.DQNAgentGeneralized import DQNAgentGeneralized
+from src.agents.DQNAgentGeneralised import DQNAgentGeneralized
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.RandomAgent import RandomAgent
 from src.agents.utils import generalized_agent_utils

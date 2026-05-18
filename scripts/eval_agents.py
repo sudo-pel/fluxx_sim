@@ -15,11 +15,11 @@ from pathlib import Path
 import torch
 
 from src.agents.DQNAgent import DQNAgent
-from src.agents.DQNAgentGeneralized import DQNAgentGeneralized
+from src.agents.DQNAgentGeneralised import DQNAgentGeneralized
 from src.agents.HeuristicAgentMKI import HeuristicAgentMKI
 from src.agents.HeuristicAgentMKII import HeuristicAgentMKII
 from src.agents.PPOAgent import PPOAgent
-from src.agents.PPOAgentGeneralized import PPOAgentGeneralized
+from src.agents.PPOAgentGeneralised import PPOAgentGeneralized
 from src.agents.RandomAgent import RandomAgent
 from src.env.AgentBattlerParallel import AgentBattler
 from src.env.FluxxEnv import FluxxEnv
